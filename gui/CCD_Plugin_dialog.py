@@ -23,6 +23,8 @@ import os
 
 from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
+from qgis.PyQt.QtCore import QUrl, pyqtSignal
+from qgis.PyQt.QtWebKit import QWebSettings
 
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
 plugin_folder = os.path.dirname(os.path.dirname(__file__))
@@ -30,6 +32,8 @@ FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, 'ui', 'CCD_Plugin_dia
 
 
 class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
+    closingPlugin = pyqtSignal()
+
     def __init__(self, parent=None):
         """Constructor."""
         super(CCD_PluginDialog, self).__init__(parent)
@@ -39,3 +43,19 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
         # http://qt-project.org/doc/qt-4.8/designer-using-a-ui-file.html
         # #widgets-and-dialogs-with-auto-connect
         self.setupUi(self)
+
+        # plot web view
+        plot_view_settings = self.plot_webview.settings()
+        plot_view_settings.setAttribute(QWebSettings.WebGLEnabled, True)
+        plot_view_settings.setAttribute(QWebSettings.DeveloperExtrasEnabled, True)
+        plot_view_settings.setAttribute(QWebSettings.Accelerated2dCanvasEnabled, True)
+
+        self.plot_webview.load(QUrl.fromLocalFile("/home/xavier/Projects/SMBYC/Qgis_Plugins/CCD-Plugin/lcmap-pyccd/test.html"))
+
+    def setup_gui(self):
+        pass
+
+    def closeEvent(self, event):
+        # close
+        self.closingPlugin.emit()
+        event.accept()

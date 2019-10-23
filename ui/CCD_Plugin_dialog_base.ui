@@ -290,29 +290,13 @@
  <connections>
   <connection>
    <sender>button_box</sender>
-   <signal>accepted()</signal>
-   <receiver>CCD_PluginDialogBase</receiver>
-   <slot>accept()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>6</x>
-     <y>646</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>20</x>
-     <y>20</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>button_box</sender>
    <signal>rejected()</signal>
    <receiver>CCD_PluginDialogBase</receiver>
-   <slot>reject()</slot>
+   <slot>close()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>6</x>
-     <y>646</y>
+     <x>9</x>
+     <y>698</y>
     </hint>
     <hint type="destinationlabel">
      <x>20</x>
