@@ -1,5 +1,5 @@
 <RCC>
     <qresource prefix="/plugins/CCD_Plugin" >
-        <file>icon.png</file>
+        <file>icons/ccd_plugin.svg</file>
     </qresource>
 </RCC>

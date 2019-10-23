@@ -25,8 +25,8 @@ from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
 
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
-FORM_CLASS, _ = uic.loadUiType(os.path.join(
-    os.path.dirname(__file__), 'CCD_Plugin_dialog_base.ui'))
+plugin_folder = os.path.dirname(os.path.dirname(__file__))
+FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, 'ui', 'CCD_Plugin_dialog_base.ui'))
 
 
 class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):

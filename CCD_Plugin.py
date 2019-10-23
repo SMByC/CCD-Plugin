@@ -26,7 +26,7 @@ from qgis.PyQt.QtWidgets import QAction
 # Initialize Qt resources from file resources.py
 from .resources import *
 # Import the code for the dialog
-from .CCD_Plugin_dialog import CCD_PluginDialog
+from CCD_Plugin.gui.CCD_Plugin_dialog import CCD_PluginDialog
 import os.path
 
 
@@ -158,7 +158,7 @@ class CCD_Plugin:
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
 
-        icon_path = ':/plugins/CCD_Plugin/icon.png'
+        icon_path = ':/plugins/CCD_Plugin/icons/ccd_plugin.svg'
         self.add_action(
             icon_path,
             text=self.tr(u'Continuous Change Detection Plugin'),

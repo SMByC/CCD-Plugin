@@ -36,7 +36,7 @@ LOCALES =
 # translation
 SOURCES = \
     __init__.py \
-    thrase.py
+    CCD_Plugin.py
 
 PLUGINNAME = CCD_Plugin
 
