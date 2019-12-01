@@ -26,6 +26,9 @@ from qgis.PyQt import QtWidgets
 from qgis.PyQt.QtCore import QUrl, pyqtSignal
 from qgis.PyQt.QtWebKit import QWebSettings
 
+from CCD_Plugin.core.ccd_process import compute_ccd
+from CCD_Plugin.core.plot import generate_plot
+
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
 plugin_folder = os.path.dirname(os.path.dirname(__file__))
 FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, 'ui', 'CCD_Plugin_dialog_base.ui'))
@@ -50,7 +53,8 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
         plot_view_settings.setAttribute(QWebSettings.DeveloperExtrasEnabled, True)
         plot_view_settings.setAttribute(QWebSettings.Accelerated2dCanvasEnabled, True)
 
-        self.plot_webview.load(QUrl.fromLocalFile("/home/xavier/Projects/SMBYC/Qgis_Plugins/CCD-Plugin/lcmap-pyccd/test.html"))
+        #self.plot_webview.load(QUrl.fromLocalFile("/home/xavier/Projects/SMBYC/Qgis_Plugins/CCD-Plugin/lcmap-pyccd/test.html"))
+        self.new_plot()
 
     def setup_gui(self):
         pass
@@ -59,3 +63,17 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
         # close
         self.closingPlugin.emit()
         event.accept()
+
+    def new_plot(self):
+        from CCD_Plugin.CCD_Plugin import CCD_Plugin
+
+        # Run everything
+        coords = (-74.163, 2.5182)
+        year_range = (2000, 2020)
+        doy_range = (1, 365)
+
+        ccd_results, dates, band_data = compute_ccd(coords, year_range, doy_range)
+
+        html_file = generate_plot(ccd_results, dates, band_data, CCD_Plugin.tmp_dir)
+
+        self.plot_webview.load(QUrl.fromLocalFile(html_file))
