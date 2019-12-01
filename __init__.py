@@ -19,6 +19,18 @@
  ***************************************************************************/
  This script initializes the plugin, making it known to QGIS.
 """
+import os
+import platform
+import site
+
+if platform.system() == "Windows":
+    extlib_path = 'extlibs_windows'
+if platform.system() == "Darwin":
+    extlib_path = 'extlibs_darwin'
+if platform.system() == "Linux":
+    extlib_path = 'extlibs_linux'
+
+site.addsitedir(os.path.abspath(os.path.join(os.path.dirname(__file__), extlib_path)))
 
 
 # noinspection PyPep8Naming
