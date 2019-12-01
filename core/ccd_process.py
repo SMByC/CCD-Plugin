@@ -18,8 +18,7 @@
  *                                                                         *
  ***************************************************************************/
 """
-import os
-import sys
+import numpy as np
 from datetime import datetime
 
 import ccd
@@ -74,10 +73,10 @@ def compute_ccd(coords, year_range=(2000, 2020), doy_range=(1, 365)):
         mask([dp[11] for dp in data_point], nan_mask)
 
     # convert the dates from miliseconds unix time to ordinal
-    dates = [datetime.fromtimestamp(int(str(int(d))[:-3])).toordinal() for d in dates]
+    dates = np.array([datetime.fromtimestamp(int(str(int(d))[:-3])).toordinal() for d in dates])
 
     results = ccd.detect(dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas)
 
-    band_data = swir1s
+    band_data = np.array(swir1s)
 
     return results, dates, band_data
