@@ -32,9 +32,6 @@ from .resources import *
 from CCD_Plugin.gui.CCD_Plugin_dialog import CCD_PluginDialog
 import os.path
 
-from CCD_Plugin import ee_auth
-ee_auth.init()
-
 
 class CCD_Plugin:
     """QGIS Plugin Implementation."""

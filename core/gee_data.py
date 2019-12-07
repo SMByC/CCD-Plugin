@@ -23,7 +23,6 @@ with the collaboration of Paulo Arevalo Orduz <parevalo@bu.edu>
 """
 
 import ee
-ee.Initialize()
 
 
 # Filter collection by point and date

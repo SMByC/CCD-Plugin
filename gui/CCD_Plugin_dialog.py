@@ -47,6 +47,10 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
         # #widgets-and-dialogs-with-auto-connect
         self.setupUi(self)
 
+        # init Google Earth Engine
+        from CCD_Plugin import ee_auth
+        ee_auth.init()
+
         # plot web view
         plot_view_settings = self.plot_webview.settings()
         plot_view_settings.setAttribute(QWebSettings.WebGLEnabled, True)
