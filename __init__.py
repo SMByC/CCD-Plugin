@@ -22,6 +22,7 @@
 import os
 import platform
 import site
+import logging
 
 if platform.system() == "Windows":
     extlib_path = 'extlibs_windows'
@@ -31,6 +32,10 @@ if platform.system() == "Linux":
     extlib_path = 'extlibs_linux'
 
 site.addsitedir(os.path.abspath(os.path.join(os.path.dirname(__file__), extlib_path)))
+
+# fix the warnings/errors messages from 'file_cache is unavailable when using oauth2client'
+# https://github.com/googleapis/google-api-python-client/issues/299
+logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 
 
 # noinspection PyPep8Naming
