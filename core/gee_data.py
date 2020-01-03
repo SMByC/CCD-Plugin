@@ -28,9 +28,9 @@ import ee
 # Filter collection by point and date
 def collection_filtering(point, collection_name, year_range, doy_range):
     collection = ee.ImageCollection(collection_name)\
-    .filterBounds(point)\
-    .filter(ee.Filter.calendarRange(year_range[0], year_range[1], 'year'))\
-    .filter(ee.Filter.dayOfYear(doy_range[0],doy_range[1]))
+        .filterBounds(point)\
+        .filter(ee.Filter.calendarRange(year_range[0], year_range[1], 'year'))\
+        .filter(ee.Filter.dayOfYear(doy_range[0], doy_range[1]))
     return collection
 
 
@@ -38,16 +38,14 @@ def collection_filtering(point, collection_name, year_range, doy_range):
 # avoid confusing with internal Python operators
 def cloud_mask_l4_7_C1(img):
     pqa = ee.Image(img).select(['pixel_qa'])
-    mask = (pqa.eq(66)).Or(pqa.eq(130))\
-    .Or(pqa.eq(68)).Or(pqa.eq(132))
+    mask = (pqa.eq(66)).Or(pqa.eq(130)).Or(pqa.eq(68)).Or(pqa.eq(132))
     return ee.Image(img).updateMask(mask)
 
 
 # Cloud masking for C1, L8
 def cloud_mask_l8_C1(img):
     pqa = ee.Image(img).select(['pixel_qa'])
-    mask = (pqa.eq(322)).Or(pqa.eq(386)).Or(pqa.eq(324))\
-    .Or(pqa.eq(388)).Or(pqa.eq(836)).Or(pqa.eq(900))
+    mask = (pqa.eq(322)).Or(pqa.eq(386)).Or(pqa.eq(324)).Or(pqa.eq(388)).Or(pqa.eq(836)).Or(pqa.eq(900))
     return ee.Image(img).updateMask(mask)
 
 
@@ -68,20 +66,16 @@ def stack_renamer_l8_C1(img):
 # filter and merge collections
 def get_full_collection(coords, year_range, doy_range):
     point = ee.Geometry.Point(coords)
-    l8_renamed = collection_filtering(point, 'LANDSAT/LC08/C01/T1_SR', year_range, doy_range)\
-        .map(stack_renamer_l8_C1)
+    l8_renamed = collection_filtering(point, 'LANDSAT/LC08/C01/T1_SR', year_range, doy_range).map(stack_renamer_l8_C1)
     l8_filtered1 = l8_renamed.map(cloud_mask_l8_C1)
 
-    l7_renamed = collection_filtering(point, 'LANDSAT/LE07/C01/T1_SR', year_range, doy_range)\
-        .map(stack_renamer_l4_7_C1);
+    l7_renamed = collection_filtering(point, 'LANDSAT/LE07/C01/T1_SR', year_range, doy_range).map(stack_renamer_l4_7_C1)
     l7_filtered1 = l7_renamed.map(cloud_mask_l4_7_C1)
 
-    l5_renamed = collection_filtering(point, 'LANDSAT/LT05/C01/T1_SR', year_range, doy_range)\
-        .map(stack_renamer_l4_7_C1)
+    l5_renamed = collection_filtering(point, 'LANDSAT/LT05/C01/T1_SR', year_range, doy_range).map(stack_renamer_l4_7_C1)
     l5_filtered1 = l5_renamed.map(cloud_mask_l4_7_C1)
 
-    all_scenes = ee.ImageCollection((l8_filtered1.merge(l7_filtered1))\
-                .merge(l5_filtered1)).sort('system:time_start')
+    all_scenes = ee.ImageCollection((l8_filtered1.merge(l7_filtered1)).merge(l5_filtered1)).sort('system:time_start')
     
     # Return merged image collection
     return all_scenes
