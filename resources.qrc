@@ -1,5 +1,7 @@
 <RCC>
     <qresource prefix="/plugins/CCD_Plugin" >
         <file>icons/ccd_plugin.svg</file>
+        <file>icons/generate.svg</file>
+        <file>icons/select_on_canvas.svg</file>
     </qresource>
 </RCC>
