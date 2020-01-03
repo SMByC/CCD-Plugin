@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1144</width>
-    <height>702</height>
+    <width>1182</width>
+    <height>667</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -76,6 +76,13 @@
            <property name="text">
             <string>Select on canvas</string>
            </property>
+           <property name="icon">
+            <iconset>
+             <normaloff>:/plugins/CCD_Plugin/icons/select_on_canvas.svg</normaloff>:/plugins/CCD_Plugin/icons/select_on_canvas.svg</iconset>
+           </property>
+           <property name="toolButtonStyle">
+            <enum>Qt::ToolButtonTextBesideIcon</enum>
+           </property>
           </widget>
          </item>
          <item row="1" column="0">
@@ -131,15 +138,29 @@
           <number>3</number>
          </property>
          <item row="1" column="0">
-          <widget class="QComboBox" name="start_year"/>
+          <widget class="QSpinBox" name="start_year">
+           <property name="minimum">
+            <number>2000</number>
+           </property>
+           <property name="maximum">
+            <number>2100</number>
+           </property>
+          </widget>
          </item>
          <item row="1" column="1">
-          <widget class="QComboBox" name="end_year"/>
+          <widget class="QSpinBox" name="end_year">
+           <property name="minimum">
+            <number>2000</number>
+           </property>
+           <property name="maximum">
+            <number>2100</number>
+           </property>
+          </widget>
          </item>
-         <item row="0" column="0" colspan="2">
+         <item row="0" column="0" colspan="4">
           <widget class="QLabel" name="label">
            <property name="text">
-            <string>Date range</string>
+            <string>Year Range</string>
            </property>
            <property name="alignment">
             <set>Qt::AlignCenter</set>
@@ -151,6 +172,67 @@
       </item>
       <item>
        <widget class="Line" name="line_2">
+        <property name="orientation">
+         <enum>Qt::Vertical</enum>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QWidget" name="widget_6" native="true">
+        <layout class="QGridLayout" name="gridLayout_3">
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <property name="spacing">
+          <number>3</number>
+         </property>
+         <item row="2" column="1">
+          <widget class="QSpinBox" name="end_doy">
+           <property name="minimum">
+            <number>2</number>
+           </property>
+           <property name="maximum">
+            <number>365</number>
+           </property>
+           <property name="value">
+            <number>365</number>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QSpinBox" name="start_doy">
+           <property name="minimum">
+            <number>1</number>
+           </property>
+           <property name="maximum">
+            <number>364</number>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0" colspan="2">
+          <widget class="QLabel" name="label_5">
+           <property name="text">
+            <string>Days of Year</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="Line" name="line_5">
         <property name="orientation">
          <enum>Qt::Vertical</enum>
         </property>
@@ -185,7 +267,43 @@
           </widget>
          </item>
          <item>
-          <widget class="QComboBox" name="band"/>
+          <widget class="QComboBox" name="band">
+           <item>
+            <property name="text">
+             <string>BLUE</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>GREEN</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>RED</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>NIR</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>SWIR1</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>SWIR2</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>THERMAL</string>
+            </property>
+           </item>
+          </widget>
          </item>
         </layout>
        </widget>
@@ -223,9 +341,16 @@
           </widget>
          </item>
          <item>
-          <widget class="QToolButton" name="generate">
+          <widget class="QToolButton" name="generate_button">
            <property name="text">
             <string>Generate</string>
+           </property>
+           <property name="icon">
+            <iconset>
+             <normaloff>:/plugins/CCD_Plugin/icons/generate.svg</normaloff>:/plugins/CCD_Plugin/icons/generate.svg</iconset>
+           </property>
+           <property name="toolButtonStyle">
+            <enum>Qt::ToolButtonTextBesideIcon</enum>
            </property>
           </widget>
          </item>
