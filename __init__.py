@@ -22,20 +22,22 @@
 import os
 import platform
 import site
-import logging
+import pkg_resources
 
-if platform.system() == "Windows":
-    extlib_path = 'extlibs_windows'
-if platform.system() == "Darwin":
-    extlib_path = 'extlibs_darwin'
-if platform.system() == "Linux":
-    extlib_path = 'extlibs_linux'
 
-site.addsitedir(os.path.abspath(os.path.join(os.path.dirname(__file__), extlib_path)))
+def pre_init_plugin():
+    if platform.system() == "Windows":
+        extlib_path = 'extlibs_windows'
+    if platform.system() == "Darwin":
+        extlib_path = 'extlibs_darwin'
+    if platform.system() == "Linux":
+        extlib_path = 'extlibs_linux'
+    extra_libs_path = os.path.abspath(os.path.join(os.path.dirname(__file__), extlib_path))
 
-# fix the warnings/errors messages from 'file_cache is unavailable when using oauth2client'
-# https://github.com/googleapis/google-api-python-client/issues/299
-logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
+    # add to python path
+    site.addsitedir(extra_libs_path)
+    # pkg_resources doesn't listen to changes on sys.path.
+    pkg_resources.working_set.add_entry(extra_libs_path)
 
 
 # noinspection PyPep8Naming
@@ -45,6 +47,8 @@ def classFactory(iface):  # pylint: disable=invalid-name
     :param iface: A QGIS interface instance.
     :type iface: QgsInterface
     """
-    #
+    # load extra python dependencies
+    pre_init_plugin()
+
     from .CCD_Plugin import CCD_Plugin
     return CCD_Plugin(iface)
