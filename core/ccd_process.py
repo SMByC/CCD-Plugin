@@ -5,8 +5,8 @@
                                  A QGIS plugin
  Continuous Change Detection Plugin
                               -------------------
-        copyright            : (C) 2019 by Xavier Corredor Llano, SMByC
-        email                : xcorredorl@ideam.gov.co
+        copyright            : (C) 2019-2022 by Xavier Corredor Llano, SMByC
+        email                : xavier.corredor.llano@gmail.com
  ***************************************************************************/
 
 /***************************************************************************

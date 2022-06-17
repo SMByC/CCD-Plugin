@@ -5,8 +5,8 @@
                                  A QGIS plugin
  Continuous Change Detection Plugin
                               -------------------
-        copyright            : (C) 2019 by Xavier Corredor Llano, SMByC
-        email                : xcorredorl@ideam.gov.co
+        copyright            : (C) 2019-2022 by Xavier Corredor Llano, SMByC
+        email                : xavier.corredor.llano@gmail.com
  ***************************************************************************/
 
 /***************************************************************************
@@ -24,7 +24,6 @@ import tempfile
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
-from qgis.utils import iface
 
 # Initialize Qt resources from file resources.py
 from .resources import *
