@@ -22,7 +22,7 @@ changelog=
 
 tags=gee,trends,change detection
 
-external_deps=
+plugin_dependencies=Google Earth Engine
 
 category=Plugins
 icon=icons/ccd_plugin.svg
