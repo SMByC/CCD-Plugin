@@ -46,6 +46,7 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
         # http://qt-project.org/doc/qt-4.8/designer-using-a-ui-file.html
         # #widgets-and-dialogs-with-auto-connect
         self.setupUi(self)
+        self.setup_gui()
 
         # plot web view
         plot_view_settings = self.plot_webview.settings()
@@ -53,11 +54,8 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
         plot_view_settings.setAttribute(QWebSettings.DeveloperExtrasEnabled, True)
         plot_view_settings.setAttribute(QWebSettings.Accelerated2dCanvasEnabled, True)
 
-        #self.plot_webview.load(QUrl.fromLocalFile("/home/xavier/Projects/SMBYC/Qgis_Plugins/CCD-Plugin/lcmap-pyccd/test.html"))
-        self.new_plot()
-
     def setup_gui(self):
-        pass
+        self.generate_button.clicked.connect(self.new_plot)
 
     def closeEvent(self, event):
         # close
