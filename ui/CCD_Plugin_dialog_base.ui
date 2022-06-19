@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1182</width>
-    <height>667</height>
+    <width>1317</width>
+    <height>822</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -382,13 +382,25 @@
    </item>
    <item>
     <widget class="QWebView" name="plot_webview">
+     <property name="mouseTracking">
+      <bool>true</bool>
+     </property>
+     <property name="tabletTracking">
+      <bool>true</bool>
+     </property>
+     <property name="acceptDrops">
+      <bool>false</bool>
+     </property>
      <property name="url">
       <url>
        <string>about:blank</string>
       </url>
      </property>
      <property name="zoomFactor">
-      <double>1.500000000000000</double>
+      <double>1.600000023841858</double>
+     </property>
+     <property name="renderHints">
+      <set>QPainter::Antialiasing|QPainter::HighQualityAntialiasing|QPainter::LosslessImageRendering|QPainter::SmoothPixmapTransform|QPainter::TextAntialiasing</set>
      </property>
     </widget>
    </item>
@@ -420,8 +432,8 @@
    <slot>close()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>9</x>
-     <y>698</y>
+     <x>12</x>
+     <y>663</y>
     </hint>
     <hint type="destinationlabel">
      <x>20</x>

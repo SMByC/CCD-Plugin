@@ -53,6 +53,12 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
         plot_view_settings.setAttribute(QWebSettings.WebGLEnabled, True)
         plot_view_settings.setAttribute(QWebSettings.DeveloperExtrasEnabled, True)
         plot_view_settings.setAttribute(QWebSettings.Accelerated2dCanvasEnabled, True)
+        plot_view_settings.setAttribute(QWebSettings.PluginsEnabled, True)
+        plot_view_settings.setAttribute(QWebSettings.DnsPrefetchEnabled, True)
+        plot_view_settings.setAttribute(QWebSettings.XSSAuditingEnabled, True)
+        plot_view_settings.setAttribute(QWebSettings.CSSGridLayoutEnabled, True)
+        plot_view_settings.setAttribute(QWebSettings.JavaEnabled, True)
+        plot_view_settings.setAttribute(QWebSettings.JavascriptEnabled, True)
 
     def setup_gui(self):
         self.generate_button.clicked.connect(self.new_plot)
@@ -67,7 +73,7 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
 
         # Run everything
         coords = (-74.163, 2.5182)
-        year_range = (2000, 2020)
+        year_range = (2000, 2022)
         doy_range = (1, 365)
 
         ccd_results, dates, band_data = compute_ccd(coords, year_range, doy_range)
