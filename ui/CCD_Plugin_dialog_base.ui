@@ -270,17 +270,17 @@
           <widget class="QComboBox" name="band">
            <item>
             <property name="text">
-             <string>BLUE</string>
+             <string>Blue</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>GREEN</string>
+             <string>Green</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>RED</string>
+             <string>Red</string>
             </property>
            </item>
            <item>
@@ -296,11 +296,6 @@
            <item>
             <property name="text">
              <string>SWIR2</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>THERMAL</string>
             </property>
            </item>
           </widget>

@@ -73,10 +73,11 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
 
         # Run everything
         coords = (-74.163, 2.5182)
-        year_range = (2000, 2022)
+        year_range = (1970, 2022)
         doy_range = (1, 365)
+        collection = 1
 
-        ccd_results, dates, band_data = compute_ccd(coords, year_range, doy_range)
+        ccd_results, dates, band_data = compute_ccd(coords, year_range, doy_range, collection)
 
         html_file = generate_plot(ccd_results, dates, band_data, CCD_Plugin.tmp_dir)
 

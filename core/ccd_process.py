@@ -39,7 +39,7 @@ def mask(input_list, boolean_mask):
     return [i for i, b in zip(input_list, boolean_mask) if b]
 
 
-def compute_ccd(coords, year_range=(2000, 2020), doy_range=(1, 365)):
+def compute_ccd(coords, year_range, doy_range, collection):
 
     # get data from Google Earth Engine
     # list index order:
@@ -56,7 +56,7 @@ def compute_ccd(coords, year_range=(2000, 2020), doy_range=(1, 365)):
     # 'pixel_qa'11
 
     ### get GEE data from the specific point
-    data_collection = get_full_collection(coords, year_range, doy_range)
+    data_collection = get_full_collection(coords, year_range, doy_range, collection)
     data_point = get_data_full(data_collection, coords)[1::]
 
     # generate a merge/fusion mask layer of nan/none values to filter all data
