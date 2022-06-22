@@ -94,7 +94,7 @@ def generate_plot(ccd_results, dates, band_data, tmp_dir):
                       annotation_position="bottom left", annotation_textangle=-90,
                       annotation_font_size=9, annotation_font_color="red")
     # add a fake line to add the legend for the break lines
-    fig.add_trace(go.Scatter(x=[dates_dt[0]]*2, y=[np.min(_predvalue)]*2,
+    fig.add_trace(go.Scatter(x=[dates_dt[0]]*2, y=[np.min(band_data)]*2,
                              mode='lines', line=dict(color='red', width=1, dash='dash'), name='break lines'))
 
     fig.update_layout(
