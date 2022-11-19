@@ -53,7 +53,7 @@ def compute_ccd(coords, year_range, doy_range, collection):
     # 'SWIR1',8
     # 'SWIR2',9
     # 'THERMAL',10
-    # 'pixel_qa'11
+    # 'pixel_qa',11
 
     ### get GEE data from the specific point
     data_collection = get_full_collection(coords, year_range, doy_range, collection)

@@ -19,20 +19,18 @@
  ***************************************************************************/
 
 with the collaboration of Paulo Arevalo Orduz <parevalo@bu.edu>
+https://github.com/parevalo/gee-ccdc-tools
 
 """
 
 import ee
-# import httplib2
-#
-# ee.Initialize(http_transport=httplib2.Http())
 
 
-# Filter collection by point and date
 def collection_filtering(point, collection_name, year_range, doy_range):
+    # Filter collection by point and date
     collection = ee.ImageCollection(collection_name)\
         .filterBounds(point)\
-        .filter(ee.Filter.calendarRange(year_range[0], year_range[1], 'year'))\
+        .filterDate(ee.Date(str(year_range[0])), ee.Date(str(year_range[1])))\
         .filter(ee.Filter.dayOfYear(doy_range[0], doy_range[1]))
     return collection
 
@@ -40,7 +38,7 @@ def collection_filtering(point, collection_name, year_range, doy_range):
 def prepare_L4L5_C1(image):
     band_list = ['B1', 'B2', 'B3', 'B4', 'B5', 'B7', 'B6', 'pixel_qa']
     name_list = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Temp', 'pixel_qa']
-    scaling = [1]*8  #[10000, 10000, 10000, 10000, 10000, 10000, 1000, 1]
+    scaling = [1]*8  #[10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
     scaled = ee.Image(image).select(band_list).rename(name_list).divide(ee.Image.constant(scaling))
 
     validQA = [66, 130, 68, 132]
@@ -57,7 +55,7 @@ def prepare_L4L5_C1(image):
 def prepare_L7_C1(image):
     band_list = ['B1', 'B2', 'B3', 'B4', 'B5', 'B7', 'B6', 'pixel_qa']
     name_list = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Temp', 'pixel_qa']
-    scaling = [1]*8  #[10000, 10000, 10000, 10000, 10000, 10000, 1000, 1]
+    scaling = [1]*8  #[10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
     scaled = ee.Image(image).select(band_list).rename(name_list).divide(ee.Image.constant(scaling))
 
     validQA = [66, 130, 68, 132]
@@ -76,7 +74,7 @@ def prepare_L7_C1(image):
 def prepare_L8_C1(image):
     band_list = ['B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B10', 'pixel_qa']
     name_list = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Temp', 'pixel_qa']
-    scaling = [1]*8  #[10000, 10000, 10000, 10000, 10000, 10000, 1000, 1]
+    scaling = [1]*8  #[10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
     scaled = ee.Image(image).select(band_list).rename(name_list).divide(ee.Image.constant(scaling))
 
     validTOA = [66, 68, 72, 80, 96, 100, 130, 132, 136, 144, 160, 164]
@@ -92,18 +90,20 @@ def prepare_L4L5L7_C2(image):
     band_list = ['SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B7', 'ST_B6', 'QA_PIXEL']
     name_list = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Temp', 'pixel_qa']
     subBand = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2']
+    scaling = [10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
 
     opticalBands = image.select('SR_B.').multiply(0.0000275).add(-0.2)
     thermalBand = image.select('ST_B6').multiply(0.00341802).add(149.0)
-    scaled = opticalBands.addBands(thermalBand, None, True).addBands(image.select(['QA_PIXEL']), None, True)\
+    no_scaled = opticalBands.addBands(thermalBand, None, True).addBands(image.select(['QA_PIXEL']), None, True)\
         .select(band_list).rename(name_list)
+    scaled = no_scaled.multiply(ee.Image.constant(scaling))
 
     validQA = [5440, 5504]
     mask1 = ee.Image(image).select(['QA_PIXEL']).remap(validQA, ee.List.repeat(1, len(validQA)), 0)
     # Gat valid data mask, for pixels without band saturation
     mask2 = image.select('QA_RADSAT').eq(0)
-    mask3 = scaled.select(subBand).reduce(ee.Reducer.min()).gt(0)
-    mask4 = scaled.select(subBand).reduce(ee.Reducer.max()).lt(1)
+    mask3 = no_scaled.select(subBand).reduce(ee.Reducer.min()).gt(0)
+    mask4 = no_scaled.select(subBand).reduce(ee.Reducer.max()).lt(1)
     # Mask hazy pixels using AOD threshold
     mask5 = (image.select("SR_ATMOS_OPACITY").unmask(-1)).lt(300)
     return ee.Image(image).addBands(scaled).updateMask(mask1.And(mask2).And(mask3).And(mask4).And(mask5)).select(name_list)
@@ -113,19 +113,21 @@ def prepare_L8L9_C2(image):
     band_list = ['SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7', 'ST_B10', 'QA_PIXEL']
     name_list = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Temp', 'pixel_qa']
     subBand = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2']
+    scaling = [10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
 
     opticalBands = image.select('SR_B.').multiply(0.0000275).add(-0.2)
     thermalBand = image.select('ST_B10').multiply(0.00341802).add(149.0)
-    scaled = opticalBands.addBands(thermalBand, None, True).addBands(image.select(['QA_PIXEL']), None, True)\
+    no_scaled = opticalBands.addBands(thermalBand, None, True).addBands(image.select(['QA_PIXEL']), None, True)\
         .select(band_list).rename(name_list)
+    scaled = no_scaled.multiply(ee.Image.constant(scaling))
 
     validTOA = [2, 4, 32, 66, 68, 96, 100, 130, 132, 160, 164]
     validQA = [21824, 21888]  # 21826, 21890
     mask1 = ee.Image(image).select(['QA_PIXEL']).remap(validQA, ee.List.repeat(1, len(validQA)), 0)
     mask2 = image.select('QA_RADSAT').eq(0)
     # Assume that all saturated pixels equal to 20000
-    mask3 = scaled.select(subBand).reduce(ee.Reducer.min()).gt(0)
-    mask4 = scaled.select(subBand).reduce(ee.Reducer.max()).lt(1)
+    mask3 = no_scaled.select(subBand).reduce(ee.Reducer.min()).gt(0)
+    mask4 = no_scaled.select(subBand).reduce(ee.Reducer.max()).lt(1)
     mask5 = ee.Image(image).select(['SR_QA_AEROSOL']).remap(validTOA, ee.List.repeat(1, len(validTOA)), 0)
     return ee.Image(image).addBands(scaled).updateMask(mask1.And(mask2).And(mask3).And(mask4).And(mask5)).select(name_list)
 
@@ -147,7 +149,8 @@ def get_full_collection(coords, year_range, doy_range, collection):
         l8 = collection_filtering(point, 'LANDSAT/LC08/C01/T1_SR', year_range, doy_range)
         l8_prepared = l8.map(prepare_L8_C1)
 
-        all_scenes = ee.ImageCollection(l4_prepared.merge(l5_prepared).merge(l7_prepared).merge(l8_prepared)).sort('system:time_start')
+        all_scenes = ee.ImageCollection(l4_prepared).merge(l5_prepared).merge(l7_prepared)\
+                                        .merge(l8_prepared).sort('system:time_start')
 
     if collection == 2:
         l4 = collection_filtering(point, 'LANDSAT/LT04/C02/T1_L2', year_range, doy_range)
@@ -165,8 +168,8 @@ def get_full_collection(coords, year_range, doy_range, collection):
         l9 = collection_filtering(point, 'LANDSAT/LC09/C02/T1_L2', year_range, doy_range)
         l9_prepared = l9.map(prepare_L8L9_C2)
 
-        all_scenes = ee.ImageCollection(l4_prepared.merge(l5_prepared).merge(l7_prepared)
-                                        .merge(l8_prepared).merge(l9_prepared)).sort('system:time_start')
+        all_scenes = ee.ImageCollection(l4_prepared).merge(l5_prepared).merge(l7_prepared)\
+                                        .merge(l8_prepared).merge(l9_prepared).sort('system:time_start')
 
     # Return merged image collection
     return all_scenes
