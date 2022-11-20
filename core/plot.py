@@ -34,7 +34,6 @@ def generate_plot(ccd_results, dates, band_data, tmp_dir):
     band_data = np.array(band_data)
 
     mask = np.array(ccd_results['processing_mask'], dtype=np.bool)
-    print(mask)
     print('Start Date: {0}\nEnd Date: {1}\n'.format(dates_dt[0], dates_dt[-1]))
 
     predicted_values = []
@@ -97,7 +96,7 @@ def generate_plot(ccd_results, dates, band_data, tmp_dir):
                       annotation_font_size=9, annotation_font_color="red")
 
     # add a fake line to add the legend for the break lines
-    fig.add_trace(go.Scatter(x=[dates_dt[0]]*2, y=[np.min(band_data)]*2,
+    fig.add_trace(go.Scatter(x=[dates_dt[0]]*2, y=[np.min(band_data)]*2, hoverinfo=None,
                              mode='lines', line=dict(color='red', width=1, dash='dash'), name='break lines'))
 
     fig.update_layout(
@@ -111,10 +110,10 @@ def generate_plot(ccd_results, dates, band_data, tmp_dir):
         paper_bgcolor="white",
     )
 
-    fig.update_layout(hovermode=False)
-    fig.update_xaxes(title_text=None, tickangle=-90, ticklabelmode="period", dtick="M12",
-                     tick0=date(np.min(dates_dt).year, 1, 1), automargin=True)
-    fig.update_yaxes(title_text="Reflectance", automargin=True)
+    fig.update_traces(hovertemplate='%{y:.0f}<br>%{x}')
+    fig.update_xaxes(title_text=None, tickangle=-90 if np.max(dates_dt).year - np.min(dates_dt).year > 20 else 0,
+                     ticklabelmode="period", dtick="M12", tick0=date(np.min(dates_dt).year, 1, 1), automargin=True)
+    fig.update_yaxes(title_text="Surface Reflectance (x10⁴)", automargin=True)
 
     html_file = tempfile.mktemp(suffix=".html", dir=tmp_dir)
     plotly.offline.plot(fig, filename=html_file, auto_open=False, config={'displaylogo': False})

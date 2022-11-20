@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1502</width>
-    <height>597</height>
+    <width>1455</width>
+    <height>619</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -521,7 +521,7 @@
       </url>
      </property>
      <property name="zoomFactor">
-      <double>1.700000000000000</double>
+      <double>1.600000000000000</double>
      </property>
     </widget>
    </item>
