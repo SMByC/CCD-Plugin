@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1317</width>
-    <height>822</height>
+    <width>1502</width>
+    <height>597</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -55,7 +55,10 @@
       </property>
       <item>
        <widget class="QWidget" name="widget_4" native="true">
-        <layout class="QGridLayout" name="gridLayout">
+        <layout class="QVBoxLayout" name="verticalLayout_4">
+         <property name="spacing">
+          <number>3</number>
+         </property>
          <property name="leftMargin">
           <number>0</number>
          </property>
@@ -68,45 +71,119 @@
          <property name="bottomMargin">
           <number>0</number>
          </property>
-         <property name="spacing">
-          <number>3</number>
-         </property>
-         <item row="1" column="2">
-          <widget class="QToolButton" name="select_on_canvas">
-           <property name="text">
-            <string>Select on canvas</string>
-           </property>
-           <property name="icon">
-            <iconset>
-             <normaloff>:/plugins/CCD_Plugin/icons/select_on_canvas.svg</normaloff>:/plugins/CCD_Plugin/icons/select_on_canvas.svg</iconset>
-           </property>
-           <property name="toolButtonStyle">
-            <enum>Qt::ToolButtonTextBesideIcon</enum>
-           </property>
+         <item>
+          <widget class="QWidget" name="widget_8" native="true">
+           <layout class="QHBoxLayout" name="horizontalLayout_3">
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>0</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>0</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="label_3">
+              <property name="text">
+               <string>Coordinates:</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignCenter</set>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QToolButton" name="select_on_canvas">
+              <property name="text">
+               <string>Select on canvas</string>
+              </property>
+              <property name="icon">
+               <iconset>
+                <normaloff>:/plugins/CCD_Plugin/icons/select_on_canvas.svg</normaloff>:/plugins/CCD_Plugin/icons/select_on_canvas.svg</iconset>
+              </property>
+              <property name="toolButtonStyle">
+               <enum>Qt::ToolButtonTextBesideIcon</enum>
+              </property>
+              <property name="autoRaise">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </widget>
          </item>
-         <item row="1" column="0">
-          <widget class="QDoubleSpinBox" name="latitude">
-           <property name="buttonSymbols">
-            <enum>QAbstractSpinBox::NoButtons</enum>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="1">
-          <widget class="QDoubleSpinBox" name="longitude">
-           <property name="buttonSymbols">
-            <enum>QAbstractSpinBox::NoButtons</enum>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="0" colspan="3">
-          <widget class="QLabel" name="label_3">
-           <property name="text">
-            <string>Coordinates</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignCenter</set>
-           </property>
+         <item>
+          <widget class="QWidget" name="widget_7" native="true">
+           <layout class="QHBoxLayout" name="horizontalLayout_2">
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>0</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>0</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="label_6">
+              <property name="text">
+               <string>Lat:</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QDoubleSpinBox" name="latitude">
+              <property name="buttonSymbols">
+               <enum>QAbstractSpinBox::NoButtons</enum>
+              </property>
+              <property name="decimals">
+               <number>4</number>
+              </property>
+              <property name="minimum">
+               <double>-90.000000000000000</double>
+              </property>
+              <property name="maximum">
+               <double>90.000000000000000</double>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="label_7">
+              <property name="text">
+               <string>Lon:</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QDoubleSpinBox" name="longitude">
+              <property name="buttonSymbols">
+               <enum>QAbstractSpinBox::NoButtons</enum>
+              </property>
+              <property name="decimals">
+               <number>4</number>
+              </property>
+              <property name="minimum">
+               <double>-180.000000000000000</double>
+              </property>
+              <property name="maximum">
+               <double>180.000000000000000</double>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </widget>
          </item>
         </layout>
@@ -138,29 +215,23 @@
           <number>3</number>
          </property>
          <item row="1" column="0">
-          <widget class="QSpinBox" name="start_year">
-           <property name="minimum">
-            <number>2000</number>
-           </property>
-           <property name="maximum">
-            <number>2100</number>
+          <widget class="QDateEdit" name="start_date">
+           <property name="calendarPopup">
+            <bool>true</bool>
            </property>
           </widget>
          </item>
          <item row="1" column="1">
-          <widget class="QSpinBox" name="end_year">
-           <property name="minimum">
-            <number>2000</number>
-           </property>
-           <property name="maximum">
-            <number>2100</number>
+          <widget class="QDateEdit" name="end_date">
+           <property name="calendarPopup">
+            <bool>true</bool>
            </property>
           </widget>
          </item>
-         <item row="0" column="0" colspan="4">
+         <item row="0" column="0" colspan="5">
           <widget class="QLabel" name="label">
            <property name="text">
-            <string>Year Range</string>
+            <string>Date Range</string>
            </property>
            <property name="alignment">
             <set>Qt::AlignCenter</set>
@@ -239,6 +310,67 @@
        </widget>
       </item>
       <item>
+       <widget class="QWidget" name="widget_9" native="true">
+        <layout class="QVBoxLayout" name="verticalLayout_5">
+         <property name="spacing">
+          <number>3</number>
+         </property>
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <item>
+          <widget class="QLabel" name="label_8">
+           <property name="text">
+            <string>Lansat</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="collection">
+           <property name="currentText">
+            <string>Collection 2</string>
+           </property>
+           <property name="currentIndex">
+            <number>1</number>
+           </property>
+           <property name="sizeAdjustPolicy">
+            <enum>QComboBox::AdjustToContents</enum>
+           </property>
+           <item>
+            <property name="text">
+             <string>Collection 1</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Collection 2</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="Line" name="line_6">
+        <property name="orientation">
+         <enum>Qt::Vertical</enum>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QWidget" name="widget_3" native="true">
         <layout class="QVBoxLayout" name="verticalLayout_2">
          <property name="spacing">
@@ -268,6 +400,9 @@
          </item>
          <item>
           <widget class="QComboBox" name="band">
+           <property name="sizeAdjustPolicy">
+            <enum>QComboBox::AdjustToContents</enum>
+           </property>
            <item>
             <property name="text">
              <string>Blue</string>
@@ -376,13 +511,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QWebView" name="plot_webview">
-     <property name="mouseTracking">
-      <bool>true</bool>
-     </property>
-     <property name="tabletTracking">
-      <bool>true</bool>
-     </property>
+    <widget class="QWebEngineView" name="plot_webview">
      <property name="acceptDrops">
       <bool>false</bool>
      </property>
@@ -392,20 +521,7 @@
       </url>
      </property>
      <property name="zoomFactor">
-      <double>1.600000023841858</double>
-     </property>
-     <property name="renderHints">
-      <set>QPainter::Antialiasing|QPainter::HighQualityAntialiasing|QPainter::LosslessImageRendering|QPainter::SmoothPixmapTransform|QPainter::TextAntialiasing</set>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QDialogButtonBox" name="button_box">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-     <property name="standardButtons">
-      <set>QDialogButtonBox::Close</set>
+      <double>1.700000000000000</double>
      </property>
     </widget>
    </item>
@@ -413,28 +529,11 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>QWebView</class>
+   <class>QWebEngineView</class>
    <extends>QWidget</extends>
-   <header location="global">QtWebKitWidgets/QWebView</header>
+   <header location="global">QtWebEngineWidgets/QWebEngineView</header>
   </customwidget>
  </customwidgets>
  <resources/>
- <connections>
-  <connection>
-   <sender>button_box</sender>
-   <signal>rejected()</signal>
-   <receiver>CCD_PluginDialogBase</receiver>
-   <slot>close()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>12</x>
-     <y>663</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>20</x>
-     <y>20</y>
-    </hint>
-   </hints>
-  </connection>
- </connections>
+ <connections/>
 </ui>

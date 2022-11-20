@@ -23,8 +23,9 @@ with the collaboration of Paulo Arevalo Orduz <parevalo@bu.edu>
 """
 import tempfile
 import numpy as np
-import plotly.graph_objects as go
 import plotly
+import plotly.graph_objects as go
+import plotly.io as pio
 from datetime import date, datetime
 
 
@@ -70,15 +71,16 @@ def generate_plot(ccd_results, dates, band_data, tmp_dir):
                                 coef[5] * np.cos(days * 3 * 2 * np.pi / 365.25) + coef[6] * np.sin(
             days * 3 * 2 * np.pi / 365.25))
 
-    ##### plot with plotly
+    ######## plot with plotly ########
 
+    pio.templates.default = "plotly_white"
     fig = go.Figure()
 
     # observed and masked values
     fig.add_trace(go.Scatter(x=dates_dt[~mask], y=band_data[~mask], name='masked<br>values',
-                             mode='markers', marker=dict(color='#bcbcbc', size=7)))  # , symbol="cross"
+                             mode='markers', marker=dict(color='#bcbcbc', size=7, opacity=0.7)))  # , symbol="cross"
     fig.add_trace(go.Scatter(x=dates_dt[mask], y=band_data[mask], name='observed<br>values',
-                             mode='markers', marker=dict(color='#4596d3', size=7)))  # , symbol="cross"
+                             mode='markers', marker=dict(color='#408ec6', size=7, opacity=0.7)))  # , symbol="cross"
 
     # Predicted curves
     for idx, (_preddate, _predvalue) in enumerate(zip(prediction_dates, predicted_values)):
@@ -89,10 +91,11 @@ def generate_plot(ccd_results, dates, band_data, tmp_dir):
     # break lines
     break_dates = list(set(start_dates+break_dates))  # delete duplicates
     for break_date in break_dates:
-        fig.add_vline(x=datetime.fromordinal(break_date).timestamp() * 1000, line_width=1, line_dash="dash",
+        fig.add_vline(x=datetime.fromordinal(break_date).timestamp() * 1000, line_width=0.5, line_dash="dash",
                       line_color="red", annotation_text=date.fromordinal(break_date).strftime("%Y-%m-%d"),
                       annotation_position="bottom left", annotation_textangle=-90,
                       annotation_font_size=9, annotation_font_color="red")
+
     # add a fake line to add the legend for the break lines
     fig.add_trace(go.Scatter(x=[dates_dt[0]]*2, y=[np.min(band_data)]*2,
                              mode='lines', line=dict(color='red', width=1, dash='dash'), name='break lines'))
@@ -109,7 +112,7 @@ def generate_plot(ccd_results, dates, band_data, tmp_dir):
     )
 
     fig.update_layout(hovermode=False)
-    fig.update_xaxes(title_text="Time", tickangle=-90, ticklabelmode="period", dtick="M12",
+    fig.update_xaxes(title_text=None, tickangle=-90, ticklabelmode="period", dtick="M12",
                      tick0=date(np.min(dates_dt).year, 1, 1), automargin=True)
     fig.update_yaxes(title_text="Reflectance", automargin=True)
 
