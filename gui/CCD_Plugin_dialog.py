@@ -27,7 +27,7 @@ import os, sys
 from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
 from qgis.PyQt.QtCore import QUrl, pyqtSignal, Qt, QCoreApplication
-from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject
+from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject, Qgis, QgsMessageLog
 from qgis.gui import QgsMapTool, QgsMapToolPan
 from qgis.utils import iface
 
@@ -94,6 +94,17 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
 
     def new_plot(self):
         from CCD_Plugin.CCD_Plugin import CCD_Plugin
+
+        # check import ee lib
+        try:
+            import ee
+            ee.Initialize()
+        except Exception as e:
+            import traceback
+            self.MsgBar.pushMessage("Failed to import ee lib, check the installation or your internet connection.",
+                                    level=Qgis.Warning, duration=5)
+            QgsMessageLog.logMessage("CCD-plugin error: {}".format(traceback.format_exc()), level=Qgis.Critical)
+            return
 
         # Run everything
         coords = (-74.163, 2.5182)
