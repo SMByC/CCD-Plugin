@@ -18,13 +18,24 @@
  *                                                                         *
  ***************************************************************************/
 """
+# pyccd
+# https://code.usgs.gov/lcmap/pyccd
 
-import os
+
+import os, sys
 
 from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
-from qgis.PyQt.QtCore import QUrl, pyqtSignal
+from qgis.PyQt.QtCore import QUrl, pyqtSignal, Qt, QCoreApplication
+from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject
+from qgis.gui import QgsMapTool, QgsMapToolPan
+from qgis.utils import iface
+
 from qgis.PyQt.QtWebKit import QWebSettings
+## QtWebEngine
+# QCoreApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
+# app = QtWidgets.qApp = QtWidgets.QApplication(sys.argv)
+# from qgis.PyQt.QtWebEngineWidgets import QWebEngineSettings
 
 from CCD_Plugin.core.ccd_process import compute_ccd
 from CCD_Plugin.core.plot import generate_plot
@@ -51,22 +62,35 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
         # plot web view
         plot_view_settings = self.plot_webview.settings()
         plot_view_settings.setAttribute(QWebSettings.WebGLEnabled, True)
-        plot_view_settings.setAttribute(QWebSettings.DeveloperExtrasEnabled, True)
         plot_view_settings.setAttribute(QWebSettings.Accelerated2dCanvasEnabled, True)
         plot_view_settings.setAttribute(QWebSettings.PluginsEnabled, True)
         plot_view_settings.setAttribute(QWebSettings.DnsPrefetchEnabled, True)
         plot_view_settings.setAttribute(QWebSettings.XSSAuditingEnabled, True)
-        plot_view_settings.setAttribute(QWebSettings.CSSGridLayoutEnabled, True)
-        plot_view_settings.setAttribute(QWebSettings.JavaEnabled, True)
         plot_view_settings.setAttribute(QWebSettings.JavascriptEnabled, True)
 
     def setup_gui(self):
+        self.default_point_tool = QgsMapToolPan(iface.mapCanvas())
+        iface.mapCanvas().setMapTool(self.default_point_tool, clean=True)
+
+        self.pick_on_map.clicked.connect(self.coordinates_from_map)
         self.generate_button.clicked.connect(self.new_plot)
 
     def closeEvent(self, event):
         # close
         self.closingPlugin.emit()
         event.accept()
+
+    def coordinates_from_map(self):
+        # minimize the plugin dialog
+        self.setWindowState(Qt.WindowMinimized)
+        # raise qgis window
+        qgis_window = iface.mainWindow()
+        qgis_window.raise_()
+        qgis_window.setWindowState(qgis_window.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
+        qgis_window.activateWindow()
+
+        # set the map tool and actions
+        iface.mapCanvas().setMapTool(PickerCoordsOnMap(self), clean=True)
 
     def new_plot(self):
         from CCD_Plugin.CCD_Plugin import CCD_Plugin
@@ -82,3 +106,35 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
         html_file = generate_plot(ccd_results, dates, band_data, CCD_Plugin.tmp_dir)
 
         self.plot_webview.load(QUrl.fromLocalFile(html_file))
+
+
+class PickerCoordsOnMap(QgsMapTool):
+    def __init__(self, dialog):
+        QgsMapTool.__init__(self, iface.mapCanvas())
+        self.dialog = dialog
+
+    def canvasPressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            point = iface.mapCanvas().getCoordinateTransform().toMapCoordinates(event.pos().x(), event.pos().y())
+            # transform coordinates to WGS84
+            crsSrc = iface.mapCanvas().mapSettings().destinationCrs()
+            crsDest = QgsCoordinateReferenceSystem(4326)
+            xform = QgsCoordinateTransform(crsSrc, crsDest, QgsProject.instance())
+            point = xform.transform(point)
+
+            self.dialog.longitude.setValue(point.x())
+            self.dialog.latitude.setValue(point.y())
+
+            self.finish()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self.finish()
+
+    def finish(self):
+        iface.mapCanvas().unsetMapTool(self)
+        iface.mapCanvas().setMapTool(self.dialog.default_point_tool)
+        self.dialog.raise_()
+        self.dialog.setWindowState(self.dialog.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
+        self.dialog.activateWindow()
+

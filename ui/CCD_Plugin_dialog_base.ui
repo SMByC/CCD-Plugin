@@ -97,9 +97,9 @@
              </widget>
             </item>
             <item>
-             <widget class="QToolButton" name="select_on_canvas">
+             <widget class="QToolButton" name="pick_on_map">
               <property name="text">
-               <string>Select on canvas</string>
+               <string>Pick on Map</string>
               </property>
               <property name="icon">
                <iconset>
@@ -511,7 +511,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QWebEngineView" name="plot_webview">
+    <widget class="QWebView" name="plot_webview">
      <property name="acceptDrops">
       <bool>false</bool>
      </property>
@@ -529,9 +529,9 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>QWebEngineView</class>
+   <class>QWebView</class>
    <extends>QWidget</extends>
-   <header location="global">QtWebEngineWidgets/QWebEngineView</header>
+   <header location="global">QtWebKitWidgets/QWebView</header>
   </customwidget>
  </customwidgets>
  <resources/>
