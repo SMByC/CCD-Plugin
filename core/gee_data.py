@@ -23,10 +23,9 @@ https://github.com/parevalo/gee-ccdc-tools
 
 """
 
-import ee
-
 
 def collection_filtering(point, collection_name, year_range, doy_range):
+    import ee
     # Filter collection by point and date
     collection = ee.ImageCollection(collection_name)\
         .filterBounds(point)\
@@ -36,6 +35,7 @@ def collection_filtering(point, collection_name, year_range, doy_range):
 
 
 def prepare_L4L5_C1(image):
+    import ee
     band_list = ['B1', 'B2', 'B3', 'B4', 'B5', 'B7', 'B6', 'pixel_qa']
     name_list = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Temp', 'pixel_qa']
     scaling = [1]*8  #[10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
@@ -53,6 +53,7 @@ def prepare_L4L5_C1(image):
 
 
 def prepare_L7_C1(image):
+    import ee
     band_list = ['B1', 'B2', 'B3', 'B4', 'B5', 'B7', 'B6', 'pixel_qa']
     name_list = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Temp', 'pixel_qa']
     scaling = [1]*8  #[10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
@@ -72,6 +73,7 @@ def prepare_L7_C1(image):
 
 
 def prepare_L8_C1(image):
+    import ee
     band_list = ['B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B10', 'pixel_qa']
     name_list = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Temp', 'pixel_qa']
     scaling = [1]*8  #[10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
@@ -87,6 +89,7 @@ def prepare_L8_C1(image):
 
 
 def prepare_L4L5L7_C2(image):
+    import ee
     band_list = ['SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B7', 'ST_B6', 'QA_PIXEL']
     name_list = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Temp', 'pixel_qa']
     subBand = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2']
@@ -110,6 +113,7 @@ def prepare_L4L5L7_C2(image):
 
 
 def prepare_L8L9_C2(image):
+    import ee
     band_list = ['SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7', 'ST_B10', 'QA_PIXEL']
     name_list = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Temp', 'pixel_qa']
     subBand = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2']
@@ -134,6 +138,7 @@ def prepare_L8L9_C2(image):
 
 # filter and merge collections
 def get_full_collection(coords, year_range, doy_range, collection):
+    import ee
     point = ee.Geometry.Point(coords)
 
     if collection == 1:
@@ -177,6 +182,7 @@ def get_full_collection(coords, year_range, doy_range, collection):
 
 # Get time series for location
 def get_data_full(collection, coords):
+    import ee
     point = ee.Geometry.Point(coords)
     # Sample for a time series of values at the point.
     filtered_col = collection.filter("WRS_ROW < 122").filterBounds(point)
