@@ -29,7 +29,7 @@ import plotly.io as pio
 from datetime import date, datetime
 
 
-def generate_plot(ccd_results, dates, band_data, tmp_dir):
+def generate_plot(ccd_results, dates, band_data, band_name, tmp_dir):
     dates_dt = np.array([date.fromordinal(d) for d in dates])
     band_data = np.array(band_data)
 
@@ -59,8 +59,8 @@ def generate_plot(ccd_results, dates, band_data, tmp_dir):
         break_dates.append(result['break_day'])
         start_dates.append(result['start_day'])
 
-        intercept = result['swir1']['intercept']
-        coef = result['swir1']['coefficients']
+        intercept = result[band_name.lower()]['intercept']
+        coef = result[band_name.lower()]['coefficients']
 
         predicted_values.append(intercept + coef[0] * days +
                                 coef[1] * np.cos(days * 1 * 2 * np.pi / 365.25) + coef[2] * np.sin(
@@ -90,9 +90,9 @@ def generate_plot(ccd_results, dates, band_data, tmp_dir):
     # break lines
     break_dates = list(set(start_dates+break_dates))  # delete duplicates
     for break_date in break_dates:
-        fig.add_vline(x=datetime.fromordinal(break_date).timestamp() * 1000, line_width=0.5, line_dash="dash",
+        fig.add_vline(x=datetime.fromordinal(break_date).timestamp() * 1000, line_width=1, line_dash="dash",
                       line_color="red", annotation_text=date.fromordinal(break_date).strftime("%Y-%m-%d"),
-                      annotation_position="bottom left", annotation_textangle=-90,
+                      annotation_position="bottom left", annotation_textangle=-90, opacity=0.4,
                       annotation_font_size=9, annotation_font_color="red")
 
     # add a fake line to add the legend for the break lines
@@ -113,7 +113,7 @@ def generate_plot(ccd_results, dates, band_data, tmp_dir):
     fig.update_traces(hovertemplate='%{y:.0f}<br>%{x}')
     fig.update_xaxes(title_text=None, tickangle=-90 if np.max(dates_dt).year - np.min(dates_dt).year > 20 else 0,
                      ticklabelmode="period", dtick="M12", tick0=date(np.min(dates_dt).year, 1, 1), automargin=True)
-    fig.update_yaxes(title_text="Surface Reflectance (x10⁴)", automargin=True)
+    fig.update_yaxes(title_text="Surface Reflectance (x10⁴) - {}".format(band_name), automargin=True)
 
     html_file = tempfile.mktemp(suffix=".html", dir=tmp_dir)
     plotly.offline.plot(fig, filename=html_file, auto_open=False, config={'displaylogo': False})
