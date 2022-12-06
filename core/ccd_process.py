@@ -39,7 +39,7 @@ def mask(input_list, boolean_mask):
     return [i for i, b in zip(input_list, boolean_mask) if b]
 
 
-def compute_ccd(coords, date_range, doy_range, collection):
+def compute_ccd(coords, date_range, doy_range, collection, band):
 
     # get data from Google Earth Engine
     # list index order:
@@ -77,6 +77,8 @@ def compute_ccd(coords, date_range, doy_range, collection):
 
     results = ccd.detect(dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas)
 
-    band_data = np.array(swir1s)
+    # get the results by band
+    band_name = {"Blue": blues, "Green": greens, "Red": reds, "NIR": nirs, "SWIR1": swir1s, "SWIR2": swir2s}
+    band_data = np.array(band_name[band])
 
     return results, dates, band_data
