@@ -26,7 +26,7 @@ import os, sys
 
 from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
-from qgis.PyQt.QtCore import QUrl, pyqtSignal, Qt, QCoreApplication
+from qgis.PyQt.QtCore import QUrl, pyqtSignal, Qt, QDate
 from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject, Qgis, QgsMessageLog
 from qgis.gui import QgsMapTool, QgsMapToolPan
 from qgis.utils import iface
@@ -69,6 +69,13 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
         plot_view_settings.setAttribute(QWebSettings.JavascriptEnabled, True)
 
     def setup_gui(self):
+        # select swir1 band by default
+        self.band.setCurrentIndex(4)
+        # set the collection to 2 by default
+        self.collection.setCurrentIndex(1)
+        # set the current date
+        self.end_date.setDate(QDate.currentDate())
+
         self.default_point_tool = QgsMapToolPan(iface.mapCanvas())
         iface.mapCanvas().setMapTool(self.default_point_tool, clean=True)
 
