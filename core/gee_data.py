@@ -24,12 +24,12 @@ https://github.com/parevalo/gee-ccdc-tools
 """
 
 
-def collection_filtering(point, collection_name, year_range, doy_range):
+def collection_filtering(point, collection_name, date_range, doy_range):
     import ee
     # Filter collection by point and date
     collection = ee.ImageCollection(collection_name)\
         .filterBounds(point)\
-        .filterDate(ee.Date(str(year_range[0])), ee.Date(str(year_range[1])))\
+        .filterDate(ee.Date(date_range[0]), ee.Date(date_range[1]))\
         .filter(ee.Filter.dayOfYear(doy_range[0], doy_range[1]))
     return collection
 
@@ -137,40 +137,40 @@ def prepare_L8L9_C2(image):
 
 
 # filter and merge collections
-def get_full_collection(coords, year_range, doy_range, collection):
+def get_full_collection(coords, date_range, doy_range, collection):
     import ee
     point = ee.Geometry.Point(coords)
 
     if collection == 1:
-        l4 = collection_filtering(point, 'LANDSAT/LT04/C01/T1_SR', year_range, doy_range)
+        l4 = collection_filtering(point, 'LANDSAT/LT04/C01/T1_SR', date_range, doy_range)
         l4_prepared = l4.map(prepare_L4L5_C1)
 
-        l5 = collection_filtering(point, 'LANDSAT/LT05/C01/T1_SR', year_range, doy_range)
+        l5 = collection_filtering(point, 'LANDSAT/LT05/C01/T1_SR', date_range, doy_range)
         l5_prepared = l5.map(prepare_L4L5_C1)
 
-        l7 = collection_filtering(point, 'LANDSAT/LE07/C01/T1_SR', year_range, doy_range)
+        l7 = collection_filtering(point, 'LANDSAT/LE07/C01/T1_SR', date_range, doy_range)
         l7_prepared = l7.map(prepare_L7_C1)
 
-        l8 = collection_filtering(point, 'LANDSAT/LC08/C01/T1_SR', year_range, doy_range)
+        l8 = collection_filtering(point, 'LANDSAT/LC08/C01/T1_SR', date_range, doy_range)
         l8_prepared = l8.map(prepare_L8_C1)
 
         all_scenes = ee.ImageCollection(l4_prepared).merge(l5_prepared).merge(l7_prepared)\
                                         .merge(l8_prepared).sort('system:time_start')
 
     if collection == 2:
-        l4 = collection_filtering(point, 'LANDSAT/LT04/C02/T1_L2', year_range, doy_range)
+        l4 = collection_filtering(point, 'LANDSAT/LT04/C02/T1_L2', date_range, doy_range)
         l4_prepared = l4.map(prepare_L4L5L7_C2)
 
-        l5 = collection_filtering(point, 'LANDSAT/LT05/C02/T1_L2', year_range, doy_range)
+        l5 = collection_filtering(point, 'LANDSAT/LT05/C02/T1_L2', date_range, doy_range)
         l5_prepared = l5.map(prepare_L4L5L7_C2)
 
-        l7 = collection_filtering(point, 'LANDSAT/LE07/C02/T1_L2', year_range, doy_range)
+        l7 = collection_filtering(point, 'LANDSAT/LE07/C02/T1_L2', date_range, doy_range)
         l7_prepared = l7.map(prepare_L4L5L7_C2)
 
-        l8 = collection_filtering(point, 'LANDSAT/LC08/C02/T1_L2', year_range, doy_range)
+        l8 = collection_filtering(point, 'LANDSAT/LC08/C02/T1_L2', date_range, doy_range)
         l8_prepared = l8.map(prepare_L8L9_C2)
 
-        l9 = collection_filtering(point, 'LANDSAT/LC09/C02/T1_L2', year_range, doy_range)
+        l9 = collection_filtering(point, 'LANDSAT/LC09/C02/T1_L2', date_range, doy_range)
         l9_prepared = l9.map(prepare_L8L9_C2)
 
         all_scenes = ee.ImageCollection(l4_prepared).merge(l5_prepared).merge(l7_prepared)\

@@ -106,16 +106,23 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
             QgsMessageLog.logMessage("CCD-plugin error: {}".format(traceback.format_exc()), level=Qgis.Critical)
             return
 
-        # Run everything
-        coords = (-74.163, 2.5182)
-        year_range = (1970, 2022)
-        doy_range = (1, 365)
-        collection = 1
+        # get the coordinates
+        lon = self.longitude.value()
+        lat = self.latitude.value()
+        coords = [lon, lat]
+        # get the date range
+        start_date = self.start_date.date().toString("yyyy-MM-dd")
+        end_date = self.end_date.date().toString("yyyy-MM-dd")
+        date_range = [start_date, end_date]
+        # get days of year range
+        start_doy = self.start_doy.value()
+        end_doy = self.end_doy.value()
+        doy_range = [start_doy, end_doy]
+        # get collection
+        collection = int(self.collection.currentText()[-1])
 
-        ccd_results, dates, band_data = compute_ccd(coords, year_range, doy_range, collection)
-
+        ccd_results, dates, band_data = compute_ccd(coords, date_range, doy_range, collection)
         html_file = generate_plot(ccd_results, dates, band_data, CCD_Plugin.tmp_dir)
-
         self.plot_webview.load(QUrl.fromLocalFile(html_file))
 
 
