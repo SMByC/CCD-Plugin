@@ -39,6 +39,7 @@ from qgis.PyQt.QtWebKit import QWebSettings
 
 from CCD_Plugin.core.ccd_process import compute_ccd
 from CCD_Plugin.core.plot import generate_plot
+from CCD_Plugin.utils.system_utils import wait_process
 
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
 plugin_folder = os.path.dirname(os.path.dirname(__file__))
@@ -80,7 +81,7 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
         iface.mapCanvas().setMapTool(self.default_point_tool, clean=True)
 
         self.pick_on_map.clicked.connect(self.coordinates_from_map)
-        self.generate_button.clicked.connect(self.new_plot)
+        self.generate_button.clicked.connect(lambda: self.new_plot())
 
     def closeEvent(self, event):
         # close
@@ -99,6 +100,7 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
         # set the map tool and actions
         iface.mapCanvas().setMapTool(PickerCoordsOnMap(self), clean=True)
 
+    @wait_process
     def new_plot(self):
         from CCD_Plugin.CCD_Plugin import CCD_Plugin
 
@@ -106,12 +108,8 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
         try:
             import ee
             ee.Initialize()
-        except Exception as e:
-            import traceback
-            self.MsgBar.pushMessage("Failed to import ee lib, check the installation or your internet connection.",
-                                    level=Qgis.Warning, duration=5)
-            QgsMessageLog.logMessage("CCD-plugin error: {}".format(traceback.format_exc()), level=Qgis.Critical)
-            return
+        except Exception as err:
+            raise Exception("Error importing ee lib, check the installation or your internet connection|{}".format(err))
 
         # get the coordinates
         lon = self.longitude.value()
