@@ -76,8 +76,8 @@ def generate_plot(ccd_results, dates, band_data, band_name, tmp_dir):
     fig = go.Figure()
 
     # observed and masked values
-    fig.add_trace(go.Scatter(x=dates_dt[~mask], y=band_data[~mask], name='masked<br>values',
-                             mode='markers', marker=dict(color='#bcbcbc', size=7, opacity=0.7)))  # , symbol="cross"
+    # fig.add_trace(go.Scatter(x=dates_dt[~mask], y=band_data[~mask], name='masked<br>values',
+    #                          mode='markers', marker=dict(color='#bcbcbc', size=7, opacity=0.7)))  # , symbol="cross"
     fig.add_trace(go.Scatter(x=dates_dt[mask], y=band_data[mask], name='observed<br>values',
                              mode='markers', marker=dict(color='#408ec6', size=7, opacity=0.7)))  # , symbol="cross"
 
