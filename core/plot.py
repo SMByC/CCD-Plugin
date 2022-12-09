@@ -79,14 +79,14 @@ def generate_plot(ccd_results, dates, band_data, band_name, tmp_dir):
     # fig.add_trace(go.Scatter(x=dates_dt[~mask], y=band_data[~mask], name='masked<br>values',
     #                          mode='markers', marker=dict(color='#bcbcbc', size=7, opacity=0.7)))  # , symbol="cross"
     fig.add_trace(go.Scatter(x=dates_dt[mask], y=band_data[mask], name='observed<br>values',
-                             mode='markers', marker=dict(color='#408ec6', size=7, opacity=0.7)))  # , symbol="cross"
+                             mode='markers', marker=dict(color='#4498d4', size=7, opacity=1)))  # , symbol="cross"
 
     # Predicted curves
     curve_colors = ["#56ad74", "#a291e1", "#c69255", "#e274cf", "#5ea5c5"]*2
     for idx, (_preddate, _predvalue) in enumerate(zip(prediction_dates, predicted_values)):
         fig.add_trace(go.Scatter(x=np.array([date.fromordinal(pd) for pd in _preddate]), y=_predvalue,
-                                 name='predicted<br>values ({})'.format(idx + 1), opacity=0.7,
-                                 hovertemplate="%{y}", line=dict(width=1.7, color=curve_colors[idx])))
+                                 name='predicted<br>values ({})'.format(idx + 1), opacity=0.6,
+                                 hovertemplate="%{y}", line=dict(width=1.5, color=curve_colors[idx])))
 
     # break lines
     break_dates = list(set(start_dates+break_dates))  # delete duplicates
