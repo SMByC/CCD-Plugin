@@ -1,0 +1,5 @@
+ratelim
+pyCrypto
+earthengine-api
+six>=1.13
+https://code.usgs.gov/lcmap/pyccd/-/archive/1.x/pyccd-1.x.zip
