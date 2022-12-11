@@ -108,7 +108,6 @@ def make_zip(zipFile, options):
 
     for root, dirs, files in os.walk(src_dir):
         for f in filter_excludes(files):
-            relpath = os.path.relpath(root, '..')
-            print(relpath)
+            relpath = os.path.relpath(root, '..').replace('CCD-Plugin', 'CCD_Plugin')
             zipFile.write(path(root) / f, path(relpath) / f)
         filter_excludes(dirs)
