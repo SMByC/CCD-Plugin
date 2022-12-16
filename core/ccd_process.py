@@ -18,10 +18,11 @@
  *                                                                         *
  ***************************************************************************/
 """
+import ccd
 import numpy as np
 from datetime import datetime
+from qgis.core import Qgis
 
-import ccd
 from CCD_Plugin.core.gee_data import get_full_collection, get_data_full
 
 
@@ -74,6 +75,13 @@ def compute_ccd(coords, date_range, doy_range, collection, band):
 
     # convert the dates from miliseconds unix time to ordinal
     dates = np.array([datetime.fromtimestamp(int(str(int(d))[:-3])).toordinal() for d in dates])
+
+    # check if nan_mask is all zeros, not clean data available
+    if not any(nan_mask):
+        from CCD_Plugin.CCD_Plugin import CCD_Plugin
+        CCD_Plugin.dialog.MsgBar.pushMessage("Error: Not enough clean data to compute CCD for this point",
+                                             level=Qgis.Warning, duration=5)
+        return
 
     results = ccd.detect(dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas)
 

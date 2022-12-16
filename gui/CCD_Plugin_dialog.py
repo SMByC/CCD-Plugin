@@ -128,7 +128,10 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
         # get band
         band = self.band.currentText()
 
-        ccd_results, dates, band_data = compute_ccd(coords, date_range, doy_range, collection, band)
+        results = compute_ccd(coords, date_range, doy_range, collection, band)
+        if not results:
+            return
+        ccd_results, dates, band_data = results
         html_file = generate_plot(ccd_results, dates, band_data, band, CCD_Plugin.tmp_dir)
         self.plot_webview.load(QUrl.fromLocalFile(html_file))
 
