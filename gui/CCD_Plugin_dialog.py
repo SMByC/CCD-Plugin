@@ -26,24 +26,31 @@ import os, sys
 
 from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
-from qgis.PyQt.QtCore import QUrl, pyqtSignal, Qt, QDate
-from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject, Qgis, QgsMessageLog
+from qgis.PyQt.QtCore import QUrl, pyqtSignal, Qt, QDate, QCoreApplication
+from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject
 from qgis.gui import QgsMapTool, QgsMapToolPan
 from qgis.utils import iface
 
-from qgis.PyQt.QtWebKit import QWebSettings
-## QtWebEngine
-# QCoreApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
-# app = QtWidgets.qApp = QtWidgets.QApplication(sys.argv)
-# from qgis.PyQt.QtWebEngineWidgets import QWebEngineSettings
+try:
+    from qgis.PyQt.QtWebKit import QWebSettings
+
+    # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
+    plugin_folder = os.path.dirname(os.path.dirname(__file__))
+    FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, 'ui', 'CCD_Plugin_dialog_base_QWebView.ui'))
+
+except ImportError:
+    # QtWebEngine for QT >= 5.15 and 6
+    QCoreApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
+    app = QtWidgets.qApp = QtWidgets.QApplication(sys.argv)
+    from PyQt5.QtWebEngineWidgets import QWebEngineSettings as QWebSettings
+
+    # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
+    plugin_folder = os.path.dirname(os.path.dirname(__file__))
+    FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, 'ui', 'CCD_Plugin_dialog_base_QWebEngine.ui'))
 
 from CCD_Plugin.core.ccd_process import compute_ccd
 from CCD_Plugin.core.plot import generate_plot
 from CCD_Plugin.utils.system_utils import wait_process
-
-# This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
-plugin_folder = os.path.dirname(os.path.dirname(__file__))
-FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, 'ui', 'CCD_Plugin_dialog_base.ui'))
 
 
 class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
