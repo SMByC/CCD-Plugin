@@ -4,7 +4,7 @@ CCD-Plugin implements the Continuous Change Detection algorithm using PyCCD and 
 
 ![](screenshot.png)
 
-The plugin utilizes Google Earth Engine to obtain data for the specified coordinates, filtering for high-quality data only, for all Landsat available right now 4, 5, 7, 8 and 9. The plugin then uses [PyCCD](https://code.usgs.gov/lcmap/pyccd) to calculate the trend and breakpoints using the Continuous Change Detection algorithm.
+The plugin utilizes Google Earth Engine to obtain data for the specified coordinate, filtering for high-quality data only, for all Landsat available right now 4, 5, 7, 8 and 9. The plugin then uses [PyCCD](https://code.usgs.gov/lcmap/pyccd) to calculate the trend and breakpoints using the Continuous Change Detection algorithm.
 
 - Zhu, Z., & Woodcock, C. E. (2014). Continuous change detection and classification of land cover using all available Landsat data. Remote sensing of Environment, 144, 152-171. https://doi.org/10.1016/j.rse.2014.01.011
 
@@ -14,7 +14,7 @@ The plugin utilizes Google Earth Engine to obtain data for the specified coordin
 
 The plugin needs to work:
 
-- Google Earth Engine [plugin](https://gee-community.github.io/qgis-earthengine-plugin/ ): The user needs to have this plugin installed an active Google Earth Engine (EE) account.
+- Google Earth Engine [plugin](https://gee-community.github.io/qgis-earthengine-plugin/ ): The user needs to have this plugin installed and an active Google Earth Engine (EE) account.
 - PyCCD, numpy, scipy and scikit-learn packages are already included in the plugin.
 
 ## About us
