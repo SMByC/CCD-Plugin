@@ -32,11 +32,13 @@ jobs:
     - name: Upload artifact full-plugin by OS
       uses: actions/upload-artifact@v3
       with:
+        name: CCD_Plugin_${{ matrix.os }}
         path: ./*.zip
 
     - name: Upload artifact extlibs by OS
       uses: actions/upload-artifact@v3
       with:
+        name: extlibs_${{ matrix.os }}
         path: ./extlibs_*.zip
 
   package:
