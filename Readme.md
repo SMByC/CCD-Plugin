@@ -1,10 +1,10 @@
 # CCD-Plugin
 
-CCD-Plugin implements the Continuous Change Detection algorithm using PyCCD and Google Earth Engine to analyze the trend and breakpoints of change over multi-year of the time series for a specific Landsat band at a given coordinate.
+The CCD-Plugin utilizes PyCCD and data from Google Earth Engine to implement the Continuous Change Detection algorithm to analyze the trend and breakpoints of change over multi-year time series at a given coordinate.
 
 ![](screenshot.png)
 
-The plugin utilizes Google Earth Engine to obtain data for the specified coordinate, filtering for high-quality data only, for all Landsat available right now 4, 5, 7, 8 and 9. The plugin then uses [PyCCD](https://code.usgs.gov/lcmap/pyccd) to calculate the trend and breakpoints using the Continuous Change Detection algorithm.
+The plugin uses Google Earth Engine to retrieve data for the specified coordinates for all available Landsat satellites, including 4, 5, 7, 8, and 9, from Collections 1 or 2. It filters for high-quality data only. The plugin then uses [PyCCD](https://code.usgs.gov/lcmap/pyccd) to calculate the trend and breakpoints using the Continuous Change Detection algorithm.
 
 - Zhu, Z., & Woodcock, C. E. (2014). Continuous change detection and classification of land cover using all available Landsat data. Remote sensing of Environment, 144, 152-171. https://doi.org/10.1016/j.rse.2014.01.011
 
@@ -15,7 +15,7 @@ The plugin utilizes Google Earth Engine to obtain data for the specified coordin
 The plugin needs to work:
 
 - Google Earth Engine [plugin](https://gee-community.github.io/qgis-earthengine-plugin/ ): The user needs to have this plugin installed and an active Google Earth Engine (EE) account.
-- PyCCD, numpy, scipy and scikit-learn packages are already included in the plugin.
+- PyCCD, numpy, scipy, scikit-learn and ploty. These packages are included in the all-in-one zip prepared by each OS: *CCD_Plugin_Windows.zip*, *CCD_Plugin_Linux.zip* and *CCD_Plugin_MacOS.zip* available in the [releases](https://github.com/SMByC/AcATaMa/releases) section. The user needs to (re)install the plugin from "Install from zip" in Qgis.
 
 ## About us
 
