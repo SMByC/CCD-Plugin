@@ -28,6 +28,7 @@ jobs:
       run: |
         paver setup
         paver package
+        paver package_extlibs
    
     - name: Upload artifact full-plugin by OS
       uses: actions/upload-artifact@v3
