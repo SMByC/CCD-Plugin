@@ -97,13 +97,19 @@ def package(options):
     with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as f:
         if not hasattr(options.package, 'tests'):
             options.plugin.excludes.extend(options.plugin.tests)
-        make_zip(f, options)
+        make_zip(f, options, src_dir=options.plugin.source_dir)
+
+@task
+def package_extlibs(options):
+    '''create package for extlibs for the plugin'''
+    package_file = options.plugin.package_dir / '{}.zip'.format(get_extlibs())
+    with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as f:
+        make_zip(f, options, src_dir=options.plugin.ext_libs)
 
 
-def make_zip(zipFile, options):
+def make_zip(zipFile, options, src_dir):
     excludes = set(options.plugin.excludes)
 
-    src_dir = options.plugin.source_dir
     exclude = lambda p: any([fnmatch.fnmatch(p, e) for e in excludes])
 
     def filter_excludes(files):
@@ -117,6 +123,6 @@ def make_zip(zipFile, options):
 
     for root, dirs, files in os.walk(src_dir):
         for f in filter_excludes(files):
-            relpath = os.path.relpath(root, '..').replace('CCD-Plugin', 'CCD_Plugin')
+            relpath = os.path.relpath(root, '..')
             zipFile.write(path(root) / f, path(relpath) / f)
         filter_excludes(dirs)
