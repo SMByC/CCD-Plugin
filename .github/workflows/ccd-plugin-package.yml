@@ -29,11 +29,16 @@ jobs:
         paver setup
         paver package
    
-    - name: Upload artifact
+    - name: Upload artifact full-plugin by OS
       uses: actions/upload-artifact@v3
       with:
-        name: CCD_Plugin-${{ matrix.os }}.zip
-        path: CCD_Plugin.zip
+        path: ./*.zip
+
+    - name: Upload artifact extlibs by OS
+      uses: actions/upload-artifact@v3
+      with:
+        path: extlibs_*
+
   package:
     needs: build
     runs-on: ubuntu-latest

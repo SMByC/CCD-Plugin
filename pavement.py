@@ -17,6 +17,15 @@ def get_extlibs():
         return 'extlibs_linux'
 
 
+def get_zip_name():
+    if platform.system() == "Windows":
+        return 'CCD_Plugin_Windows.zip'
+    if platform.system() == "Darwin":
+        return 'CCD_Plugin_MacOS.zip'
+    if platform.system() == "Linux":
+        return 'CCD_Plugin_Linux.zip'
+
+
 options(
     plugin=Bunch(
         name='CCD_Plugin',
@@ -31,7 +40,7 @@ options(
             ".idea",
             ".gitignore",
             "__pycache__",
-            "CCD_Plugin.zip"
+            "*.zip"
         ]
     ),
 )
@@ -84,7 +93,7 @@ def read_requirements():
 @cmdopts([('tests', 't', 'Package tests with plugin')])
 def package(options):
     '''create package for plugin'''
-    package_file = options.plugin.package_dir / ('%s.zip' % options.plugin.name)
+    package_file = options.plugin.package_dir / get_zip_name()
     with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as f:
         if not hasattr(options.package, 'tests'):
             options.plugin.excludes.extend(options.plugin.tests)
