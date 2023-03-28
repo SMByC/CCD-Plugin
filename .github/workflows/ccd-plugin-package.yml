@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.9"]
-        os: [ubuntu-latest]
+        os: [macos-latest, windows-latest, ubuntu-latest]
 
     steps:
     - uses: actions/checkout@v3
@@ -34,7 +34,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: CCD_Plugin_${{ matrix.os }}
-        path: ./*.zip
+        path: ./CCD_Plugin_*.zip
 
     - name: Upload artifact extlibs by OS
       uses: actions/upload-artifact@v3
