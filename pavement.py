@@ -9,6 +9,8 @@ import zipfile
 
 from paver.easy import *
 
+py_version = 'py' + str(platform.python_version_tuple()[0]) + '.' + str(platform.python_version_tuple()[1])
+
 
 def get_extlibs():
     if platform.system() == "Windows":
@@ -21,11 +23,11 @@ def get_extlibs():
 
 def get_zip_name():
     if platform.system() == "Windows":
-        return 'CCD_Plugin_Windows.zip'
+        return 'CCD_Plugin_Windows_{}.zip'.format(py_version)
     if platform.system() == "Darwin":
-        return 'CCD_Plugin_MacOS.zip'
+        return 'CCD_Plugin_MacOS_{}.zip'.format(py_version)
     if platform.system() == "Linux":
-        return 'CCD_Plugin_Linux.zip'
+        return 'CCD_Plugin_Linux_{}.zip'.format(py_version)
 
 
 def delete_directories(paths):
@@ -122,7 +124,7 @@ def package(options):
 @task
 def package_extlibs(options):
     '''create package for extlibs for the plugin'''
-    package_file = options.plugin.package_dir / '{}.zip'.format(get_extlibs())
+    package_file = options.plugin.package_dir / '{}_{}.zip'.format(get_extlibs(), py_version)
     with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as f:
         make_zip(f, options, src_dir=options.plugin.ext_libs)
 
