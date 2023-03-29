@@ -61,7 +61,7 @@ class CCD_Plugin:
             self.translator.load(locale_path)
             QCoreApplication.installTranslator(self.translator)
 
-        self.menu_name_plugin = self.tr(u'&Continuous Change Detection Plugin')
+        self.menu_name_plugin = self.tr("Continuous Change Detection Plugin")
         self.pluginIsActive = False
         CCD_Plugin.dialog = None
 
