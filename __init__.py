@@ -24,8 +24,21 @@ import platform
 import site
 import pkg_resources
 
+from qgis.PyQt.QtWidgets import QMessageBox
+
+from CCD_Plugin.utils import extralibs
+
+
+def check_dependencies():
+    try:
+        import ccd
+        return True
+    except ImportError:
+        return False
+
 
 def pre_init_plugin():
+
     if platform.system() == "Windows":
         extlib_path = 'extlibs_windows'
     if platform.system() == "Darwin":
@@ -34,10 +47,11 @@ def pre_init_plugin():
         extlib_path = 'extlibs_linux'
     extra_libs_path = os.path.abspath(os.path.join(os.path.dirname(__file__), extlib_path))
 
-    # add to python path
-    site.addsitedir(extra_libs_path)
-    # pkg_resources doesn't listen to changes on sys.path.
-    pkg_resources.working_set.add_entry(extra_libs_path)
+    if os.path.isdir(extra_libs_path):
+        # add to python path
+        site.addsitedir(extra_libs_path)
+        # pkg_resources doesn't listen to changes on sys.path.
+        pkg_resources.working_set.add_entry(extra_libs_path)
 
 
 # noinspection PyPep8Naming
@@ -49,6 +63,18 @@ def classFactory(iface):  # pylint: disable=invalid-name
     """
     # load extra python dependencies
     pre_init_plugin()
+
+    if not check_dependencies():
+        # install extra python dependencies
+        extralibs.install()
+        # load extra python dependencies
+        pre_init_plugin()
+
+        if not check_dependencies():
+            msg = "Error loading libraries for CCD-Plugin. " \
+                  "Read the install instructions here:\n\n" \
+                  "https://github.com/SMByC/CCD-Plugin#installation"
+            QMessageBox.critical(None, 'CCD-Plugin: Error loading', msg, QMessageBox.Ok)
 
     from .CCD_Plugin import CCD_Plugin
     return CCD_Plugin(iface)
