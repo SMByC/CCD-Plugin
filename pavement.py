@@ -79,7 +79,7 @@ def setup():
             sh('pip3 install -U -t "{ext_libs}" "{dep}"'.format(ext_libs=ext_libs.abspath(), dep=req))
 
     # remove some libraries that are not needed
-    list_of_dirs = ["numpy*"]
+    list_of_dirs = ["numpy*", "scipy*"]
     list_of_dirs = [os.path.join(ext_libs.abspath(), d) for d in list_of_dirs]
     delete_directories(list_of_dirs)
 
