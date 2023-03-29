@@ -27,9 +27,9 @@ jobs:
     - name: Package QGIS Plugin
       run: |
         paver setup
-#        paver package
         paver package_extlibs
-   
+#        paver package
+
 #    - name: Upload artifact full-plugin by OS
 #      uses: actions/upload-artifact@v3
 #      with:
