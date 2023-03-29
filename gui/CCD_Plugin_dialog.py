@@ -90,6 +90,11 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
         self.pick_on_map.clicked.connect(self.coordinates_from_map)
         self.generate_button.clicked.connect(lambda: self.new_plot())
 
+    def keyPressEvent(self, event):
+        # ignore esc key for close the main dialog
+        if not event.key() == Qt.Key_Escape:
+            super(CCD_PluginDialog, self).keyPressEvent(event)
+
     def closeEvent(self, event):
         # close
         self.closingPlugin.emit()
