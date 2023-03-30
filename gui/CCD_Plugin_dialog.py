@@ -115,6 +115,8 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
     @wait_process
     def new_plot(self):
         from CCD_Plugin.CCD_Plugin import CCD_Plugin
+        # clean the plot
+        self.plot_webview.setHtml("")
 
         # check import ee lib
         try:
