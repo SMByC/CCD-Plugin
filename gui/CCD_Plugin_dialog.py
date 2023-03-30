@@ -26,9 +26,10 @@ import os, sys
 
 from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
+from qgis.PyQt.QtGui import QColor
 from qgis.PyQt.QtCore import QUrl, pyqtSignal, Qt, QDate, QCoreApplication
 from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject
-from qgis.gui import QgsMapTool, QgsMapToolPan
+from qgis.gui import QgsMapTool, QgsMapToolPan, QgsVertexMarker
 from qgis.utils import iface
 
 try:
@@ -151,13 +152,34 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
 
 
 class PickerCoordsOnMap(QgsMapTool):
+    marker = None
+
     def __init__(self, dialog):
         QgsMapTool.__init__(self, iface.mapCanvas())
         self.dialog = dialog
 
+    @staticmethod
+    def delete_marker():
+        if PickerCoordsOnMap.marker:
+            iface.mapCanvas().scene().removeItem(PickerCoordsOnMap.marker)
+            PickerCoordsOnMap.marker = None
+
+    def create_marker(self, point):
+        # remove the previous marker
+        self.delete_marker()
+        # create a marker
+        marker = QgsVertexMarker(iface.mapCanvas())
+        marker.setCenter(point)
+        marker.setColor(QColor("red"))
+        marker.setIconSize(25)
+        marker.setIconType(QgsVertexMarker.ICON_CIRCLE)
+        marker.setPenWidth(4)
+        PickerCoordsOnMap.marker = marker
+
     def canvasPressEvent(self, event):
         if event.button() == Qt.LeftButton:
             point = iface.mapCanvas().getCoordinateTransform().toMapCoordinates(event.pos().x(), event.pos().y())
+            self.create_marker(point)
             # transform coordinates to WGS84
             crsSrc = iface.mapCanvas().mapSettings().destinationCrs()
             crsDest = QgsCoordinateReferenceSystem(4326)

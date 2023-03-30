@@ -130,6 +130,10 @@ class CCD_Plugin:
         """Cleanup necessary items here when plugin is closed"""
         self.removes_temporary_files()
 
+        # delete the marker
+        from CCD_Plugin.gui.CCD_Plugin_dialog import PickerCoordsOnMap
+        PickerCoordsOnMap.delete_marker()
+
         # remove this statement if dialog is to remain
         # for reuse if plugin is reopened
         # Commented next statement since it causes QGIS crashe
