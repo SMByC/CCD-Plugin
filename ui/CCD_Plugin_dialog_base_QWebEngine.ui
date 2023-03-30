@@ -205,6 +205,23 @@
               </property>
              </widget>
             </item>
+            <item>
+             <widget class="QToolButton" name="btm_center_on_point">
+              <property name="toolTip">
+               <string>Center to the current coordinate</string>
+              </property>
+              <property name="icon">
+               <iconset>
+                <normaloff>:/plugins/CCD_Plugin/icons/center_on_point.svg</normaloff>:/plugins/CCD_Plugin/icons/center_on_point.svg</iconset>
+              </property>
+              <property name="toolButtonStyle">
+               <enum>Qt::ToolButtonIconOnly</enum>
+              </property>
+              <property name="autoRaise">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
            </layout>
           </widget>
          </item>
@@ -537,12 +554,12 @@
      <property name="acceptDrops">
       <bool>false</bool>
      </property>
-     <property name="url" stdset="0">
+     <property name="url">
       <url>
        <string>about:blank</string>
       </url>
      </property>
-     <property name="zoomFactor" stdset="0">
+     <property name="zoomFactor">
       <double>1.400000000000000</double>
      </property>
     </widget>

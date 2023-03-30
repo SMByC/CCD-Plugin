@@ -3,5 +3,6 @@
         <file>icons/ccd_plugin.svg</file>
         <file>icons/generate.svg</file>
         <file>icons/select_on_canvas.svg</file>
+        <file>icons/center_on_point.svg</file>
     </qresource>
 </RCC>

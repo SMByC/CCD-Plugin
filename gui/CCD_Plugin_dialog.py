@@ -28,7 +28,7 @@ from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
 from qgis.PyQt.QtGui import QColor
 from qgis.PyQt.QtCore import QUrl, pyqtSignal, Qt, QDate, QCoreApplication
-from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject
+from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject, QgsPointXY
 from qgis.gui import QgsMapTool, QgsMapToolPan, QgsVertexMarker
 from qgis.utils import iface
 
@@ -84,6 +84,8 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
         self.collection.setCurrentIndex(1)
         # set the current date
         self.end_date.setDate(QDate.currentDate())
+        # set action center on point
+        self.btm_center_on_point.clicked.connect(self.center_on_point)
 
         self.default_point_tool = QgsMapToolPan(iface.mapCanvas())
         iface.mapCanvas().setMapTool(self.default_point_tool, clean=True)
@@ -150,6 +152,19 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
         html_file = generate_plot(ccd_results, dates, band_data, band, CCD_Plugin.tmp_dir)
         self.plot_webview.load(QUrl.fromLocalFile(html_file))
 
+    def center_on_point(self):
+        # get the coordinates
+        point = QgsPointXY(self.longitude.value(), self.latitude.value())
+        # transform coordinates to map canvas
+        crsSrc = QgsCoordinateReferenceSystem(4326)
+        crsDest = iface.mapCanvas().mapSettings().destinationCrs()
+        xform = QgsCoordinateTransform(crsSrc, crsDest, QgsProject.instance())
+        point = xform.transform(point)
+        # create a marker
+        PickerCoordsOnMap.create_marker(point)
+        # center on point
+        iface.mapCanvas().setCenter(point)
+
 
 class PickerCoordsOnMap(QgsMapTool):
     marker = None
@@ -164,9 +179,10 @@ class PickerCoordsOnMap(QgsMapTool):
             iface.mapCanvas().scene().removeItem(PickerCoordsOnMap.marker)
             PickerCoordsOnMap.marker = None
 
-    def create_marker(self, point):
+    @staticmethod
+    def create_marker(point):
         # remove the previous marker
-        self.delete_marker()
+        PickerCoordsOnMap.delete_marker()
         # create a marker
         marker = QgsVertexMarker(iface.mapCanvas())
         marker.setCenter(point)
