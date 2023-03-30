@@ -2,7 +2,7 @@
 
 The CCD-Plugin utilizes PyCCD and data from Google Earth Engine to implement the Continuous Change Detection algorithm to analyze the trend and breakpoints of change over multi-year time series at a given coordinate.
 
-![](screenshot.png)
+![](screenshot.webp)
 
 The plugin uses Google Earth Engine to retrieve data for the specified coordinates for all available Landsat satellites, including 4, 5, 7, 8, and 9, from Collections 1 or 2. It filters for high-quality data only. The plugin then uses [PyCCD](https://code.usgs.gov/lcmap/pyccd) to calculate the trend and breakpoints using the Continuous Change Detection algorithm.
 
@@ -15,7 +15,10 @@ The plugin uses Google Earth Engine to retrieve data for the specified coordinat
 The plugin needs to work:
 
 - Google Earth Engine [plugin](https://gee-community.github.io/qgis-earthengine-plugin/ ): The user needs to have this plugin installed and an active Google Earth Engine (EE) account.
-- PyCCD, numpy, scipy, scikit-learn and ploty. These packages are included in the all-in-one zip prepared by each OS: *CCD_Plugin_Windows.zip*, *CCD_Plugin_Linux.zip* and *CCD_Plugin_MacOS.zip* available in the [releases](https://github.com/SMByC/AcATaMa/releases) section. The user needs to (re)install the plugin from "Install from zip" in Qgis.
+- PyCCD, Scikit-learn and Plotly. The plugin install automatically these additional libraries by each OS and Python version.
+
+> *Note:* 
+    This plugin does not work in very old Qgis versions and only for 64bit systems. For uninstall/update in Windows, due to some dlls, you must first deactivate, restart Qgis and finally uninstall, update or reinstall.
 
 ## About us
 
