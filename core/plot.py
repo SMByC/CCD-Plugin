@@ -33,7 +33,7 @@ def generate_plot(ccd_results, dates, band_data, band_name, tmp_dir):
     dates_dt = np.array([date.fromordinal(d) for d in dates])
     band_data = np.array(band_data)
 
-    mask = np.array(ccd_results['processing_mask'], dtype=np.bool)
+    mask = np.array(ccd_results['processing_mask'], dtype=bool)
     print('Start Date: {0}\nEnd Date: {1}\n'.format(dates_dt[0], dates_dt[-1]))
 
     predicted_values = []
