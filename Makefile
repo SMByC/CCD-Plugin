@@ -42,13 +42,13 @@ PLUGINNAME = CCD_Plugin
 
 PY_FILES = \
     __init__.py \
-    CCD_Plugin.py CCD_Plugin_dialog.py
+    CCD_Plugin.py
 
 UI_FILES = 
 
 EXTRAS = metadata.txt
 
-EXTRA_DIRS = core utils gui ui icons
+EXTRA_DIRS = core gui icons ui utils
 
 COMPILED_RESOURCE_FILES = resources.py
 
@@ -69,7 +69,7 @@ QGISDIR=.local/share/QGIS/QGIS3/profiles/default
 # Normally you would not need to edit below here
 #################################################
 
-HELP = README.md
+HELP = Readme.md
 
 PLUGIN_UPLOAD = python3 plugin_upload.py -u xaviercll
 

@@ -10,7 +10,7 @@ qgisMaximumVersion=3.99
 author=Xavier Corredor Llano, SMByC
 email=xavier.corredor.llano@gmail.com
 
-homepage=https://smbyc.github.io/CCD-Plugin
+homepage=https://github.com/SMByC/CCD-Plugin
 tracker=https://github.com/SMByC/CCD-Plugin/issues
 repository=https://github.com/SMByC/CCD-Plugin
 
