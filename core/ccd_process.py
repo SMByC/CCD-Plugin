@@ -23,7 +23,7 @@ import numpy as np
 from datetime import datetime
 from qgis.core import Qgis
 
-from CCD_Plugin.core.gee_data import get_full_collection, get_data_full
+from CCD_Plugin.core.gee_data import get_gee_data_landsat
 
 
 def mask(input_list, boolean_mask):
@@ -57,21 +57,24 @@ def compute_ccd(coords, date_range, doy_range, collection, band):
     # 'pixel_qa',11
 
     ### get GEE data from the specific point
-    data_collection = get_full_collection(coords, date_range, doy_range, collection)
-    data_point = get_data_full(data_collection, coords)[1::]
+    gee_data_point = get_gee_data_landsat(coords, date_range, doy_range, collection)
 
     # generate a merge/fusion mask layer of nan/none values to filter all data
-    nan_masks = [[0 if dp[i] is None else 1 for dp in data_point] for i in range(3, 12)]
+    nan_masks = [[0 if dp[i] is None else 1 for dp in gee_data_point] for i in range(3, 12)]
     # fusion masks
     nan_mask = [0 if 0 in m else 1 for m in zip(*nan_masks)]
 
     # get each features applying the mask
     dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas = \
-        mask([dp[3] for dp in data_point], nan_mask), mask([dp[4] for dp in data_point], nan_mask), \
-        mask([dp[5] for dp in data_point], nan_mask), mask([dp[6] for dp in data_point], nan_mask), \
-        mask([dp[7] for dp in data_point], nan_mask), mask([dp[8] for dp in data_point], nan_mask), \
-        mask([dp[9] for dp in data_point], nan_mask), mask([dp[10] for dp in data_point], nan_mask), \
-        mask([dp[11] for dp in data_point], nan_mask)
+        [mask([dp[i] for dp in gee_data_point], nan_mask) for i in range(3, 12)]
+
+    # mask the indices range 12-19 for 'NBR', 'NDVI', 'EVI', 'EVI2', 'BRIGHTNESS', 'GREENNESS', 'WETNESS'
+    nbrs, ndvis, evis, evi2s, brightnesss, greennesss, wetnesss = \
+        [mask([dp[i] for dp in gee_data_point], nan_mask) for i in range(12, 19)]
+
+    # # multiply by 10000 to nbrs, ndvis, evis, evi2s
+    nbrs, ndvis, evis, evi2s = \
+        [np.array([i * 10000 for i in b]) for b in [nbrs, ndvis, evis, evi2s]]
 
     # convert the dates from miliseconds unix time to ordinal
     dates = np.array([datetime.fromtimestamp(int(str(int(d))[:-3])).toordinal() for d in dates])
@@ -83,10 +86,12 @@ def compute_ccd(coords, date_range, doy_range, collection, band):
                                              level=Qgis.Warning, duration=5)
         return
 
-    results = ccd.detect(dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas)
+    results = ccd.detect(dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, nbrs, ndvis, evis, evi2s, brightnesss, greennesss, wetnesss, qas)
 
     # get the results by band
-    band_name = {"Blue": blues, "Green": greens, "Red": reds, "NIR": nirs, "SWIR1": swir1s, "SWIR2": swir2s}
+    band_name = {"Blue": blues, "Green": greens, "Red": reds, "NIR": nirs, "SWIR1": swir1s, "SWIR2": swir2s,
+                 "NBR": nbrs, "NDVI": ndvis, "EVI": evis, "EVI2": evi2s, "BRIGHTNESS": brightnesss,
+                 "GREENNESS": greennesss, "WETNESS": wetnesss}
     band_data = np.array(band_name[band])
 
     return results, dates, band_data

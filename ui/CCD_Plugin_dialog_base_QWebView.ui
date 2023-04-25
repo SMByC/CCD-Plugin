@@ -433,7 +433,7 @@
          <item>
           <widget class="QLabel" name="label_2">
            <property name="text">
-            <string>Band</string>
+            <string>Band / Index</string>
            </property>
            <property name="alignment">
             <set>Qt::AlignCenter</set>
@@ -473,6 +473,46 @@
            <item>
             <property name="text">
              <string>SWIR2</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>---</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>NBR</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>NDVI</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>EVI</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>EVI2</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>BRIGHTNESS</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>GREENNESS</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>WETNESS</string>
             </property>
            </item>
           </widget>

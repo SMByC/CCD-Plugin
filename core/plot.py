@@ -125,7 +125,14 @@ def generate_plot(ccd_results, dates, band_data, band_name, tmp_dir):
     fig.update_traces(hovertemplate='%{y:.0f}<br>%{x}')
     fig.update_xaxes(title_text=None, tickangle=-90 if np.max(dates_dt).year - np.min(dates_dt).year > 20 else 0,
                      ticklabelmode="period", dtick="M12", tick0=date(np.min(dates_dt).year, 1, 1), automargin=True)
-    fig.update_yaxes(title_text="Surface Reflectance (x10⁴) - {}".format(band_name), automargin=True)
+
+    if band_name in ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2']:
+        title = "Surface Reflectance (x10⁴) - {}".format(band_name)
+    if band_name in ["NBR", "NDVI", "EVI", "EVI2"]:
+        title = "Index (x10⁴) - {}".format(band_name)
+    if band_name in ["BRIGHTNESS", "GREENNESS", "WETNESS"]:
+        title = "Index - {}".format(band_name)
+    fig.update_yaxes(title_text=title, automargin=True)
 
     html_file = tempfile.mktemp(suffix=".html", dir=tmp_dir)
     plotly.offline.plot(fig, filename=html_file, auto_open=False, config={'displaylogo': False})

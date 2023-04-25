@@ -137,7 +137,7 @@ def prepare_L8L9_C2(image):
 
 
 # filter and merge collections
-def get_full_collection(coords, date_range, doy_range, collection):
+def get_gee_data_landsat(coords, date_range, doy_range, collection):
     import ee
     point = ee.Geometry.Point(coords)
 
@@ -176,27 +176,49 @@ def get_full_collection(coords, date_range, doy_range, collection):
         all_scenes = ee.ImageCollection(l4_prepared).merge(l5_prepared).merge(l7_prepared)\
                                         .merge(l8_prepared).merge(l9_prepared).sort('system:time_start')
 
-    # Return merged image collection
-    return all_scenes
+    # Add indices: 'NBR', 'NDVI', 'EVI', 'EVI2', 'BRIGHTNESS', 'GREENNESS', 'WETNESS'
+    all_gee_data = all_scenes.map(lambda image: image.addBands([
+        image.normalizedDifference(['NIR', 'SWIR2']).rename('NBR'),
+        image.normalizedDifference(['NIR', 'Red']).rename('NDVI'),
+        image.expression('2.5 * ((NIR - Red) / (NIR + 6 * Red - 7.5 * Blue + 1))',
+            {'NIR': image.select('NIR'),
+             'Red': image.select('Red'),
+             'Blue': image.select('Blue')}).rename('EVI'),
+        image.expression('2.5 * ((NIR - Red) / (NIR + 2.4 * Red + 1))',
+            {'NIR': image.select('NIR'),
+             'Red': image.select('Red')}).rename('EVI2'),
+        image.expression('sqrt((Red - SWIR1) * (Red - SWIR1) + (NIR - SWIR2) * (NIR - SWIR2))',
+            {'Red': image.select('Red'),
+             'SWIR1': image.select('SWIR1'),
+             'NIR': image.select('NIR'),
+             'SWIR2': image.select('SWIR2')}).rename('BRIGHTNESS'),
+        image.expression('Red + 2.5 * NIR - 1.5 * (Blue + SWIR1) - 0.25 * SWIR2',
+            {'Red': image.select('Red'),
+             'NIR': image.select('NIR'),
+             'Blue': image.select('Blue'),
+             'SWIR1': image.select('SWIR1'),
+             'SWIR2': image.select('SWIR2')}).rename('GREENNESS'),
+        image.expression('4 * (NIR - SWIR1) - (0.25 * SWIR2 + 2.75 * Blue)',
+            {'NIR': image.select('NIR'),
+             'SWIR1': image.select('SWIR1'),
+             'SWIR2': image.select('SWIR2'),
+             'Blue': image.select('Blue')}).rename('WETNESS'),
+        ]))
 
-
-# Get time series for location
-def get_data_full(collection, coords):
-    import ee
-    point = ee.Geometry.Point(coords)
     # Sample for a time series of values at the point.
-    filtered_col = collection.filter("WRS_ROW < 122").filterBounds(point)
+    filtered_col = all_gee_data.filter("WRS_ROW < 122").filterBounds(point)
     geom_values = filtered_col.getRegion(geometry=point, scale=30)
-    data = ee.List(geom_values).getInfo()
+    data_point = ee.List(geom_values).getInfo()[1::]
     
-    return data
+    return data_point
 
 # Run everything
+# import ee
+# ee.Initialize()
 # coords = [-72.500634, 1.90668]
-# year_range = (2000, 2001)
+# year_range = (2000, 2010)
 # doy_range = (1, 365)
 #
-# click_col = get_full_collection(coords, year_range, doy_range, 2)
-# click_df = get_data_full(click_col, coords)
+# click_col = get_gee_data_landsat(coords, year_range, doy_range, 2)
 #
-# print(click_df)
+# print(click_col)
