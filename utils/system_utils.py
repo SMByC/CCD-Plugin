@@ -40,8 +40,8 @@ def error_handler(func):
 
             # select the message bar
             from CCD_Plugin.CCD_Plugin import CCD_Plugin
-            if CCD_Plugin.dialog:
-                msg_bar = CCD_Plugin.dialog.MsgBar
+            if CCD_Plugin.widget:
+                msg_bar = CCD_Plugin.widget.MsgBar
             else:
                 msg_bar = iface.messageBar()
 

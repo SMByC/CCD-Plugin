@@ -37,7 +37,7 @@ try:
 
     # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
     plugin_folder = os.path.dirname(os.path.dirname(__file__))
-    FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, 'ui', 'CCD_Plugin_dialog_base_QWebView.ui'))
+    FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, 'ui', 'CCD_Plugin_dockwidget_QWebView.ui'))
 
 except ImportError:
     # QtWebEngine for QT >= 5.15 and 6
@@ -47,19 +47,19 @@ except ImportError:
 
     # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
     plugin_folder = os.path.dirname(os.path.dirname(__file__))
-    FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, 'ui', 'CCD_Plugin_dialog_base_QWebEngine.ui'))
+    FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, 'ui', 'CCD_Plugin_dockwidget_QWebEngine.ui'))
 
 from CCD_Plugin.core.ccd_process import compute_ccd
 from CCD_Plugin.core.plot import generate_plot
 from CCD_Plugin.utils.system_utils import wait_process
 
 
-class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
+class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
     closingPlugin = pyqtSignal()
 
     def __init__(self, parent=None):
         """Constructor."""
-        super(CCD_PluginDialog, self).__init__(parent)
+        super(CCD_PluginDockWidget, self).__init__(parent)
         # Set up the user interface from Designer through FORM_CLASS.
         # After self.setupUi() you can access any designer object by doing
         # self.<objectname>, and you can use autoconnect slots - see
@@ -93,25 +93,12 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
         self.pick_on_map.clicked.connect(self.coordinates_from_map)
         self.generate_button.clicked.connect(lambda: self.new_plot())
 
-    def keyPressEvent(self, event):
-        # ignore esc key for close the main dialog
-        if not event.key() == Qt.Key_Escape:
-            super(CCD_PluginDialog, self).keyPressEvent(event)
-
     def closeEvent(self, event):
         # close
         self.closingPlugin.emit()
         event.accept()
 
     def coordinates_from_map(self):
-        # minimize the plugin dialog
-        self.setWindowState(Qt.WindowMinimized)
-        # raise qgis window
-        qgis_window = iface.mainWindow()
-        qgis_window.raise_()
-        qgis_window.setWindowState(qgis_window.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
-        qgis_window.activateWindow()
-
         # set the map tool and actions
         iface.mapCanvas().setMapTool(PickerCoordsOnMap(self), clean=True)
 
@@ -169,9 +156,9 @@ class CCD_PluginDialog(QtWidgets.QDialog, FORM_CLASS):
 class PickerCoordsOnMap(QgsMapTool):
     marker = None
 
-    def __init__(self, dialog):
+    def __init__(self, widget):
         QgsMapTool.__init__(self, iface.mapCanvas())
-        self.dialog = dialog
+        self.widget = widget
 
     @staticmethod
     def delete_marker():
@@ -202,8 +189,8 @@ class PickerCoordsOnMap(QgsMapTool):
             xform = QgsCoordinateTransform(crsSrc, crsDest, QgsProject.instance())
             point = xform.transform(point)
 
-            self.dialog.longitude.setValue(point.x())
-            self.dialog.latitude.setValue(point.y())
+            self.widget.longitude.setValue(point.x())
+            self.widget.latitude.setValue(point.y())
 
             self.finish()
 
@@ -213,8 +200,5 @@ class PickerCoordsOnMap(QgsMapTool):
 
     def finish(self):
         iface.mapCanvas().unsetMapTool(self)
-        iface.mapCanvas().setMapTool(self.dialog.default_point_tool)
-        self.dialog.raise_()
-        self.dialog.setWindowState(self.dialog.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
-        self.dialog.activateWindow()
+        iface.mapCanvas().setMapTool(self.widget.default_point_tool)
 

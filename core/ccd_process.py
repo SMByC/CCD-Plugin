@@ -82,7 +82,7 @@ def compute_ccd(coords, date_range, doy_range, collection, band):
     # check if nan_mask is all zeros, not clean data available
     if not any(nan_mask):
         from CCD_Plugin.CCD_Plugin import CCD_Plugin
-        CCD_Plugin.dialog.MsgBar.pushMessage("Error: Not enough clean data to compute CCD for this point",
+        CCD_Plugin.widget.MsgBar.pushMessage("Error: Not enough clean data to compute CCD for this point",
                                              level=Qgis.Warning, duration=5)
         return
 

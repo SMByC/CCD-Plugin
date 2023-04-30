@@ -100,10 +100,10 @@ def generate_plot(ccd_results, dates, band_data, band_name, tmp_dir):
     fig.add_trace(go.Scatter(x=[dates_dt[0]]*2, y=[np.min(band_data)]*2, hoverinfo=None,
                              mode='lines', line=dict(color='red', width=1, dash='dash'), name='break lines'))
 
-    # get longitude and latitude from CCD_PluginDialog
+    # get longitude and latitude from CCD_PluginDockWidget
     from CCD_Plugin.CCD_Plugin import CCD_Plugin
-    lon = CCD_Plugin.dialog.longitude.value()
-    lat = CCD_Plugin.dialog.latitude.value()
+    lon = CCD_Plugin.widget.longitude.value()
+    lat = CCD_Plugin.widget.latitude.value()
 
     fig.update_layout(
         title={

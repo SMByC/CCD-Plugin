@@ -27,14 +27,14 @@ from qgis.PyQt.QtWidgets import QAction
 
 # Initialize Qt resources from file resources.py
 from .resources import *
-# Import the code for the dialog
-from CCD_Plugin.gui.CCD_Plugin_dialog import CCD_PluginDialog
+# Import the code for the widget
+from CCD_Plugin.gui.CCD_Plugin_dockwidget import CCD_PluginDockWidget
 import os.path
 
 
 class CCD_Plugin:
     """QGIS Plugin Implementation."""
-    dialog = None
+    widget = None
     tmp_dir = None
 
     def __init__(self, iface):
@@ -63,7 +63,7 @@ class CCD_Plugin:
 
         self.menu_name_plugin = self.tr("Continuous Change Detection Plugin")
         self.pluginIsActive = False
-        CCD_Plugin.dialog = None
+        CCD_Plugin.widget = None
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -81,7 +81,7 @@ class CCD_Plugin:
         return QCoreApplication.translate('CCD_Plugin', message)
 
     def initGui(self):
-        ### Main dialog menu
+        ### Main widget menu
         # Create action that will start plugin configuration
         icon_path = ':/plugins/CCD_Plugin/icons/ccd_plugin.svg'
         self.dockable_action = QAction(QIcon(icon_path), "CCD_Plugin", self.iface.mainWindow())
@@ -97,32 +97,27 @@ class CCD_Plugin:
         if not self.pluginIsActive:
             self.pluginIsActive = True
 
-            # dialog may not exist if:
+            # print "** STARTING CCD_Plugin"
+
+            # dockwidget may not exist if:
             #    first run of plugin
             #    removed on close (see self.onClosePlugin method)
-            if CCD_Plugin.dialog is None:
-                CCD_Plugin.dialog = CCD_PluginDialog()
+            if CCD_Plugin.widget == None:
+                # Create the dockwidget (after translation) and keep reference
+                CCD_Plugin.widget = CCD_PluginDockWidget()
 
             # init tmp dir for all process and intermediate files
+            if CCD_Plugin.tmp_dir:
+                self.removes_temporary_files()
             CCD_Plugin.tmp_dir = tempfile.mkdtemp()
-            # connect to provide cleanup on closing of dialog
-            CCD_Plugin.dialog.closingPlugin.connect(self.onClosePlugin)
 
-            # setup and show the dialog
-            CCD_Plugin.dialog.show()
-            # Run the dialog event loop
-            result = CCD_Plugin.dialog.exec_()
-            # See if OK was pressed
-            if result:
-                # Do something useful here - delete the line containing pass and
-                # substitute with your code.
-                pass
-        else:
-            # an instance of CCD_Plugin is already created
-            # brings that instance to front even if it is minimized
-            CCD_Plugin.dialog.setWindowState(CCD_Plugin.dialog.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
-            CCD_Plugin.dialog.raise_()
-            CCD_Plugin.dialog.activateWindow()
+            # connect to provide cleanup on closing of dockwidget
+            CCD_Plugin.widget.closingPlugin.connect(self.onClosePlugin)
+
+            # show the dockwidget
+            # TODO: fix to allow choice of dock location
+            self.iface.addDockWidget(Qt.BottomDockWidgetArea, CCD_Plugin.widget)
+            CCD_Plugin.widget.show()
 
     #--------------------------------------------------------------------------
 
@@ -131,15 +126,15 @@ class CCD_Plugin:
         self.removes_temporary_files()
 
         # delete the marker
-        from CCD_Plugin.gui.CCD_Plugin_dialog import PickerCoordsOnMap
+        from CCD_Plugin.gui.CCD_Plugin_dockwidget import PickerCoordsOnMap
         PickerCoordsOnMap.delete_marker()
 
-        # remove this statement if dialog is to remain
+        # remove this statement if widget is to remain
         # for reuse if plugin is reopened
         # Commented next statement since it causes QGIS crashe
         # when closing the docked window:
-        CCD_Plugin.dialog.close()
-        CCD_Plugin.dialog = None
+        CCD_Plugin.widget.close()
+        CCD_Plugin.widget = None
 
         # reset some variables
         self.pluginIsActive = False
@@ -154,12 +149,14 @@ class CCD_Plugin:
         self.iface.removePluginMenu(self.menu_name_plugin, self.dockable_action)
         self.iface.removeToolBarIcon(self.dockable_action)
 
-        if CCD_Plugin.dialog:
-            CCD_Plugin.dialog.close()
+        if CCD_Plugin.widget:
+            self.iface.removeDockWidget(CCD_Plugin.widget)
+            # delete the widget
+            del CCD_Plugin.widget
 
     @staticmethod
     def removes_temporary_files():
-        if not CCD_Plugin.dialog:
+        if not CCD_Plugin.widget:
             return
 
         # clear CCD_Plugin.tmp_dir
