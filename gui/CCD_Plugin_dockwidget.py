@@ -68,15 +68,6 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.setupUi(self)
         self.setup_gui()
 
-        # plot web view
-        plot_view_settings = self.plot_webview.settings()
-        plot_view_settings.setAttribute(QWebSettings.WebGLEnabled, True)
-        plot_view_settings.setAttribute(QWebSettings.Accelerated2dCanvasEnabled, True)
-        plot_view_settings.setAttribute(QWebSettings.PluginsEnabled, True)
-        plot_view_settings.setAttribute(QWebSettings.DnsPrefetchEnabled, True)
-        plot_view_settings.setAttribute(QWebSettings.XSSAuditingEnabled, True)
-        plot_view_settings.setAttribute(QWebSettings.JavascriptEnabled, True)
-
     def setup_gui(self):
         # select swir1 band by default
         self.band.setCurrentIndex(4)
@@ -92,6 +83,20 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         self.pick_on_map.clicked.connect(self.coordinates_from_map)
         self.generate_button.clicked.connect(lambda: self.new_plot())
+
+        # plot web view
+        plot_view_settings = self.plot_webview.settings()
+        plot_view_settings.setAttribute(QWebSettings.WebGLEnabled, True)
+        plot_view_settings.setAttribute(QWebSettings.Accelerated2dCanvasEnabled, True)
+        plot_view_settings.setAttribute(QWebSettings.PluginsEnabled, True)
+        plot_view_settings.setAttribute(QWebSettings.DnsPrefetchEnabled, True)
+        plot_view_settings.setAttribute(QWebSettings.XSSAuditingEnabled, True)
+        plot_view_settings.setAttribute(QWebSettings.JavascriptEnabled, True)
+        # define the zoom factor based on the dpi
+        dpi = iface.mapCanvas().mapSettings().outputDpi()
+        zoom_factor = dpi/96 - 0.4
+        zoom_factor = 1 if zoom_factor < 1 else zoom_factor
+        self.plot_webview.setZoomFactor(zoom_factor)
 
     def closeEvent(self, event):
         # close

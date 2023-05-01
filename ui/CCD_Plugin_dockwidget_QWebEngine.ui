@@ -585,9 +585,6 @@
         <string>about:blank</string>
        </url>
       </property>
-      <property name="zoomFactor">
-       <double>1.400000000000000</double>
-      </property>
      </widget>
     </item>
    </layout>
