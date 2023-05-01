@@ -223,6 +223,9 @@ class PickerCoordsOnMap(QgsMapTool):
             self.widget.longitude.setValue(point.x())
             self.widget.latitude.setValue(point.y())
 
+            # clean the plot
+            self.widget.plot_webview.setHtml("")
+
             self.finish()
 
     def keyPressEvent(self, event):
