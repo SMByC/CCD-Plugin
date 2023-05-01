@@ -96,7 +96,7 @@ def compute_ccd(coords, date_range, doy_range, collection, band_or_index):
     time_series = np.array(ts_by_band_or_index[band_or_index])
 
     # store the results
-    ccd_results = {}
-    ccd_results[(coords, date_range, doy_range, collection)] = (results, dates, ts_by_band_or_index)
+    global ccd_results
+    ccd_results = {(coords, date_range, doy_range, collection): (results, dates, ts_by_band_or_index)}
 
     return results, dates, time_series
