@@ -70,13 +70,15 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     def setup_gui(self):
         # select swir1 band by default
-        self.band.setCurrentIndex(4)
+        self.band_or_index.setCurrentIndex(4)
         # set the collection to 2 by default
         self.collection.setCurrentIndex(1)
         # set the current date
         self.end_date.setDate(QDate.currentDate())
         # set action center on point
         self.btm_center_on_point.clicked.connect(self.center_on_point)
+        # set action when change the band or index repaint the plot
+        self.band_or_index.currentIndexChanged.connect(lambda: self.repaint_plot())
 
         self.default_point_tool = QgsMapToolPan(iface.mapCanvas())
         iface.mapCanvas().setMapTool(self.default_point_tool, clean=True)
@@ -107,6 +109,28 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # set the map tool and actions
         iface.mapCanvas().setMapTool(PickerCoordsOnMap(self), clean=True)
 
+
+    def get_config_from_widget(self):
+        # get the coordinates
+        lon = self.longitude.value()
+        lat = self.latitude.value()
+        coords = (lon, lat)
+        # get the date range
+        start_date = self.start_date.date().toString("yyyy-MM-dd")
+        end_date = self.end_date.date().toString("yyyy-MM-dd")
+        date_range = (start_date, end_date)
+        # get days of year range
+        start_doy = self.start_doy.value()
+        end_doy = self.end_doy.value()
+        doy_range = (start_doy, end_doy)
+        # get collection
+        collection = int(self.collection.currentText()[-1])
+        # get band_or_index
+        band_or_index = self.band_or_index.currentText()
+
+        return coords, date_range, doy_range, collection, band_or_index
+
+
     @wait_process
     def new_plot(self):
         from CCD_Plugin.CCD_Plugin import CCD_Plugin
@@ -120,29 +144,31 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         except Exception as err:
             raise Exception("Error importing ee lib, check the installation or your internet connection|{}".format(err))
 
-        # get the coordinates
-        lon = self.longitude.value()
-        lat = self.latitude.value()
-        coords = [lon, lat]
-        # get the date range
-        start_date = self.start_date.date().toString("yyyy-MM-dd")
-        end_date = self.end_date.date().toString("yyyy-MM-dd")
-        date_range = [start_date, end_date]
-        # get days of year range
-        start_doy = self.start_doy.value()
-        end_doy = self.end_doy.value()
-        doy_range = [start_doy, end_doy]
-        # get collection
-        collection = int(self.collection.currentText()[-1])
-        # get band
-        band = self.band.currentText()
+        # get the config from the widget
+        coords, date_range, doy_range, collection, band_or_index = self.get_config_from_widget()
 
-        results = compute_ccd(coords, date_range, doy_range, collection, band)
+        results = compute_ccd(coords, date_range, doy_range, collection, band_or_index)
         if not results:
             return
-        ccd_results, dates, band_data = results
-        html_file = generate_plot(ccd_results, dates, band_data, band, CCD_Plugin.tmp_dir)
+        ccd_results, dates, time_series = results
+        html_file = generate_plot(ccd_results, dates, time_series, band_or_index, CCD_Plugin.tmp_dir)
         self.plot_webview.load(QUrl.fromLocalFile(html_file))
+
+    @wait_process
+    def repaint_plot(self):
+        from CCD_Plugin.CCD_Plugin import CCD_Plugin
+        from CCD_Plugin.core.ccd_process import ccd_results
+        if not ccd_results:
+            return
+        # get the config from the widget
+        coords, date_range, doy_range, collection, band_or_index = self.get_config_from_widget()
+        # check if ccd results are already computed
+        if (coords, date_range, doy_range, collection) in ccd_results:
+            ccd_results, dates, ts_by_band_or_index = ccd_results[(coords, date_range, doy_range, collection)]
+            time_series = ts_by_band_or_index[band_or_index]
+            html_file = generate_plot(ccd_results, dates, time_series, band_or_index, CCD_Plugin.tmp_dir)
+            self.plot_webview.load(QUrl.fromLocalFile(html_file))
+
 
     def center_on_point(self):
         # get the coordinates

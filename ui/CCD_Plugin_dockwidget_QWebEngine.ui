@@ -308,7 +308,7 @@
               </widget>
              </item>
              <item>
-              <widget class="QComboBox" name="band">
+              <widget class="QComboBox" name="band_or_index">
                <property name="sizeAdjustPolicy">
                 <enum>QComboBox::AdjustToContents</enum>
                </property>

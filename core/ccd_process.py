@@ -39,8 +39,9 @@ def mask(input_list, boolean_mask):
     """
     return [i for i, b in zip(input_list, boolean_mask) if b]
 
+ccd_results = {}
 
-def compute_ccd(coords, date_range, doy_range, collection, band):
+def compute_ccd(coords, date_range, doy_range, collection, band_or_index):
 
     # get data from Google Earth Engine
     # list index order:
@@ -88,10 +89,14 @@ def compute_ccd(coords, date_range, doy_range, collection, band):
 
     results = ccd.detect(dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, nbrs, ndvis, evis, evi2s, brightnesss, greennesss, wetnesss, qas)
 
-    # get the results by band
-    band_name = {"Blue": blues, "Green": greens, "Red": reds, "NIR": nirs, "SWIR1": swir1s, "SWIR2": swir2s,
-                 "NBR": nbrs, "NDVI": ndvis, "EVI": evis, "EVI2": evi2s, "BRIGHTNESS": brightnesss,
-                 "GREENNESS": greennesss, "WETNESS": wetnesss}
-    band_data = np.array(band_name[band])
+    ts_by_band_or_index = {"Blue": blues, "Green": greens, "Red": reds, "NIR": nirs, "SWIR1": swir1s, "SWIR2": swir2s,
+                        "NBR": nbrs, "NDVI": ndvis, "EVI": evis, "EVI2": evi2s, "BRIGHTNESS": brightnesss,
+                        "GREENNESS": greennesss, "WETNESS": wetnesss}
 
-    return results, dates, band_data
+    time_series = np.array(ts_by_band_or_index[band_or_index])
+
+    # store the results
+    ccd_results = {}
+    ccd_results[(coords, date_range, doy_range, collection)] = (results, dates, ts_by_band_or_index)
+
+    return results, dates, time_series
