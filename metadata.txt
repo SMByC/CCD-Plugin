@@ -3,7 +3,7 @@ name=CCD-Plugin
 description=Qgis plugin for Continuous Change Detection algorithm of a time series at a given coordinate
 about=The CCD-Plugin utilizes PyCCD and data from Google Earth Engine to implement the Continuous Change Detection algorithm to analyze the trend and breakpoints of change over multi-year time series at a given coordinate.
 
-version=23.3.30
+version=23.5
 qgisMinimumVersion=3.16
 qgisMaximumVersion=3.99
 
@@ -15,8 +15,12 @@ tracker=https://github.com/SMByC/CCD-Plugin/issues
 repository=https://github.com/SMByC/CCD-Plugin
 
 changelog=
-    23.3.30:
-    - First stable version
+    23.5:
+    - Implemented several indices to the CCD data input through GEE: 'NBR', 'NDVI', 'EVI', 'EVI2', 'BRIGHTNESS', 'GREENNESS', 'WETNESS'
+    - Refactoring the plugin to convert it as dock widget instead of dialog, improving usability and the integration with Qgis
+    - Dynamic ticks for the axe date
+    - Define the zoom factor of the plot based on the dpi
+    - Store the cdd results to repaint the plot when the user change the band or index without reprocess it
     - All commits in: https://github.com/SMByC/CCD-Plugin/commits
 
 tags=gee,trends,change detection,ccdc,landsat,time series

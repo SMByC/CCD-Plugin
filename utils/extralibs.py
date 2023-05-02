@@ -99,7 +99,7 @@ class DownloadAndUnzip(QDialog):
 
 def install():
     # define the Qgis plugins directory and url by OS
-    url = "https://github.com/SMByC/CCD-Plugin/releases/download/23.3.30/"
+    url = "https://github.com/SMByC/CCD-Plugin/releases/download/23.5/"
     py_version = 'py' + str(platform.python_version_tuple()[0]) + '.' + str(platform.python_version_tuple()[1])
     if platform.system() == "Windows":
         qgis_plugins_dir = os.path.join(os.path.expanduser('~'), 'AppData', 'Roaming', 'QGIS', 'QGIS3', 'profiles', 'default', 'python', 'plugins')
