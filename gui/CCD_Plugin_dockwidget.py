@@ -22,12 +22,13 @@
 # https://code.usgs.gov/lcmap/pyccd
 
 
-import os, sys
+import os
 
 from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
 from qgis.PyQt.QtGui import QColor
-from qgis.PyQt.QtCore import QUrl, pyqtSignal, Qt, QDate, QCoreApplication
+from qgis.PyQt.QtCore import QUrl, pyqtSignal, Qt, QDate
+from qgis.PyQt.QtWidgets import QMessageBox
 from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject, QgsPointXY
 from qgis.gui import QgsMapTool, QgsMapToolPan, QgsVertexMarker
 from qgis.utils import iface
@@ -40,14 +41,13 @@ try:
     FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, 'ui', 'CCD_Plugin_dockwidget_QWebView.ui'))
 
 except ImportError:
-    # QtWebEngine for QT >= 5.15 and 6
-    QCoreApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
-    app = QtWidgets.qApp = QtWidgets.QApplication(sys.argv)
-    from PyQt5.QtWebEngineWidgets import QWebEngineSettings as QWebSettings
+    # Qt without webkit
+    msg = "CCD-Plugin needs QtWebKit in your QT/Qgis installation. See the options here:\n\n" \
+          "https://github.com/SMByC/CCD-Plugin#installation"
+    QMessageBox.critical(None, 'CCD-Plugin: Error loading', msg, QMessageBox.Ok)
+    # raise Qgis error
+    raise ImportError(msg)
 
-    # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
-    plugin_folder = os.path.dirname(os.path.dirname(__file__))
-    FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, 'ui', 'CCD_Plugin_dockwidget_QWebEngine.ui'))
 
 from CCD_Plugin.core.ccd_process import compute_ccd
 from CCD_Plugin.core.plot import generate_plot
