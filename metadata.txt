@@ -3,7 +3,7 @@ name=CCD-Plugin
 description=Qgis plugin for Continuous Change Detection algorithm of a time series at a given coordinate
 about=The CCD-Plugin utilizes PyCCD and data from Google Earth Engine to implement the Continuous Change Detection algorithm to analyze the trend and breakpoints of change over multi-year time series at a given coordinate.
 
-version=23.5
+version=23.5a
 qgisMinimumVersion=3.16
 qgisMaximumVersion=3.99
 
