@@ -17,8 +17,18 @@ The plugin needs to work:
 - Google Earth Engine [plugin](https://gee-community.github.io/qgis-earthengine-plugin/ ): The user needs to have this plugin installed and an active Google Earth Engine (EE) account.
 - PyCCD, Scikit-learn and Plotly. The plugin install automatically these additional libraries by each OS and Python version.
 
-> *Note:* 
-    This plugin does not work in very old Qgis versions and only for 64bit systems. For uninstall/update in Windows, due to some dlls, you must first deactivate, restart Qgis and finally uninstall, update or reinstall.
+> **QT without WebKit:**
+> The plugin uses the QT WebKit module for plotting, QtWebEngine is very unstable for Qgis. We recommend installing
+> Qgis with the QT WebKit module (by default in Windows and Mac packages), other systems like Linux install the
+> python QtWebKit module (e.g. `python3-pyqt5.qtwebkit` or `python-pyqt5-webkit`) or use alternative installation of
+> Qgis (e.g. using conda). 
+
+> **Update or reinstall:**
+> In some cases update or reinstall the plugin show an error (mainly due to some dlls), then you must first 
+> deactivate it, restart Qgis and finally uninstall, update or reinstall the plugin.
+
+> **Extra libs:** The plugin install extra libraries in the plugin folder in the user directory, these libs are only 
+> for 64bit systems.
 
 ## About us
 
