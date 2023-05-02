@@ -19,8 +19,10 @@
  ***************************************************************************/
  This script initializes the plugin, making it known to QGIS.
 """
+import inspect
 import os
 import platform
+import shutil
 import site
 import pkg_resources
 
@@ -29,23 +31,36 @@ from qgis.PyQt.QtWidgets import QMessageBox
 from CCD_Plugin.utils import extralibs
 
 
-def check_dependencies():
-    try:
-        import ccd
-        return True
-    except ImportError:
-        return False
-
-
-def pre_init_plugin():
-
+def get_extlib_path():
     if platform.system() == "Windows":
         extlib_path = 'extlibs_windows'
     if platform.system() == "Darwin":
         extlib_path = 'extlibs_darwin'
     if platform.system() == "Linux":
         extlib_path = 'extlibs_linux'
-    extra_libs_path = os.path.abspath(os.path.join(os.path.dirname(__file__), extlib_path))
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), extlib_path))
+
+
+def check_dependencies():
+    try:
+        import ccd
+
+        # update the ccd library if using an old version
+        if len(inspect.signature(ccd.detect).parameters) != 18:
+            extra_libs_path = get_extlib_path()
+            # remove the extra libs ignoring the errors
+            shutil.rmtree(extra_libs_path, ignore_errors=True)
+            return False
+
+        return True
+    except ImportError:
+        return False
+
+
+
+def pre_init_plugin():
+
+    extra_libs_path = get_extlib_path()
 
     if os.path.isdir(extra_libs_path):
         # add to python path
