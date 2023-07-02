@@ -17,6 +17,9 @@
  *   (at your option) any later version.                                   *
  *                                                                         *
  ***************************************************************************/
+
+with the collaboration of Daniel Moraes <moraesd90@gmail.com>
+
 """
 # pyccd
 # https://code.usgs.gov/lcmap/pyccd
@@ -73,6 +76,13 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.band_or_index.setCurrentIndex(4)
         # set the collection to 2 by default
         self.collection.setCurrentIndex(1)
+        # set breakpointbands to blue, green, red, nir, swir1 and swir2 by default
+        self.box_breakpointbands.setItemCheckState(0,Qt.Checked)
+        self.box_breakpointbands.setItemCheckState(1,Qt.Checked)
+        self.box_breakpointbands.setItemCheckState(2,Qt.Checked)
+        self.box_breakpointbands.setItemCheckState(3,Qt.Checked)
+        self.box_breakpointbands.setItemCheckState(4,Qt.Checked)
+        self.box_breakpointbands.setItemCheckState(5,Qt.Checked)
         # set the current date
         self.end_date.setDate(QDate.currentDate())
         # set action center on point
@@ -124,11 +134,13 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         end_doy = self.end_doy.value()
         doy_range = (start_doy, end_doy)
         # get collection
-        collection = int(self.collection.currentText()[-1])
-        # get band_or_index
+        collection = self.collection.currentText()
+        # get band_or_index to plot
         band_or_index = self.band_or_index.currentText()
+        # get breakpoint bands (detection bands)
+        breakpointbands = self.box_breakpointbands.checkedItems()
 
-        return coords, date_range, doy_range, collection, band_or_index
+        return coords, date_range, doy_range, collection, band_or_index, breakpointbands
 
 
     @wait_process
@@ -145,13 +157,15 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             raise Exception("Error importing ee lib, check the installation or your internet connection|{}".format(err))
 
         # get the config from the widget
-        coords, date_range, doy_range, collection, band_or_index = self.get_config_from_widget()
-
-        results = compute_ccd(coords, date_range, doy_range, collection, band_or_index)
+        coords, date_range, doy_range, collection, band_or_index, breakpointbands = self.get_config_from_widget()
+        #use default parameters while parameter setting option is not implemented
+        tmask, numObs, chi, minYears, lda = [None, 6, 0.99, 1.33, 200]
+        results  = compute_ccd(coords, date_range, doy_range, collection, breakpointbands, tmask, numObs, chi, minYears, lda)
+                    
         if not results:
             return
-        ccd_results, dates, time_series = results
-        html_file = generate_plot(ccd_results, dates, time_series, band_or_index, CCD_Plugin.tmp_dir)
+        ccdc_result_info, timeseries = results
+        html_file = generate_plot(ccdc_result_info, timeseries, date_range, band_or_index, CCD_Plugin.tmp_dir)
         self.plot_webview.load(QUrl.fromLocalFile(html_file))
 
     @wait_process
@@ -161,12 +175,11 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         if not ccd_results:
             return
         # get the config from the widget
-        coords, date_range, doy_range, collection, band_or_index = self.get_config_from_widget()
+        coords, date_range, doy_range, collection, band_or_index, breakpointbands = self.get_config_from_widget()
         # check if ccd results are already computed
-        if (coords, date_range, doy_range, collection) in ccd_results:
-            ccd_results, dates, ts_by_band_or_index = ccd_results[(coords, date_range, doy_range, collection)]
-            time_series = ts_by_band_or_index[band_or_index]
-            html_file = generate_plot(ccd_results, dates, time_series, band_or_index, CCD_Plugin.tmp_dir)
+        if (coords, date_range, doy_range, collection, tuple(breakpointbands)) in ccd_results:
+            ccdc_result_info, timeseries = ccd_results[(coords, date_range, doy_range, collection, tuple(breakpointbands))]
+            html_file = generate_plot(ccdc_result_info, timeseries, date_range, band_or_index, CCD_Plugin.tmp_dir)
             self.plot_webview.load(QUrl.fromLocalFile(html_file))
 
 
