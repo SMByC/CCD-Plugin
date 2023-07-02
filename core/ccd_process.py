@@ -17,86 +17,61 @@
  *   (at your option) any later version.                                   *
  *                                                                         *
  ***************************************************************************/
+
+with the collaboration of Daniel Moraes <moraesd90@gmail.com>
+
 """
-import ccd
 import numpy as np
-from datetime import datetime
-from qgis.core import Qgis
+#from qgis.core import Qgis
 
-from CCD_Plugin.core.gee_data import get_gee_data_landsat
-
-
-def mask(input_list, boolean_mask):
-    """Apply boolean mask to input list
-
-    Args:
-        input_list (list): Input list for apply mask
-        boolean_mask (list): The boolean mask list
-
-    Examples:
-        >>> mask(['A','B','C','D'], [1,0,1,0])
-        ['A', 'C']
-    """
-    return [i for i, b in zip(input_list, boolean_mask) if b]
+from CCD_Plugin.core.gee_data_landsat import get_gee_data_landsat
+from CCD_Plugin.core.gee_data_sentinel import getImageCollection
 
 ccd_results = {}
 
-def compute_ccd(coords, date_range, doy_range, collection, band_or_index):
+def compute_ccd(coords, date_range, doy_range, collection, breakpointbands, tmask, numObs, chi, minYears, lda):
 
-    # get data from Google Earth Engine
-    # list index order:
-    # 'longitude', 1
-    # 'latitude',2
-    # 'time',3
-    # 'BLUE',4
-    # 'GREEN',5
-    # 'RED',6
-    # 'NIR',7
-    # 'SWIR1',8
-    # 'SWIR2',9
-    # 'THERMAL',10
-    # 'pixel_qa',11
+    import ee
+    point = ee.Geometry.Point(coords)
 
-    ### get GEE data from the specific point
-    gee_data_point = get_gee_data_landsat(coords, date_range, doy_range, collection)
+    ### determine gee scale (30m for LS / 10m for S2)
+    gee_scale = 30 if collection in ["Landsat col. 1", "Landsat col. 2"] else 10
 
-    # generate a merge/fusion mask layer of nan/none values to filter all data
-    nan_masks = [[0 if dp[i] is None else 1 for dp in gee_data_point] for i in range(3, 12)]
-    # fusion masks
-    nan_mask = [0 if 0 in m else 1 for m in zip(*nan_masks)]
+    ### get GEE data from the specific point according to selected collection
+    if collection=="Sentinel-2":
+        gee_col = getImageCollection(coords, date_range, doy_range, collection) #cloud filter selection can be implemented later
+    elif collection=="Landsat col. 1":
+        gee_col = get_gee_data_landsat(coords, date_range, doy_range, 1)
+    elif collection=="Landsat col. 2":
+        gee_col = get_gee_data_landsat(coords, date_range, doy_range, 2)
+        
+    ### execute CCDC (GEE implementation)
+    ccdc_result = ee.Algorithms.TemporalSegmentation.Ccdc(gee_col, breakpointbands, tmask, numObs, chi, minYears, 2, lda)
 
-    # get each features applying the mask
-    dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas = \
-        [mask([dp[i] for dp in gee_data_point], nan_mask) for i in range(3, 12)]
+    ### retrieve ccdc_result from server
+    ccdc_result_info = ccdc_result.reduceRegion(ee.Reducer.toList(),
+                                                point,
+                                                scale=gee_scale).getInfo()
+    
+    ### get time series from selected band
+    gee_data_point = np.array(ee.List(gee_col.getRegion(geometry=point, scale=gee_scale)).getInfo())
+    #print(gee_data_point)
+    timeseries = {}
+    stacked_gee_data = np.stack(gee_data_point[1:],axis=1)
+    for i in range(len(gee_data_point[0])):
+        timeseries[gee_data_point[0][i]] = stacked_gee_data[i]
+    #timeseries is a dictionary with the followings keys: id, longitude, latitude, time, Blue, Green, Red...
+    
+    #timeseries = np.array(gee_data_point)
 
-    # mask the indices range 12-19 for 'NBR', 'NDVI', 'EVI', 'EVI2', 'BRIGHTNESS', 'GREENNESS', 'WETNESS'
-    nbrs, ndvis, evis, evi2s, brightnesss, greennesss, wetnesss = \
-        [mask([dp[i] for dp in gee_data_point], nan_mask) for i in range(12, 19)]
+    # # check if nan_mask is all zeros, not clean data available
+    # if not any(nan_mask):
+    #     from CCD_Plugin.CCD_Plugin import CCD_Plugin
+    #     CCD_Plugin.widget.MsgBar.pushMessage("Error: Not enough clean data to compute CCD for this point",
+    #                                          level=Qgis.Warning, duration=5)
+    #     return
 
-    # # multiply by 10000 to nbrs, ndvis, evis, evi2s
-    nbrs, ndvis, evis, evi2s = \
-        [np.array([i * 10000 for i in b]) for b in [nbrs, ndvis, evis, evi2s]]
-
-    # convert the dates from miliseconds unix time to ordinal
-    dates = np.array([datetime.fromtimestamp(int(str(int(d))[:-3])).toordinal() for d in dates])
-
-    # check if nan_mask is all zeros, not clean data available
-    if not any(nan_mask):
-        from CCD_Plugin.CCD_Plugin import CCD_Plugin
-        CCD_Plugin.widget.MsgBar.pushMessage("Error: Not enough clean data to compute CCD for this point",
-                                             level=Qgis.Warning, duration=5)
-        return
-
-    results = ccd.detect(dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, nbrs, ndvis, evis, evi2s, brightnesss, greennesss, wetnesss, qas)
-
-    ts_by_band_or_index = {"Blue": blues, "Green": greens, "Red": reds, "NIR": nirs, "SWIR1": swir1s, "SWIR2": swir2s,
-                        "NBR": nbrs, "NDVI": ndvis, "EVI": evis, "EVI2": evi2s, "BRIGHTNESS": brightnesss,
-                        "GREENNESS": greennesss, "WETNESS": wetnesss}
-
-    time_series = np.array(ts_by_band_or_index[band_or_index])
-
-    # store the results
     global ccd_results
-    ccd_results = {(coords, date_range, doy_range, collection): (results, dates, ts_by_band_or_index)}
+    ccd_results = {(coords, date_range, doy_range, collection, tuple(breakpointbands)):(ccdc_result_info,timeseries)}
 
-    return results, dates, time_series
+    return ccdc_result_info, timeseries
