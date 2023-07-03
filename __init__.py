@@ -20,23 +20,12 @@
  This script initializes the plugin, making it known to QGIS.
 """
 import os
-import platform
 import site
 import pkg_resources
 
 from qgis.PyQt.QtWidgets import QMessageBox
 
 from CCD_Plugin.utils import extralibs
-
-
-def get_extlib_path():
-    if platform.system() == "Windows":
-        extlib_path = 'extlibs_windows'
-    if platform.system() == "Darwin":
-        extlib_path = 'extlibs_darwin'
-    if platform.system() == "Linux":
-        extlib_path = 'extlibs_linux'
-    return os.path.abspath(os.path.join(os.path.dirname(__file__), extlib_path))
 
 
 def check_dependencies():
@@ -49,7 +38,7 @@ def check_dependencies():
 
 def pre_init_plugin():
 
-    extra_libs_path = get_extlib_path()
+    extra_libs_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'extlibs'))
 
     if os.path.isdir(extra_libs_path):
         # add to python path

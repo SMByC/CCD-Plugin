@@ -1,3 +1,23 @@
+# -*- coding: utf-8 -*-
+"""
+/***************************************************************************
+ CCD Plugin
+                                 A QGIS plugin
+ Continuous Change Detection Plugin
+                              -------------------
+        copyright            : (C) 2019-2023 by Xavier Corredor Llano, SMByC
+        email                : xavier.corredor.llano@gmail.com
+ ***************************************************************************/
+
+/***************************************************************************
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ ***************************************************************************/
+"""
 import os
 import platform
 import tempfile
@@ -99,17 +119,13 @@ class DownloadAndUnzip(QDialog):
 
 def install():
     # define the Qgis plugins directory and url by OS
-    url = "https://github.com/SMByC/CCD-Plugin/releases/download/23.5/"
-    py_version = 'py' + str(platform.python_version_tuple()[0]) + '.' + str(platform.python_version_tuple()[1])
+    url = "https://github.com/SMByC/CCD-Plugin/releases/download/23.5/extlibs.zip"
     if platform.system() == "Windows":
         qgis_plugins_dir = os.path.join(os.path.expanduser('~'), 'AppData', 'Roaming', 'QGIS', 'QGIS3', 'profiles', 'default', 'python', 'plugins')
-        url += "extlibs_windows_{}.zip".format(py_version)
     elif platform.system() == "Linux":
         qgis_plugins_dir = os.path.join(os.path.expanduser('~'), '.local', 'share', 'QGIS', 'QGIS3', 'profiles', 'default', 'python', 'plugins')
-        url += "extlibs_linux_{}.zip".format(py_version)
     elif platform.system() == "Darwin":
         qgis_plugins_dir = os.path.join(os.path.expanduser('~'), 'Library', 'Application Support', 'QGIS', 'QGIS3', 'profiles', 'default', 'python', 'plugins')
-        url += "extlibs_macos_{}.zip".format(py_version)
 
     # install the extra libraries
     DownloadAndUnzip(url, qgis_plugins_dir)
