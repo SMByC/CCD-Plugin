@@ -1,2 +1,1 @@
-https://github.com/SMByC/pyccd/archive/refs/heads/1.x.zip
 plotly
