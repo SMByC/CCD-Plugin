@@ -5,7 +5,7 @@
                                  A QGIS plugin
  Continuous Change Detection Plugin
                               -------------------
-        copyright            : (C) 2019-2022 by Xavier Corredor Llano, SMByC
+        copyright            : (C) 2019-2023 by Xavier Corredor Llano, SMByC
         email                : xavier.corredor.llano@gmail.com
  ***************************************************************************/
 
@@ -21,10 +21,6 @@
 with the collaboration of Daniel Moraes <moraesd90@gmail.com>
 
 """
-# pyccd
-# https://code.usgs.gov/lcmap/pyccd
-
-
 import os
 
 from qgis.PyQt import uic
@@ -115,7 +111,6 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
     def coordinates_from_map(self):
         # set the map tool and actions
         iface.mapCanvas().setMapTool(PickerCoordsOnMap(self), clean=True)
-
 
     def get_config_from_widget(self):
         # get the coordinates

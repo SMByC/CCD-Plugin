@@ -18,7 +18,6 @@
  ***************************************************************************/
 
 """
-import numpy as np
 
 
 def getImageCollection(coords, date_range, doy_range, name, cloud_filter='s2cloudless'):

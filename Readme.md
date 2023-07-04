@@ -35,7 +35,8 @@ The plugin needs to work:
 CCD-Plugin was developing, designed and implemented by the Group of Forest and Carbon Monitoring System (SMByC), operated by the Institute of Hydrology, Meteorology and Environmental Studies (IDEAM) - Colombia.
 
 Author and developer: *Xavier C. Llano* *<xavier.corredor.llano@gmail.com>*  
-Theoretical support, tester and product verification: SMByC-PDI group
+Collaborator and co-developer: *Daniel Moraes* *<moraesd90@gmail.com>*  
+Theoretical support, tester and product verification: *SMByC-PDI group*  
 
 ## License
 

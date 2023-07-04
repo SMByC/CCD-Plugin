@@ -5,7 +5,7 @@
                                  A QGIS plugin
  Continuous Change Detection Plugin
                               -------------------
-        copyright            : (C) 2019-2022 by Xavier Corredor Llano, SMByC
+        copyright            : (C) 2019-2023 by Xavier Corredor Llano, SMByC
         email                : xavier.corredor.llano@gmail.com
  ***************************************************************************/
 
@@ -18,8 +18,9 @@
  *                                                                         *
  ***************************************************************************/
 
-with the collaboration of Paulo Arevalo Orduz <parevalo@bu.edu> and
-Daniel Moraes <moraesd90@gmail.com>
+with the collaboration of:
+    Paulo Arevalo Orduz <parevalo@bu.edu>
+    Daniel Moraes <moraesd90@gmail.com>
 
 """
 import tempfile

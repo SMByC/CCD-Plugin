@@ -29,6 +29,7 @@ from CCD_Plugin.core.gee_data_sentinel import getImageCollection
 
 ccd_results = {}
 
+
 def compute_ccd(coords, date_range, doy_range, dataset, breakpoint_bands, tmask, numObs, chi, minYears, lda):
 
     import ee
