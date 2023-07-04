@@ -51,6 +51,7 @@ except ImportError:
 from CCD_Plugin.core.ccd_process import compute_ccd
 from CCD_Plugin.core.plot import generate_plot
 from CCD_Plugin.utils.system_utils import wait_process
+from CCD_Plugin.gui.advanced_settings import AdvancedSettings
 
 
 class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
@@ -102,6 +103,10 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         zoom_factor = dpi/96 - 0.4
         zoom_factor = 1 if zoom_factor < 1 else zoom_factor
         self.plot_webview.setZoomFactor(zoom_factor)
+
+        # advanced settings dialog
+        self.advanced_settings = AdvancedSettings()
+        self.btm_advanced_settings.clicked.connect(self.advanced_settings.show)
 
     def closeEvent(self, event):
         # close
