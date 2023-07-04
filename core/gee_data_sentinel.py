@@ -49,7 +49,7 @@ def getImageCollection(coords, date_range, doy_range, name, cloud_filter='s2clou
         img_col_filtered = img_col.map(filterS2_level2A)
     elif cloud_filter=='s2cloudless':
         #get cloud probability collection
-        s2_cloudprob = ee.ImageCollection('COPERNICUS/S2_CLOUD_PROBABILITY').filterBounds(geometry).filterDate(ee.Date(date_range[0]),ee.Date(date_range[1]))
+        s2_cloudprob = ee.ImageCollection('COPERNICUS/S2_CLOUD_PROBABILITY').filterBounds(geometry).filterDate(ee.Date(date_range[0]),ee.Date(date_range[1])).filter(ee.Filter.dayOfYear(doy_range[0], doy_range[1]))
         img_col_filtered = filterS2cloudless(img_col,s2_cloudprob)
     elif cloud_filter=='No Mask':
         img_col_filtered = img_col
