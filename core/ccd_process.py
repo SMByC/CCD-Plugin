@@ -29,24 +29,24 @@ from CCD_Plugin.core.gee_data_sentinel import getImageCollection
 
 ccd_results = {}
 
-def compute_ccd(coords, date_range, doy_range, collection, breakpointbands, tmask, numObs, chi, minYears, lda):
+def compute_ccd(coords, date_range, doy_range, dataset, breakpoint_bands, tmask, numObs, chi, minYears, lda):
 
     import ee
     point = ee.Geometry.Point(coords)
 
     ### determine gee scale (30m for LS / 10m for S2)
-    gee_scale = 30 if collection in ["Landsat col. 1", "Landsat col. 2"] else 10
+    gee_scale = 30 if dataset in ["Landsat C1", "Landsat C2"] else 10
 
     ### get GEE data from the specific point according to selected collection
-    if collection=="Sentinel-2":
-        gee_col = getImageCollection(coords, date_range, doy_range, collection) #cloud filter selection can be implemented later
-    elif collection=="Landsat col. 1":
+    if dataset== "Sentinel-2":
+        gee_col = getImageCollection(coords, date_range, doy_range, dataset) #cloud filter selection can be implemented later
+    elif dataset== "Landsat C1":
         gee_col = get_gee_data_landsat(coords, date_range, doy_range, 1)
-    elif collection=="Landsat col. 2":
+    elif dataset== "Landsat C2":
         gee_col = get_gee_data_landsat(coords, date_range, doy_range, 2)
         
     ### execute CCDC (GEE implementation)
-    ccdc_result = ee.Algorithms.TemporalSegmentation.Ccdc(gee_col, breakpointbands, tmask, numObs, chi, minYears, 2, lda)
+    ccdc_result = ee.Algorithms.TemporalSegmentation.Ccdc(gee_col, breakpoint_bands, tmask, numObs, chi, minYears, 2, lda)
 
     ### retrieve ccdc_result from server
     ccdc_result_info = ccdc_result.reduceRegion(ee.Reducer.toList(),
@@ -72,6 +72,6 @@ def compute_ccd(coords, date_range, doy_range, collection, breakpointbands, tmas
     #     return
 
     global ccd_results
-    ccd_results = {(coords, date_range, doy_range, collection, tuple(breakpointbands)):(ccdc_result_info,timeseries)}
+    ccd_results = {(coords, date_range, doy_range, dataset, tuple(breakpoint_bands)):(ccdc_result_info, timeseries)}
 
     return ccdc_result_info, timeseries

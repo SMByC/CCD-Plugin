@@ -75,7 +75,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # select swir1 band by default
         self.band_or_index.setCurrentIndex(4)
         # set the collection to 2 by default
-        self.collection.setCurrentIndex(1)
+        self.box_dataset.setCurrentIndex(1)
         # set break point bands/indices
         self.box_breakpoint_bands.addItems(['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'NDVI', 'NBR', 'EVI',
                                            'EVI2', 'BRIGHTNESS', 'GREENNESS', 'WETNESS'])
@@ -130,14 +130,14 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         start_doy = self.start_doy.value()
         end_doy = self.end_doy.value()
         doy_range = (start_doy, end_doy)
-        # get collection
-        collection = self.collection.currentText()
+        # get dataset selected
+        dataset = self.box_dataset.currentText()
         # get band_or_index to plot
         band_or_index = self.band_or_index.currentText()
         # get breakpoint bands (detection bands)
-        breakpointbands = self.box_breakpoint_bands.checkedItems()
+        breakpoint_bands = self.box_breakpoint_bands.checkedItems()
 
-        return coords, date_range, doy_range, collection, band_or_index, breakpointbands
+        return coords, date_range, doy_range, dataset, band_or_index, breakpoint_bands
 
 
     @wait_process
@@ -154,10 +154,10 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             raise Exception("Error importing ee lib, check the installation or your internet connection|{}".format(err))
 
         # get the config from the widget
-        coords, date_range, doy_range, collection, band_or_index, breakpointbands = self.get_config_from_widget()
+        coords, date_range, doy_range, dataset, band_or_index, breakpoint_bands = self.get_config_from_widget()
         #use default parameters while parameter setting option is not implemented
         tmask, numObs, chi, minYears, lda = [None, 6, 0.99, 1.33, 200]
-        results  = compute_ccd(coords, date_range, doy_range, collection, breakpointbands, tmask, numObs, chi, minYears, lda)
+        results  = compute_ccd(coords, date_range, doy_range, dataset, breakpoint_bands, tmask, numObs, chi, minYears, lda)
                     
         if not results:
             return
@@ -172,10 +172,10 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         if not ccd_results:
             return
         # get the config from the widget
-        coords, date_range, doy_range, collection, band_or_index, breakpointbands = self.get_config_from_widget()
+        coords, date_range, doy_range, dataset, band_or_index, breakpoint_bands = self.get_config_from_widget()
         # check if ccd results are already computed
-        if (coords, date_range, doy_range, collection, tuple(breakpointbands)) in ccd_results:
-            ccdc_result_info, timeseries = ccd_results[(coords, date_range, doy_range, collection, tuple(breakpointbands))]
+        if (coords, date_range, doy_range, dataset, tuple(breakpoint_bands)) in ccd_results:
+            ccdc_result_info, timeseries = ccd_results[(coords, date_range, doy_range, dataset, tuple(breakpoint_bands))]
             html_file = generate_plot(ccdc_result_info, timeseries, date_range, band_or_index, CCD_Plugin.tmp_dir)
             self.plot_webview.load(QUrl.fromLocalFile(html_file))
 

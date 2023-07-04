@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1000</width>
+    <width>1044</width>
     <height>560</height>
    </rect>
   </property>
@@ -246,7 +246,7 @@
              <item>
               <widget class="QLabel" name="label_8">
                <property name="text">
-                <string>Collection</string>
+                <string>Dataset</string>
                </property>
                <property name="alignment">
                 <set>Qt::AlignCenter</set>
@@ -254,24 +254,24 @@
               </widget>
              </item>
              <item>
-              <widget class="QComboBox" name="collection">
+              <widget class="QComboBox" name="box_dataset">
                <property name="currentText">
-                <string>Landsat col. 1</string>
+                <string>Landsat C2</string>
                </property>
                <property name="currentIndex">
-                <number>0</number>
+                <number>1</number>
                </property>
                <property name="sizeAdjustPolicy">
                 <enum>QComboBox::AdjustToContents</enum>
                </property>
                <item>
                 <property name="text">
-                 <string>Landsat col. 1</string>
+                 <string>Landsat C1</string>
                 </property>
                </item>
                <item>
                 <property name="text">
-                 <string>Landsat col. 2</string>
+                 <string>Landsat C2</string>
                 </property>
                </item>
                <item>
