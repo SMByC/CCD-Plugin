@@ -77,9 +77,9 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # set the collection to 2 by default
         self.collection.setCurrentIndex(1)
         # set break point bands/indices
-        self.box_breakpointbands.addItems(['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'NDVI', 'NBR', 'EVI',
+        self.box_breakpoint_bands.addItems(['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'NDVI', 'NBR', 'EVI',
                                            'EVI2', 'BRIGHTNESS', 'GREENNESS', 'WETNESS'])
-        self.box_breakpointbands.setCheckedItems(['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2'])
+        self.box_breakpoint_bands.setCheckedItems(['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2'])
         # set the current date
         self.end_date.setDate(QDate.currentDate())
         # set action center on point
@@ -135,7 +135,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # get band_or_index to plot
         band_or_index = self.band_or_index.currentText()
         # get breakpoint bands (detection bands)
-        breakpointbands = self.box_breakpointbands.checkedItems()
+        breakpointbands = self.box_breakpoint_bands.checkedItems()
 
         return coords, date_range, doy_range, collection, band_or_index, breakpointbands
 
