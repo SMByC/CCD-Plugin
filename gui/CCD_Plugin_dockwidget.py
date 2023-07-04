@@ -76,13 +76,10 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.band_or_index.setCurrentIndex(4)
         # set the collection to 2 by default
         self.collection.setCurrentIndex(1)
-        # set breakpointbands to blue, green, red, nir, swir1 and swir2 by default
-        self.box_breakpointbands.setItemCheckState(0,Qt.Checked)
-        self.box_breakpointbands.setItemCheckState(1,Qt.Checked)
-        self.box_breakpointbands.setItemCheckState(2,Qt.Checked)
-        self.box_breakpointbands.setItemCheckState(3,Qt.Checked)
-        self.box_breakpointbands.setItemCheckState(4,Qt.Checked)
-        self.box_breakpointbands.setItemCheckState(5,Qt.Checked)
+        # set break point bands/indices
+        self.box_breakpointbands.addItems(['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'NDVI', 'NBR', 'EVI',
+                                           'EVI2', 'BRIGHTNESS', 'GREENNESS', 'WETNESS'])
+        self.box_breakpointbands.setCheckedItems(['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2'])
         # set the current date
         self.end_date.setDate(QDate.currentDate())
         # set action center on point

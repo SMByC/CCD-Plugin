@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1000</width>
-    <height>284</height>
+    <height>560</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -530,24 +530,11 @@
           </item>
           <item row="1" column="0">
            <widget class="QgsCheckableComboBox" name="box_breakpointbands">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
+            <property name="editable">
+             <bool>true</bool>
             </property>
-            <property name="currentText">
-             <string>Blue, Green, Red, NIR, SWIR1, SWIR2</string>
-            </property>
-            <property name="checkedItems">
-             <stringlist>
-              <string>Blue</string>
-              <string>Green</string>
-              <string>Red</string>
-              <string>NIR</string>
-              <string>SWIR1</string>
-              <string>SWIR2</string>
-             </stringlist>
+            <property name="sizeAdjustPolicy">
+             <enum>QComboBox::AdjustToContents</enum>
             </property>
             <item>
              <property name="text">
