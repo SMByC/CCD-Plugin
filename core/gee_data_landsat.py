@@ -182,7 +182,7 @@ def get_gee_data_landsat(coords, date_range, doy_range, collection):
         image.normalizedDifference(['NIR', 'Red']).multiply(10000).rename('NDVI'),
         image.expression('2.5 * ((NIR - Red) / (NIR + 6 * Red - 7.5 * Blue + 1))',
             {'NIR': image.select('NIR').divide(10000),
-             'Red': image.select('Red'.divide(10000)),
+             'Red': image.select('Red').divide(10000),
              'Blue': image.select('Blue').divide(10000)}).multiply(10000).rename('EVI'),
         image.expression('2.5 * ((NIR - Red) / (NIR + 2.4 * Red + 1))',
             {'NIR': image.select('NIR').divide(10000),
