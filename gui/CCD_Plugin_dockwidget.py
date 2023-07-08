@@ -155,9 +155,10 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         # get the config from the widget
         coords, date_range, doy_range, dataset, band_or_index, breakpoint_bands = self.get_config_from_widget()
-        #use default parameters while parameter setting option is not implemented
-        tmask, numObs, chi, minYears, lda = [None, 6, 0.99, 1.33, 200]
-        results  = compute_ccd(coords, date_range, doy_range, dataset, breakpoint_bands, tmask, numObs, chi, minYears, lda)
+        # get the advanced settings from the dialog
+        numObs, chi, minYears, lda = self.advanced_settings.get_config_from_dialog()
+
+        results  = compute_ccd(coords, date_range, doy_range, dataset, breakpoint_bands, None, numObs, chi, minYears, lda)
                     
         if not results:
             return
