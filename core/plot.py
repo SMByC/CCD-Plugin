@@ -151,11 +151,10 @@ def generate_plot(ccdc_result_info, timeseries, date_range, band_to_plot, tmp_di
                      tick0=pd.to_datetime('{}-{}'.format(datetime_min.year, datetime_min.month)), automargin=True)
     
     if band_to_plot in ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2']:
-        title = "Surface Reflectance (x10⁴) - {}".format(band_to_plot)
-    if band_to_plot in ["NBR", "NDVI", "EVI", "EVI2"]:
-        title = "Index (x10⁴) - {}".format(band_to_plot)
-    if band_to_plot in ["BRIGHTNESS", "GREENNESS", "WETNESS"]:
+        title = "Surface Reflectance - {}".format(band_to_plot)
+    if band_to_plot in ["NBR", "NDVI", "EVI", "EVI2", "BRIGHTNESS", "GREENNESS", "WETNESS"]:
         title = "Index - {}".format(band_to_plot)
+
     fig.update_yaxes(title_text=title, automargin=True)
 
     html_file = tempfile.mktemp(suffix=".html", dir=tmp_dir)

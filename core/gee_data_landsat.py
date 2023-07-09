@@ -38,7 +38,7 @@ def prepare_L4L5_C1(image):
     import ee
     band_list = ['B1', 'B2', 'B3', 'B4', 'B5', 'B7', 'B6', 'pixel_qa']
     name_list = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Temp', 'pixel_qa']
-    scaling = [1]*8  #[10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
+    scaling = [1000, 1000, 1000, 1000, 1000, 1000, 1000, 1]
     scaled = ee.Image(image).select(band_list).rename(name_list).divide(ee.Image.constant(scaling))
 
     validQA = [66, 130, 68, 132]
@@ -56,7 +56,7 @@ def prepare_L7_C1(image):
     import ee
     band_list = ['B1', 'B2', 'B3', 'B4', 'B5', 'B7', 'B6', 'pixel_qa']
     name_list = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Temp', 'pixel_qa']
-    scaling = [1]*8  #[10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
+    scaling = [1000, 1000, 1000, 1000, 1000, 1000, 1000, 1]
     scaled = ee.Image(image).select(band_list).rename(name_list).divide(ee.Image.constant(scaling))
 
     validQA = [66, 130, 68, 132]
@@ -76,7 +76,7 @@ def prepare_L8_C1(image):
     import ee
     band_list = ['B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B10', 'pixel_qa']
     name_list = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Temp', 'pixel_qa']
-    scaling = [1]*8  #[10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
+    scaling = [1000, 1000, 1000, 1000, 1000, 1000, 1000, 1]
     scaled = ee.Image(image).select(band_list).rename(name_list).divide(ee.Image.constant(scaling))
 
     validTOA = [66, 68, 72, 80, 96, 100, 130, 132, 136, 144, 160, 164]
@@ -93,7 +93,7 @@ def prepare_L4L5L7_C2(image):
     band_list = ['SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B7', 'ST_B6', 'QA_PIXEL']
     name_list = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Temp', 'pixel_qa']
     subBand = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2']
-    scaling = [10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
+    scaling = [1]*8  #[10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
 
     opticalBands = image.select('SR_B.').multiply(0.0000275).add(-0.2)
     thermalBand = image.select('ST_B6').multiply(0.00341802).add(149.0)
@@ -117,7 +117,7 @@ def prepare_L8L9_C2(image):
     band_list = ['SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7', 'ST_B10', 'QA_PIXEL']
     name_list = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Temp', 'pixel_qa']
     subBand = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2']
-    scaling = [10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
+    scaling = [1]*8  #[10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
 
     opticalBands = image.select('SR_B.').multiply(0.0000275).add(-0.2)
     thermalBand = image.select('ST_B10').multiply(0.00341802).add(149.0)
@@ -178,32 +178,32 @@ def get_gee_data_landsat(coords, date_range, doy_range, collection):
 
     # Add indices: 'NBR', 'NDVI', 'EVI', 'EVI2', 'BRIGHTNESS', 'GREENNESS', 'WETNESS'
     all_gee_data = all_scenes.map(lambda image: image.addBands([
-        image.normalizedDifference(['NIR', 'SWIR2']).multiply(10000).rename('NBR'),
-        image.normalizedDifference(['NIR', 'Red']).multiply(10000).rename('NDVI'),
+        image.normalizedDifference(['NIR', 'SWIR2']).rename('NBR'),
+        image.normalizedDifference(['NIR', 'Red']).rename('NDVI'),
         image.expression('2.5 * ((NIR - Red) / (NIR + 6 * Red - 7.5 * Blue + 1))',
-            {'NIR': image.select('NIR').divide(10000),
-             'Red': image.select('Red').divide(10000),
-             'Blue': image.select('Blue').divide(10000)}).multiply(10000).rename('EVI'),
+                         {'NIR': image.select('NIR'),
+                          'Red': image.select('Red'),
+                          'Blue': image.select('Blue')}).rename('EVI'),
         image.expression('2.5 * ((NIR - Red) / (NIR + 2.4 * Red + 1))',
-            {'NIR': image.select('NIR').divide(10000),
-             'Red': image.select('Red').divide(10000)}).multiply(10000).rename('EVI2'),
+                         {'NIR': image.select('NIR'),
+                          'Red': image.select('Red')}).rename('EVI2'),
         image.expression('sqrt((Red - SWIR1) * (Red - SWIR1) + (NIR - SWIR2) * (NIR - SWIR2))',
-            {'Red': image.select('Red'),
-             'SWIR1': image.select('SWIR1'),
-             'NIR': image.select('NIR'),
-             'SWIR2': image.select('SWIR2')}).rename('BRIGHTNESS'),
+                         {'Red': image.select('Red'),
+                          'SWIR1': image.select('SWIR1'),
+                          'NIR': image.select('NIR'),
+                          'SWIR2': image.select('SWIR2')}).rename('BRIGHTNESS'),
         image.expression('Red + 2.5 * NIR - 1.5 * (Blue + SWIR1) - 0.25 * SWIR2',
-            {'Red': image.select('Red'),
-             'NIR': image.select('NIR'),
-             'Blue': image.select('Blue'),
-             'SWIR1': image.select('SWIR1'),
-             'SWIR2': image.select('SWIR2')}).rename('GREENNESS'),
+                         {'Red': image.select('Red'),
+                          'NIR': image.select('NIR'),
+                          'Blue': image.select('Blue'),
+                          'SWIR1': image.select('SWIR1'),
+                          'SWIR2': image.select('SWIR2')}).rename('GREENNESS'),
         image.expression('4 * (NIR - SWIR1) - (0.25 * SWIR2 + 2.75 * Blue)',
-            {'NIR': image.select('NIR'),
-             'SWIR1': image.select('SWIR1'),
-             'SWIR2': image.select('SWIR2'),
-             'Blue': image.select('Blue')}).rename('WETNESS'),
-        ]))
+                         {'NIR': image.select('NIR'),
+                          'SWIR1': image.select('SWIR1'),
+                          'SWIR2': image.select('SWIR2'),
+                          'Blue': image.select('Blue')}).rename('WETNESS'),
+    ]))
 
     
     filtered_col = all_gee_data.filter("WRS_ROW < 122").filterBounds(point)

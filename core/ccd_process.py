@@ -40,14 +40,15 @@ def compute_ccd(coords, date_range, doy_range, dataset, breakpoint_bands, tmask,
 
     ### get GEE data from the specific point according to selected collection
     if dataset== "Sentinel-2":
-        gee_col = getImageCollection(coords, date_range, doy_range, dataset) #cloud filter selection can be implemented later
+        gee_data = getImageCollection(coords, date_range, doy_range, dataset) #cloud filter selection can be implemented later
     elif dataset== "Landsat C1":
-        gee_col = get_gee_data_landsat(coords, date_range, doy_range, 1)
+        gee_data = get_gee_data_landsat(coords, date_range, doy_range, 1)
     elif dataset== "Landsat C2":
-        gee_col = get_gee_data_landsat(coords, date_range, doy_range, 2)
+        gee_data = get_gee_data_landsat(coords, date_range, doy_range, 2)
         
     ### execute CCDC (GEE implementation)
-    ccdc_result = ee.Algorithms.TemporalSegmentation.Ccdc(gee_col, breakpoint_bands, tmask, numObs, chi, minYears, 2, lda)
+    # (collection, breakpointBands, tmaskBands, minObservations, chiSquareProbability, minNumOfYearsScaler, dateFormat, lambda, maxIterations)
+    ccdc_result = ee.Algorithms.TemporalSegmentation.Ccdc(gee_data, breakpoint_bands, tmask, numObs, chi, minYears, 2, lda)
 
     ### retrieve ccdc_result from server
     ccdc_result_info = ccdc_result.reduceRegion(ee.Reducer.toList(),
@@ -55,7 +56,7 @@ def compute_ccd(coords, date_range, doy_range, dataset, breakpoint_bands, tmask,
                                                 scale=gee_scale).getInfo()
     
     ### get time series from selected band
-    gee_data_point = np.array(ee.List(gee_col.getRegion(geometry=point, scale=gee_scale)).getInfo())
+    gee_data_point = np.array(ee.List(gee_data.getRegion(geometry=point, scale=gee_scale)).getInfo())
     #print(gee_data_point)
     timeseries = {}
     stacked_gee_data = np.stack(gee_data_point[1:],axis=1)
