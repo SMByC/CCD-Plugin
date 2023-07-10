@@ -148,7 +148,7 @@ def generate_plot(ccdc_result_info, timeseries, date_range, band_to_plot, tmp_di
     fig.update_traces(hovertemplate='%{y:.0f}<br>%{x|%d-%b-%Y}')
     datetime_min = pd.to_datetime(np.min(dates_obs),unit='ms')
     fig.update_xaxes(title_text=None, fixedrange=False, ticklabelmode="period", dtick="M12",
-                     tick0=pd.to_datetime('{}-{}'.format(datetime_min.year, datetime_min.month)),tickformat="%Y", automargin=True)
+                     tick0=pd.to_datetime('{}-{}'.format(datetime_min.year, 1)),tickformat="%Y", automargin=True)
     
     if band_to_plot in ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2']:
         title = "Surface Reflectance - {}".format(band_to_plot)
