@@ -76,48 +76,49 @@ def prepareBands(image):
     swir2 = image.select('B12').rename('SWIR2').divide(10000)
 
     return image.addBands(blue).addBands(green).addBands(red).addBands(nir).addBands(swir1).addBands(swir2)
+    
 
 
 def addNDVI(image):
-    ndvi = image.normalizedDifference(['B8', 'B4'])
+    ndvi = image.normalizedDifference(['NIR', 'Red'])
     return image.addBands(ndvi.rename('NDVI'))
 
 
 def addNBR(image):
-    nbr = image.normalizedDifference(['B8', 'B12'])
+    nbr = image.normalizedDifference(['NIR', 'SWIR2'])
     return image.addBands(nbr.rename('NBR'))
 
 
 def addEVI(image):
-    evi = image.expression('2.5 * ((NIR-RED) / (NIR + 6 * RED - 7.5* BLUE +1))',
-        {'NIR': image.select('B8'), 'RED': image.select('B4'), 'BLUE': image.select('B2')})
+    evi = image.expression('2.5 * ((NIR-Red) / (NIR + 6 * Red - 7.5* Blue +1))',
+        {'NIR': image.select('NIR'), 'Red': image.select('Red'), 'Blue': image.select('Blue')})
     return image.addBands(evi.rename('EVI'))
 
 
 def addEVI2(image):
     evi2 = image.expression('2.5 * ((NIR - Red) / (NIR + 2.4 * Red + 1))',
-                            {'NIR': image.select('B8'), 'Red': image.select('B4')})
+                            {'NIR': image.select('NIR'), 'Red': image.select('Red')})
     return image.addBands(evi2.rename('EVI2'))
 
 
 def addBrightness(image):
     brightness = image.expression('sqrt((Red - SWIR1) * (Red - SWIR1) + (NIR - SWIR2) * (NIR - SWIR2))',
-                                  {'Red': image.select('B4'), 'SWIR1': image.select('B11'), 'NIR': image.select('B8'),
-                                   'SWIR2': image.select('B12')})
+                                  {'Red': image.select('Red'), 'SWIR1': image.select('SWIR1'), 'NIR': image.select('NIR'),
+                                   'SWIR2': image.select('SWIR2')})
     return image.addBands(brightness.rename('BRIGHTNESS'))
 
 
 def addGreeness(image):
     greeness = image.expression('Red + 2.5 * NIR - 1.5 * (Blue + SWIR1) - 0.25 * SWIR2',
-                                {'Red': image.select('B4'), 'NIR': image.select('B8'), 'Blue': image.select('B2'),
-                                 'SWIR1': image.select('B11'), 'SWIR2': image.select('B12')})
+                                {'Red': image.select('Red'), 'NIR': image.select('NIR'), 'Blue': image.select('Blue'),
+                                 'SWIR1': image.select('SWIR1'), 'SWIR2': image.select('SWIR2')})
     return image.addBands(greeness.rename('GREENNESS'))
 
 
 def addWetness(image):
     wetness = image.expression('4 * (NIR - SWIR1) - (0.25 * SWIR2 + 2.75 * Blue)',
-                               {'NIR': image.select('B8'), 'SWIR1': image.select('B11'), 'SWIR2': image.select('B12'),
-                                'Blue': image.select('B2')})
+                               {'NIR': image.select('NIR'), 'SWIR1': image.select('SWIR1'), 'SWIR2': image.select('SWIR2'),
+                                'Blue': image.select('Blue')})
     return image.addBands(wetness.rename('WETNESS'))
 
 
