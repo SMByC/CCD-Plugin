@@ -25,7 +25,7 @@ import numpy as np
 #from qgis.core import Qgis
 
 from CCD_Plugin.core.gee_data_landsat import get_gee_data_landsat
-from CCD_Plugin.core.gee_data_sentinel import getImageCollection
+from CCD_Plugin.core.gee_data_sentinel import get_gee_data_sentinel
 
 ccd_results = {}
 
@@ -40,7 +40,7 @@ def compute_ccd(coords, date_range, doy_range, dataset, breakpoint_bands, tmask,
 
     ### get GEE data from the specific point according to selected collection
     if dataset== "Sentinel-2":
-        gee_data = getImageCollection(coords, date_range, doy_range, dataset) #cloud filter selection can be implemented later
+        gee_data = get_gee_data_sentinel(coords, date_range, doy_range, dataset) #cloud filter selection can be implemented later
     elif dataset== "Landsat C1":
         gee_data = get_gee_data_landsat(coords, date_range, doy_range, 1)
     elif dataset== "Landsat C2":
