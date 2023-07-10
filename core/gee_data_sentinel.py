@@ -28,6 +28,9 @@ def getImageCollection(coords, date_range, doy_range, name, cloud_filter='s2clou
     #get image collection
     img_col = ee.ImageCollection(name).filterBounds(geometry).filterDate(ee.Date(date_range[0]),ee.Date(date_range[1])).filter(ee.Filter.dayOfYear(doy_range[0], doy_range[1]))
 
+    # prepare bands
+    img_col = img_col.map(prepareBands)
+
     #add indices
     #add NDVI
     img_col = img_col.map(addNDVI)
@@ -54,34 +57,43 @@ def getImageCollection(coords, date_range, doy_range, name, cloud_filter='s2clou
     elif cloud_filter=='No Mask':
         img_col_filtered = img_col
 
-    #rename bands to match Landsat's
-    names_original = ['B2','B3','B4','B8','B11','B12','NDVI','NBR','EVI','EVI2','BRIGHTNESS','GREENNESS','WETNESS']
+    #names_original = ['B2','B3','B4','B8','B11','B12','NDVI','NBR','EVI','EVI2','BRIGHTNESS','GREENNESS','WETNESS']
     names_renamed = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2','NDVI','NBR','EVI','EVI2','BRIGHTNESS','GREENNESS','WETNESS']
-    img_col_filtered_renamed = img_col_filtered.select(names_original).map(lambda x: x.rename(names_renamed))
+    img_col_filtered_renamed = img_col_filtered.select(names_renamed)
 
     return img_col_filtered_renamed
 
+def prepareBands(image):
+    blue = image.select('B2').rename('Blue').divide(10000)
+    green = image.select('B3').rename('Green').divide(10000)
+    red = image.select('B4').rename('Red').divide(10000)
+    nir = image.select('B8').rename('NIR').divide(10000)
+    swir1 = image.select('B11').rename('SWIR1').divide(10000)
+    swir2 = image.select('B12').rename('SWIR2').divide(10000)
+
+    return image.addBands(blue).addBands(green).addBands(red).addBands(nir).addBands(swir1).addBands(swir2)
+
 def addNDVI(image):
-    ndvi = image.normalizedDifference(['B8','B4']).multiply(10000).int16()
+    ndvi = image.normalizedDifference(['B8','B4'])
     return image.addBands(ndvi.rename('NDVI'))
 
 def addNBR(image):
-    nbr = image.normalizedDifference(['B8', 'B12']).multiply(10000).int16()
+    nbr = image.normalizedDifference(['B8', 'B12'])
     return image.addBands(nbr.rename('NBR'))
 
 def addEVI(image):
     evi = image.expression(
       '2.5 * ((NIR-RED) / (NIR + 6 * RED - 7.5* BLUE +1))', {
-        'NIR':image.select('B8').divide(10000),
-        'RED':image.select('B4').divide(10000),
-        'BLUE':image.select('B2').divide(10000)    
-          }).multiply(10000).int16()                                                        
+        'NIR':image.select('B8'),
+        'RED':image.select('B4'),
+        'BLUE':image.select('B2')
+          })
     return image.addBands(evi.rename('EVI'))
 
 def addEVI2(image):
     evi2 = image.expression('2.5 * ((NIR - Red) / (NIR + 2.4 * Red + 1))',
-            {'NIR': image.select('B8').divide(10000),
-             'Red': image.select('B4').divide(10000)}).multiply(10000)
+            {'NIR': image.select('B8'),
+             'Red': image.select('B4')})
     return image.addBands(evi2.rename('EVI2'))
 
 def addBrightness(image):
