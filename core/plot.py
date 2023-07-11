@@ -35,7 +35,7 @@ def createArtificialDates(date_range,first_date):
     import ee
  
     date_end = date_range[1]
-    #create sequence of dates from first date to date_end, spaced by 5 days
+    # create sequence of dates from first date to date_end, spaced by 5 days
     interval = 5 #days
     
     date_end_millis = ee.Date(date_end).millis().getInfo()
@@ -44,7 +44,7 @@ def createArtificialDates(date_range,first_date):
     
     artificial_dates = [first_date+x*interval*24*60*60*1000 for x in range(num_intervals)]
 
-    #adjust end of series
+    # adjust end of series
     if artificial_dates[-1]<date_end_millis:
         artificial_dates.append(date_end_millis)
     elif artificial_dates[-1]>date_end_millis:
@@ -57,13 +57,13 @@ def createArtificialDates(date_range,first_date):
 def generate_plot(ccdc_result_info, timeseries, date_range, dataset, band_to_plot, tmp_dir):
 
     first_date = int(timeseries['time'][0]) #int(timeseries[1][3])
-    #get artificial dates (required for plotting ccdc fitted curves)
+    # get artificial dates (required for plotting ccdc fitted curves)
     artificial_dates = createArtificialDates(date_range,first_date)
 
-    #get number of fitted segments
+    # get number of fitted segments
     nsegments = len(ccdc_result_info['tBreak'][0])
 
-    #cycle through each segment and plot the predicted values by pluggin into harmonic regression equation
+    # cycle through each segment and plot the predicted values by pluggin into harmonic regression equation
     predicted_values = []
     prediction_dates = []
     for seg in range(nsegments):
@@ -85,45 +85,47 @@ def generate_plot(ccdc_result_info, timeseries, date_range, dataset, band_to_plo
         predicted_values.append(pred)
         prediction_dates.append(artificial_dates_seg)
     
-    #get start and break dates
+    # get start and break dates
     break_dates = ccdc_result_info['tBreak'][0].copy()
     if 0 in break_dates:
         break_dates.remove(0) #delete zero from break dates
     #start_dates = ccdc_result_info['tStart'][0]
 
-    #get observed values (actual time series)
+    # get observed values (actual time series)
     dates_obs = timeseries['time'] #np.stack(timeseries,axis=1)[:][-2][1:].astype('int64')
     values_obs = np.array(timeseries[band_to_plot],dtype='float') #np.stack(timeseries,axis=1)[:][-1][1:].astype('float')
+    datetime_min = datetime.fromtimestamp(np.min(dates_obs) / 1000)
+    datetime_max = datetime.fromtimestamp(np.max(dates_obs) / 1000)
 
     ######## plot with plotly ########
 
     pio.templates.default = "plotly_white"
     fig = go.Figure()
 
-    #plot observed values
+    # plot observed values
     fig.add_trace(go.Scatter(x=[datetime.fromtimestamp(date / 1000) for date in dates_obs],
                              y=values_obs, name='observed<br>values', mode='markers',
                              marker=dict(color='#4498d4', size=6, opacity=1)))  # , symbol="cross"
-    
+
     # Predicted curves
     curve_colors = ["#56ad74", "#a291e1", "#c69255", "#e274cf", "#5ea5c5"]*2
     for idx, (_preddate, _predvalue) in enumerate(zip(prediction_dates, predicted_values)):
         fig.add_trace(go.Scatter(x=[datetime.fromtimestamp(date / 1000) for date in _preddate],
                                  y=_predvalue, name='predicted<br>values ({})'.format(idx + 1), opacity=0.7,
                                  hovertemplate="%{y}", line=dict(width=2.4, color=curve_colors[idx])))
-    
-    #break lines
+
+    # break lines
     #break_dates = list(set(start_dates+break_dates))  # delete duplicates
     for break_date in break_dates:
         fig.add_vline(x=break_date, line_width=1, line_dash="dash", line_color="red",
                       annotation_text=datetime.fromtimestamp(break_date / 1000).strftime("%Y-%m-%d"),
-                      annotation_position="bottom right", annotation_textangle=90, opacity=0.4,
+                      annotation_position="bottom right", annotation_textangle=90, opacity=0.6,
                       annotation_font_size=9, annotation_font_color="red")
 
     # add a fake line to add the legend for the break lines
-    fig.add_trace(go.Scatter(x=[dates_obs[0]]*2, y=[np.nanmin(values_obs)]*2, hoverinfo=None,
+    fig.add_trace(go.Scatter(x=[datetime_min]*2, y=[np.nanmin(values_obs)]*2, hoverinfo='skip',
                              mode='lines', line=dict(color='red', width=1, dash='dash'), name='break lines'))
-    
+
     # get longitude and latitude from CCD_PluginDockWidget
     from CCD_Plugin.CCD_Plugin import CCD_Plugin
     lon = CCD_Plugin.widget.longitude.value()
@@ -147,12 +149,9 @@ def generate_plot(ccdc_result_info, timeseries, date_range, dataset, band_to_plo
     )
 
     fig.update_traces(hovertemplate='%{y:.4f}<br>%{x|%d-%b-%Y}')
-    datetime_min = datetime.fromtimestamp(np.min(dates_obs) / 1000)
-    datetime_max = datetime.fromtimestamp(np.max(dates_obs) / 1000)
     fig.update_xaxes(title_text=None, fixedrange=False, ticklabelmode="period", dtick="M12",
                      tick0=datetime(datetime_min.year, 1, 1),tickformat="%Y", automargin=True)
     # update min and max xaxes margins
-    datetime_min = datetime.fromtimestamp(np.min(dates_obs) / 1000)
     margin_days = int((datetime_max - datetime_min).days*0.01)
     fig.update_xaxes(range=[datetime_min - timedelta(days=margin_days), datetime_max + timedelta(days=margin_days)])
     
