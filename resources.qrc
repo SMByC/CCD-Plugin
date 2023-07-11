@@ -4,5 +4,6 @@
         <file>icons/generate.svg</file>
         <file>icons/select_on_canvas.svg</file>
         <file>icons/center_on_point.svg</file>
+        <file>icons/open_in_web_browser.svg</file>
     </qresource>
 </RCC>

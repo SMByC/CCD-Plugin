@@ -25,7 +25,7 @@ import os
 
 from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
-from qgis.PyQt.QtGui import QColor
+from qgis.PyQt.QtGui import QColor, QDesktopServices
 from qgis.PyQt.QtCore import QUrl, pyqtSignal, Qt, QDate
 from qgis.PyQt.QtWidgets import QMessageBox
 from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject, QgsPointXY
@@ -108,6 +108,11 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.advanced_settings = AdvancedSettings()
         self.btm_advanced_settings.clicked.connect(self.advanced_settings.show)
 
+        # open the current html file in the web browser
+        self.html_file = None
+        self.btm_open_web_browser.clicked.connect(self.open_plot_in_web_browser)
+
+
     def closeEvent(self, event):
         # close
         self.closingPlugin.emit()
@@ -143,8 +148,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
     @wait_process
     def new_plot(self):
         from CCD_Plugin.CCD_Plugin import CCD_Plugin
-        # clean the plot
-        self.plot_webview.setHtml("")
+        self.clean_plot()
 
         # check import ee lib
         try:
@@ -163,22 +167,25 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         if not results:
             return
         ccdc_result_info, timeseries = results
-        html_file = generate_plot(ccdc_result_info, timeseries, date_range, dataset, band_or_index, CCD_Plugin.tmp_dir)
-        self.plot_webview.load(QUrl.fromLocalFile(html_file))
+        self.html_file = generate_plot(ccdc_result_info, timeseries, date_range, dataset, band_or_index, CCD_Plugin.tmp_dir)
+        self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
 
     @wait_process
     def repaint_plot(self):
         from CCD_Plugin.CCD_Plugin import CCD_Plugin
         from CCD_Plugin.core.ccd_process import ccd_results
+        self.clean_plot()
+
         if not ccd_results:
             return
+
         # get the config from the widget
         coords, date_range, doy_range, dataset, band_or_index, breakpoint_bands = self.get_config_from_widget()
         # check if ccd results are already computed
         if (coords, date_range, doy_range, dataset, tuple(breakpoint_bands)) in ccd_results:
             ccdc_result_info, timeseries = ccd_results[(coords, date_range, doy_range, dataset, tuple(breakpoint_bands))]
-            html_file = generate_plot(ccdc_result_info, timeseries, date_range, dataset, band_or_index, CCD_Plugin.tmp_dir)
-            self.plot_webview.load(QUrl.fromLocalFile(html_file))
+            self.html_file = generate_plot(ccdc_result_info, timeseries, date_range, dataset, band_or_index, CCD_Plugin.tmp_dir)
+            self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
 
 
     def center_on_point(self):
@@ -193,6 +200,17 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         PickerCoordsOnMap.create_marker(point)
         # center on point
         iface.mapCanvas().setCenter(point)
+
+    def clean_plot(self):
+        if self.html_file and os.path.exists(self.html_file):
+            os.remove(self.html_file)
+        self.plot_webview.setHtml("")
+        self.html_file = None
+
+    def open_plot_in_web_browser(self):
+        # TODO: generate and open mosaic of all bands and indices in the web browser
+        if self.html_file and os.path.exists(self.html_file):
+            QDesktopServices.openUrl(QUrl.fromLocalFile(self.html_file))
 
 
 class PickerCoordsOnMap(QgsMapTool):
@@ -233,9 +251,6 @@ class PickerCoordsOnMap(QgsMapTool):
 
             self.widget.longitude.setValue(point.x())
             self.widget.latitude.setValue(point.y())
-
-            # clean the plot
-            self.widget.plot_webview.setHtml("")
 
             self.finish()
 
