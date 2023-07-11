@@ -96,6 +96,9 @@
              </item>
              <item>
               <widget class="QToolButton" name="pick_on_map">
+               <property name="toolTip">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Pick on map with the pointer using any coordinate system, the plugin convert it in geographic coordinates&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
                <property name="text">
                 <string>Pick on Map</string>
                </property>
@@ -255,6 +258,9 @@
              </item>
              <item>
               <widget class="QComboBox" name="box_dataset">
+               <property name="toolTip">
+                <string>Collection of images to get the images and run CCDC</string>
+               </property>
                <property name="currentText">
                 <string>Landsat C2</string>
                </property>
@@ -315,7 +321,7 @@
              <item>
               <widget class="QComboBox" name="band_or_index">
                <property name="toolTip">
-                <string>The band or index to plot</string>
+                <string>Band or index and predicted curves to display in the plot</string>
                </property>
                <property name="currentText">
                 <string>Blue</string>
@@ -438,7 +444,7 @@
           <item row="1" column="0">
            <widget class="QgsCheckableComboBox" name="box_breakpoint_bands">
             <property name="toolTip">
-             <string>Bands or indices to use for change detection</string>
+             <string>Bands or indices to use for change detection (breakpoints)</string>
             </property>
             <property name="editable">
              <bool>true</bool>
