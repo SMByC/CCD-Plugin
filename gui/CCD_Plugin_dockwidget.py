@@ -163,7 +163,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         if not results:
             return
         ccdc_result_info, timeseries = results
-        html_file = generate_plot(ccdc_result_info, timeseries, date_range, band_or_index, CCD_Plugin.tmp_dir)
+        html_file = generate_plot(ccdc_result_info, timeseries, date_range, dataset, band_or_index, CCD_Plugin.tmp_dir)
         self.plot_webview.load(QUrl.fromLocalFile(html_file))
 
     @wait_process
@@ -177,7 +177,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # check if ccd results are already computed
         if (coords, date_range, doy_range, dataset, tuple(breakpoint_bands)) in ccd_results:
             ccdc_result_info, timeseries = ccd_results[(coords, date_range, doy_range, dataset, tuple(breakpoint_bands))]
-            html_file = generate_plot(ccdc_result_info, timeseries, date_range, band_or_index, CCD_Plugin.tmp_dir)
+            html_file = generate_plot(ccdc_result_info, timeseries, date_range, dataset, band_or_index, CCD_Plugin.tmp_dir)
             self.plot_webview.load(QUrl.fromLocalFile(html_file))
 
 

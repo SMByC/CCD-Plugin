@@ -25,7 +25,7 @@ with the collaboration of:
 """
 import tempfile
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timedelta
 import plotly
 import plotly.graph_objects as go
 import plotly.io as pio
@@ -54,7 +54,7 @@ def createArtificialDates(date_range,first_date):
     return artificial_dates #in milli
 
 
-def generate_plot(ccdc_result_info, timeseries, date_range, band_to_plot, tmp_dir):
+def generate_plot(ccdc_result_info, timeseries, date_range, dataset, band_to_plot, tmp_dir):
 
     first_date = int(timeseries['time'][0]) #int(timeseries[1][3])
     #get artificial dates (required for plotting ccdc fitted curves)
@@ -137,10 +137,10 @@ def generate_plot(ccdc_result_info, timeseries, date_range, band_to_plot, tmp_di
             'xanchor': 'center',
             'yanchor': 'top'},
         margin=go.layout.Margin(
-            l=1,
-            r=1,
-            b=1,
-            t=30,
+            l=0,
+            r=0,
+            b=0,
+            t=22,
             pad=0
         ),
         paper_bgcolor="white",
@@ -148,13 +148,18 @@ def generate_plot(ccdc_result_info, timeseries, date_range, band_to_plot, tmp_di
 
     fig.update_traces(hovertemplate='%{y:.0f}<br>%{x|%d-%b-%Y}')
     datetime_min = datetime.fromtimestamp(np.min(dates_obs) / 1000)
+    datetime_max = datetime.fromtimestamp(np.max(dates_obs) / 1000)
     fig.update_xaxes(title_text=None, fixedrange=False, ticklabelmode="period", dtick="M12",
                      tick0=datetime(datetime_min.year, 1, 1),tickformat="%Y", automargin=True)
+    # update min and max xaxes margins
+    datetime_min = datetime.fromtimestamp(np.min(dates_obs) / 1000)
+    margin_days = int((datetime_max - datetime_min).days*0.01)
+    fig.update_xaxes(range=[datetime_min - timedelta(days=margin_days), datetime_max + timedelta(days=margin_days)])
     
     if band_to_plot in ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2']:
-        title = "Surface Reflectance - {}".format(band_to_plot)
+        title = "Surface Reflectance - {} ({})".format(band_to_plot, dataset)
     if band_to_plot in ["NBR", "NDVI", "EVI", "EVI2", "BRIGHTNESS", "GREENNESS", "WETNESS"]:
-        title = "Index - {}".format(band_to_plot)
+        title = "Index - {} ({})".format(band_to_plot, dataset)
 
     fig.update_yaxes(title_text=title, automargin=True)
 
