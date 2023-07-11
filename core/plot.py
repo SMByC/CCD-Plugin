@@ -146,7 +146,7 @@ def generate_plot(ccdc_result_info, timeseries, date_range, dataset, band_to_plo
         paper_bgcolor="white",
     )
 
-    fig.update_traces(hovertemplate='%{y:.0f}<br>%{x|%d-%b-%Y}')
+    fig.update_traces(hovertemplate='%{y:.4f}<br>%{x|%d-%b-%Y}')
     datetime_min = datetime.fromtimestamp(np.min(dates_obs) / 1000)
     datetime_max = datetime.fromtimestamp(np.max(dates_obs) / 1000)
     fig.update_xaxes(title_text=None, fixedrange=False, ticklabelmode="period", dtick="M12",
