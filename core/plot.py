@@ -25,7 +25,7 @@ with the collaboration of:
 """
 import tempfile
 import numpy as np
-import pandas as pd
+from datetime import datetime
 import plotly
 import plotly.graph_objects as go
 import plotly.io as pio
@@ -101,21 +101,22 @@ def generate_plot(ccdc_result_info, timeseries, date_range, band_to_plot, tmp_di
     fig = go.Figure()
 
     #plot observed values
-    fig.add_trace(go.Scatter(x=pd.to_datetime(dates_obs,unit='ms'), y=values_obs, name='observed<br>values',
-                             mode='markers', marker=dict(color='#4498d4', size=6, opacity=1)))  # , symbol="cross"
+    fig.add_trace(go.Scatter(x=[datetime.fromtimestamp(date / 1000) for date in dates_obs],
+                             y=values_obs, name='observed<br>values', mode='markers',
+                             marker=dict(color='#4498d4', size=6, opacity=1)))  # , symbol="cross"
     
     # Predicted curves
     curve_colors = ["#56ad74", "#a291e1", "#c69255", "#e274cf", "#5ea5c5"]*2
     for idx, (_preddate, _predvalue) in enumerate(zip(prediction_dates, predicted_values)):
-        fig.add_trace(go.Scatter(x=pd.to_datetime(_preddate, unit='ms'), y=_predvalue,
-                                 name='predicted<br>values ({})'.format(idx + 1), opacity=0.7,
+        fig.add_trace(go.Scatter(x=[datetime.fromtimestamp(date / 1000) for date in _preddate],
+                                 y=_predvalue, name='predicted<br>values ({})'.format(idx + 1), opacity=0.7,
                                  hovertemplate="%{y}", line=dict(width=2.4, color=curve_colors[idx])))
     
     #break lines
     #break_dates = list(set(start_dates+break_dates))  # delete duplicates
     for break_date in break_dates:
-        fig.add_vline(x=break_date, line_width=1, line_dash="dash",
-                      line_color="red", annotation_text=pd.to_datetime(break_date,unit='ms').strftime("%Y-%m-%d"),
+        fig.add_vline(x=break_date, line_width=1, line_dash="dash", line_color="red",
+                      annotation_text=datetime.fromtimestamp(break_date / 1000).strftime("%Y-%m-%d"),
                       annotation_position="bottom right", annotation_textangle=90, opacity=0.4,
                       annotation_font_size=9, annotation_font_color="red")
 
@@ -146,9 +147,9 @@ def generate_plot(ccdc_result_info, timeseries, date_range, band_to_plot, tmp_di
     )
 
     fig.update_traces(hovertemplate='%{y:.0f}<br>%{x|%d-%b-%Y}')
-    datetime_min = pd.to_datetime(np.min(dates_obs),unit='ms')
+    datetime_min = datetime.fromtimestamp(np.min(dates_obs) / 1000)
     fig.update_xaxes(title_text=None, fixedrange=False, ticklabelmode="period", dtick="M12",
-                     tick0=pd.to_datetime('{}-{}'.format(datetime_min.year, 1)),tickformat="%Y", automargin=True)
+                     tick0=datetime(datetime_min.year, 1, 1),tickformat="%Y", automargin=True)
     
     if band_to_plot in ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2']:
         title = "Surface Reflectance - {}".format(band_to_plot)
