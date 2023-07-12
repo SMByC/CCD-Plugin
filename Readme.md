@@ -1,6 +1,6 @@
 # CCD-Plugin
 
-The CCD-Plugin use Google Earth Engine to get Landsat or Sentinel2 datasets and run the Continuous Change Detection 
+The CCD-Plugin uses Google Earth Engine to get Landsat or Sentinel2 datasets and run the Continuous Change Detection 
 (CCDC) algorithm to analyze the trends and breakpoints of change over multi-year time series at a given coordinate.
 
 ![](screenshot.webp)
