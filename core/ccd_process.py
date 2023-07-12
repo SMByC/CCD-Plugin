@@ -22,7 +22,7 @@ with the collaboration of Daniel Moraes <moraesd90@gmail.com>
 
 """
 import numpy as np
-#from qgis.core import Qgis
+import concurrent.futures
 
 from CCD_Plugin.core.gee_data_landsat import get_gee_data_landsat
 from CCD_Plugin.core.gee_data_sentinel import get_gee_data_sentinel
@@ -45,35 +45,32 @@ def compute_ccd(coords, date_range, doy_range, dataset, breakpoint_bands, tmask,
         gee_data = get_gee_data_landsat(coords, date_range, doy_range, 1)
     elif dataset== "Landsat C2":
         gee_data = get_gee_data_landsat(coords, date_range, doy_range, 2)
-        
-    ### execute CCDC (GEE implementation)
-    # (collection, breakpointBands, tmaskBands, minObservations, chiSquareProbability, minNumOfYearsScaler, dateFormat, lambda, maxIterations)
-    ccdc_result = ee.Algorithms.TemporalSegmentation.Ccdc(gee_data, breakpoint_bands, tmask, numObs, chi, minYears, 2, lda)
 
-    ### retrieve ccdc_result from server
-    ccdc_result_info = ccdc_result.reduceRegion(ee.Reducer.toList(),
-                                                point,
-                                                scale=gee_scale).getInfo()
-    
     ### get time series from selected band
-    gee_data_point = np.array(ee.List(gee_data.getRegion(geometry=point, scale=gee_scale)).getInfo())
-    #print(gee_data_point)
-    timeseries = {}
-    stacked_gee_data = np.stack(gee_data_point[1:],axis=1)
-    for i in range(len(gee_data_point[0])):
-        timeseries[gee_data_point[0][i]] = stacked_gee_data[i]
-    #timeseries is a dictionary with the followings keys: id, longitude, latitude, time, Blue, Green, Red...
-    
-    #timeseries = np.array(gee_data_point)
+    def get_time_series(gee_data):
+        gee_data_point = np.array(ee.List(gee_data.getRegion(geometry=point, scale=gee_scale)).getInfo())
+        stacked_gee_data = np.stack(gee_data_point[1:],axis=1)
+        # timeseries is a dictionary with the followings keys: id, longitude, latitude, time, Blue, Green, Red...
+        timeseries = {gee_data_point[0][i]:stacked_gee_data[i] for i in range(len(gee_data_point[0]))}
+        return timeseries
 
-    # # check if nan_mask is all zeros, not clean data available
-    # if not any(nan_mask):
-    #     from CCD_Plugin.CCD_Plugin import CCD_Plugin
-    #     CCD_Plugin.widget.MsgBar.pushMessage("Error: Not enough clean data to compute CCD for this point",
-    #                                          level=Qgis.Warning, duration=5)
-    #     return
+    ### execute CCDC (GEE implementation)
+    def get_ccdc(gee_data, breakpoint_bands, tmask, numObs, chi, minYears, lda):
+        ### execute CCDC (GEE implementation)
+        # ccdc = ee.Algorithms.TemporalSegmentation.Ccdc(collection, breakpointBands, tmaskBands, minObservations, chiSquareProbability, minNumOfYearsScaler, dateFormat, lambda, maxIterations)
+        ccdc = ee.Algorithms.TemporalSegmentation.Ccdc(gee_data, breakpoint_bands, tmask, numObs, chi, minYears, 2, lda)
+        ### retrieve ccdc from server
+        ccdc_info = ccdc.reduceRegion(ee.Reducer.toList(), point, scale=gee_scale).getInfo()
+        return ccdc_info
+
+    # process in threads to get the time series and ccdc results on GEE
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future_timeseries = executor.submit(get_time_series, gee_data)
+        future_ccdc = executor.submit(get_ccdc, gee_data, breakpoint_bands, tmask, numObs, chi, minYears, lda)
+        timeseries = future_timeseries.result()
+        ccdc_info = future_ccdc.result()
 
     global ccd_results
-    ccd_results = {(coords, date_range, doy_range, dataset, tuple(breakpoint_bands)):(ccdc_result_info, timeseries)}
+    ccd_results = {(coords, date_range, doy_range, dataset, tuple(breakpoint_bands)):(ccdc_info, timeseries)}
 
-    return ccdc_result_info, timeseries
+    return ccdc_info, timeseries
