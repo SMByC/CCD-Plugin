@@ -10,6 +10,14 @@ including 4, 5, 7, 8, and 9, from Collections 1 or 2, or Harmonized Sentinel-2 c
 data only. Then plugin run over Google Earth Engine the Continuous Change Detection algorithm to find temporal 
 breakpoints of the image collection by iteratively fitting harmonic functions to the data.
 
+### Availability of dataset collections
+
+- **Landsat C1**: ~1983 - 2021
+- **Landsat C2**: ~1983 - present
+- **Sentinel-2**: ~2018 - present
+
+### References
+
 - Zhu, Z., & Woodcock, C. E. (2014). Continuous change detection and classification of land cover using all available Landsat data. Remote sensing of Environment, 144, 152-171. https://doi.org/10.1016/j.rse.2014.01.011
 
 - Arévalo, P., Bullock, E.L., Woodcock, C.E., Olofsson, P., (2020). A Suite of Tools for Continuous Land Change Monitoring in Google Earth Engine. Front. Clim. 2. https://doi.org/10.3389/fclim.2020.576740
@@ -20,6 +28,12 @@ The plugin needs to work:
 
 - Google Earth Engine [plugin](https://gee-community.github.io/qgis-earthengine-plugin/ ): The user needs to have this plugin installed and an active Google Earth Engine (EE) account.
 - Plotly. Most of the Qgis versions have this library inside, otherwise the plugin install it automatically.
+
+> **QT without WebKit:**
+> The plugin uses the QT WebKit module for plotting, QtWebEngine is very unstable for Qgis. We recommend installing
+> Qgis with the QT WebKit module (by default in Windows and Mac packages), other systems like Linux with QT >= 5.15 
+> without QT WebKit module by default install python QtWebKit module (e.g. `python3-pyqt5.qtwebkit` or 
+> `python-pyqt5-webkit`) or use alternative installation of Qgis (e.g. using conda).
 
 ## About us
 
