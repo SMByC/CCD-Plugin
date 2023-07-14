@@ -5,16 +5,25 @@ The CCD-Plugin uses Google Earth Engine to get Landsat or Sentinel2 datasets and
 
 ![](screenshot.webp)
 
-The plugin uses Google Earth Engine to retrieve data for the specified coordinates for all available Landsat satellites, 
-including 4, 5, 7, 8, and 9, from Collections 1 or 2, or Harmonized Sentinel-2 collection. It filters for high-quality 
-data only. Then plugin run over Google Earth Engine the Continuous Change Detection algorithm to find temporal 
-breakpoints of the image collection by iteratively fitting harmonic functions to the data.
+The plugin uses Google Earth Engine (GEE) to retrieve data for the specified coordinates for all available Landsat 
+satellites, including 4, 5, 7, 8, and 9, from Collections 1 or 2, or Harmonized Sentinel-2 collection. It filters for 
+high-quality data only. Then plugin run over Google Earth Engine the Continuous Change Detection algorithm to find 
+temporal breakpoints of the image collection by iteratively fitting harmonic functions to the data.
 
-### Availability of dataset collections
+### Availability of dataset collections (GEE)
 
-- **Landsat C1**: ~1983 - 2021
-- **Landsat C2**: ~1983 - present
-- **Sentinel-2**: ~2018 - present
+- **Landsat C1** (30m resolution): ~1983 → 2021
+- **Landsat C2** (30m resolution): ~1983 → present
+- **Sentinel-2** (10m resolution): ~2018 → present
+
+
+### Time series / change detection
+
+The sub-datasets to visualize and compute the CCDC algorithm and its breakpoints are:
+
+- **Bands:** Blue, Green, Red, NIR, SWIR1, SWIR2
+
+- **Indices:** NDVI, NBR, EVI, EVI2, BRIGHTNESS, GREENNESS, WETNESS
 
 ### References
 
