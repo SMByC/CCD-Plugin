@@ -46,6 +46,9 @@ The plugin needs to work:
 > without QT WebKit module by default install python QtWebKit module (e.g. `python3-pyqt5.qtwebkit` or 
 > `python-pyqt5-webkit`) or use alternative installation of Qgis (e.g. using conda).
 
+> **Download plot as a png:**
+> It is not working inside the plugin, but it works when the plot is opened in a web browser
+
 > **Linux with Wayland:**
 > The functionality of open the current plot in a web browser may not work propertly
 
