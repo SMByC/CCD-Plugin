@@ -46,13 +46,13 @@
          <enum>QAbstractSpinBox::NoButtons</enum>
         </property>
         <property name="decimals">
-         <number>2</number>
+         <number>3</number>
         </property>
         <property name="maximum">
          <double>1.000000000000000</double>
         </property>
         <property name="singleStep">
-         <double>0.010000000000000</double>
+         <double>0.001000000000000</double>
         </property>
         <property name="value">
          <double>0.990000000000000</double>
