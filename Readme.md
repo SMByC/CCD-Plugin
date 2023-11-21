@@ -38,11 +38,16 @@ The plugin needs to work:
 - Google Earth Engine [plugin](https://gee-community.github.io/qgis-earthengine-plugin/ ): The user needs to have this plugin installed and an active Google Earth Engine (EE) account.
 - Plotly. Most of the Qgis versions have this library inside, otherwise the plugin install it automatically.
 
-> **QT without WebKit:**
-> The plugin uses the QT WebKit module for plotting, QtWebEngine is very unstable for Qgis. We recommend installing
-> Qgis with the QT WebKit module (by default in Windows and Mac packages), other systems like Linux with QT >= 5.15 
+### Known issues
+
+> **Qgis with QT > 5.15:**
+> The plugin won't work without WebKit module, deprecated after QT >= 5.16. We recommend installing
+> Qgis with the QT WebKit module (by default in Windows and Mac packages), other systems like Linux with QT > 5.15 
 > without QT WebKit module by default install python QtWebKit module (e.g. `python3-pyqt5.qtwebkit` or 
 > `python-pyqt5-webkit`) or use alternative installation of Qgis (e.g. using conda).
+
+> **Linux with Wayland:**
+> The functionality of open the current plot in a web browser may not work propertly
 
 ## About us
 
