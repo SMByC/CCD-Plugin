@@ -46,7 +46,7 @@ PY_FILES = \
 
 UI_FILES = 
 
-EXTRAS = metadata.txt
+EXTRAS = metadata.txt LICENSE
 
 EXTRA_DIRS = core gui icons ui utils
 
