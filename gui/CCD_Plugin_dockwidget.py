@@ -112,6 +112,20 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.html_file = None
         self.btm_open_web_browser.clicked.connect(self.open_plot_in_web_browser)
 
+        # enable/disable days of year when start day or end day is changed
+        self.start_date.dateChanged.connect(lambda: self.enable_disable_days_of_year())
+        self.end_date.dateChanged.connect(lambda: self.enable_disable_days_of_year())
+
+    def enable_disable_days_of_year(self):
+        # only enable the days of year if the date range is greater than 1 year
+        start_date = self.start_date.date()
+        end_date = self.end_date.date()
+        if start_date.daysTo(end_date) >= 365:
+            self.start_doy.setEnabled(True)
+            self.end_doy.setEnabled(True)
+        else:
+            self.start_doy.setEnabled(False)
+            self.end_doy.setEnabled(False)
 
     def closeEvent(self, event):
         # close
@@ -132,9 +146,12 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         end_date = self.end_date.date().toString("yyyy-MM-dd")
         date_range = (start_date, end_date)
         # get days of year range
-        start_doy = self.start_doy.value()
-        end_doy = self.end_doy.value()
-        doy_range = (start_doy, end_doy)
+        if self.start_doy.isEnabled() and self.end_doy.isEnabled():
+            start_doy = self.start_doy.value()
+            end_doy = self.end_doy.value()
+            doy_range = (start_doy, end_doy)
+        else:
+            doy_range = (1, 365)  # by default
         # get dataset selected
         dataset = self.box_dataset.currentText()
         # get band_or_index to plot

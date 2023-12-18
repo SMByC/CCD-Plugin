@@ -535,6 +535,9 @@
           </property>
           <item row="2" column="1">
            <widget class="QSpinBox" name="end_doy">
+            <property name="toolTip">
+             <string>Days of the year for a multi-year analysis</string>
+            </property>
             <property name="minimum">
              <number>2</number>
             </property>
@@ -558,6 +561,9 @@
           </item>
           <item row="2" column="0">
            <widget class="QSpinBox" name="start_doy">
+            <property name="toolTip">
+             <string>Days of the year for a multi-year analysis</string>
+            </property>
             <property name="minimum">
              <number>1</number>
             </property>
