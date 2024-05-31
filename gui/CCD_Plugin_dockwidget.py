@@ -279,6 +279,9 @@ class PickerCoordsOnMap(QgsMapTool):
             self.widget.longitude.setValue(point.x())
             self.widget.latitude.setValue(point.y())
 
+            if self.widget.auto_generate_plot.isChecked():
+                self.widget.new_plot()
+
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
             self.finish()

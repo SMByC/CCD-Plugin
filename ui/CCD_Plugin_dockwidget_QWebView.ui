@@ -671,6 +671,29 @@
               </spacer>
              </item>
              <item>
+              <widget class="QToolButton" name="auto_generate_plot">
+               <property name="cursor">
+                <cursorShape>PointingHandCursor</cursorShape>
+               </property>
+               <property name="toolTip">
+                <string>Automatically generate plot when a new coordinate is pick on map</string>
+               </property>
+               <property name="icon">
+                <iconset>
+                 <normaloff>:/plugins/CCD_Plugin/icons/lock.svg</normaloff>:/plugins/CCD_Plugin/icons/lock.svg</iconset>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+               <property name="toolButtonStyle">
+                <enum>Qt::ToolButtonIconOnly</enum>
+               </property>
+              </widget>
+             </item>
+             <item>
               <widget class="QToolButton" name="generate_button">
                <property name="cursor">
                 <cursorShape>PointingHandCursor</cursorShape>

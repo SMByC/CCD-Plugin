@@ -6,5 +6,6 @@
         <file>icons/center_on_point.svg</file>
         <file>icons/open_in_web_browser.svg</file>
         <file>icons/trash.svg</file>
+        <file>icons/lock.svg</file>
     </qresource>
 </RCC>
