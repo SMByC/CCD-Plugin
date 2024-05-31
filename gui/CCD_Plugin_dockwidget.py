@@ -29,7 +29,7 @@ from qgis.PyQt.QtGui import QColor, QDesktopServices
 from qgis.PyQt.QtCore import QUrl, pyqtSignal, Qt, QDate
 from qgis.PyQt.QtWidgets import QMessageBox
 from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject, QgsPointXY
-from qgis.gui import QgsMapTool, QgsMapToolPan, QgsVertexMarker
+from qgis.gui import QgsMapTool, QgsVertexMarker
 from qgis.utils import iface
 
 try:
@@ -133,11 +133,17 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.closingPlugin.emit()
         event.accept()
 
-    def coordinates_from_map(self):
-        # set the map tool and actions
-        for canvas, default_map_tool in zip(self.canvas, self.default_map_tools):
-            canvas.unsetMapTool(default_map_tool)
-            canvas.setMapTool(PickerCoordsOnMap(self, canvas), clean=True)
+    def coordinates_from_map(self, checked):
+        if not checked:
+            # finish, set default map tool to canvas
+            for canvas, default_map_tool in zip(self.canvas, self.default_map_tools):
+                canvas.setMapTool(default_map_tool, clean=True)
+            self.pick_on_map.setChecked(False)
+        else:
+            # set the map tool to pick coordinates
+            for canvas, default_map_tool in zip(self.canvas, self.default_map_tools):
+                canvas.unsetMapTool(default_map_tool)
+                canvas.setMapTool(PickerCoordsOnMap(self, canvas), clean=True)
 
     def get_config_from_widget(self):
         # get the coordinates
@@ -271,8 +277,6 @@ class PickerCoordsOnMap(QgsMapTool):
 
             self.widget.longitude.setValue(point.x())
             self.widget.latitude.setValue(point.y())
-
-            self.finish()
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
