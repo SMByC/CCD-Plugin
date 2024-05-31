@@ -236,7 +236,7 @@
                  </widget>
                 </item>
                 <item>
-                 <widget class="QToolButton" name="btm_center_on_point">
+                 <widget class="QToolButton" name="center_on_coordinate">
                   <property name="toolTip">
                    <string>Center to the current coordinate</string>
                   </property>

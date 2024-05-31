@@ -82,7 +82,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # set the current date
         self.end_date.setDate(QDate.currentDate())
         # set action center on point
-        self.btm_center_on_point.clicked.connect(self.center_on_point)
+        self.center_on_coordinate.clicked.connect(self.center_on_current_coordinate)
         # set action when change the band or index repaint the plot
         self.band_or_index.currentIndexChanged.connect(lambda: self.repaint_plot())
 
@@ -213,18 +213,20 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             self.html_file = generate_plot(self.id, ccdc_result_info, timeseries, date_range, dataset, band_or_index)
             self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
 
-    def center_on_point(self):
-        if PickerCoordsOnMap.marker_drawn["canvas"] is None:
-            return
+    def center_on_current_coordinate(self):
+        if PickerCoordsOnMap.marker_drawn["canvas"] is not None:
+            canvas = PickerCoordsOnMap.marker_drawn["canvas"]
+        else:
+            canvas = self.canvas[0]
         # get the coordinates
         point = QgsPointXY(self.longitude.value(), self.latitude.value())
         # transform coordinates to map canvas
         crsSrc = QgsCoordinateReferenceSystem(4326)
-        crsDest = PickerCoordsOnMap.marker_drawn["canvas"].mapSettings().destinationCrs()
+        crsDest = canvas.mapSettings().destinationCrs()
         xform = QgsCoordinateTransform(crsSrc, crsDest, QgsProject.instance())
         point = xform.transform(point)
         # center on point
-        PickerCoordsOnMap.marker_drawn["canvas"].setCenter(point)
+        canvas.setCenter(point)
 
     def clean_plot(self):
         if self.html_file and os.path.exists(self.html_file):
