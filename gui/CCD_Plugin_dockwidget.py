@@ -87,8 +87,9 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.band_or_index.currentIndexChanged.connect(lambda: self.repaint_plot())
 
         self.default_map_tools = [canvas.mapTool() for canvas in self.canvas]
-
         self.pick_on_map.clicked.connect(self.coordinates_from_map)
+        self.delete_markers.clicked.connect(PickerCoordsOnMap.delete_markers)
+
         self.generate_button.clicked.connect(lambda: self.new_plot())
 
         # plot web view

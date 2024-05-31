@@ -85,6 +85,9 @@
              <item>
               <widget class="QWidget" name="widget_8" native="true">
                <layout class="QHBoxLayout" name="horizontalLayout_3">
+                <property name="spacing">
+                 <number>3</number>
+                </property>
                 <property name="leftMargin">
                  <number>0</number>
                 </property>
@@ -127,6 +130,26 @@
                   </property>
                   <property name="toolButtonStyle">
                    <enum>Qt::ToolButtonTextBesideIcon</enum>
+                  </property>
+                  <property name="autoRaise">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QToolButton" name="delete_markers">
+                  <property name="cursor">
+                   <cursorShape>PointingHandCursor</cursorShape>
+                  </property>
+                  <property name="toolTip">
+                   <string>Delete markers drawn</string>
+                  </property>
+                  <property name="icon">
+                   <iconset>
+                    <normaloff>:/plugins/CCD_Plugin/icons/trash.svg</normaloff>:/plugins/CCD_Plugin/icons/trash.svg</iconset>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonIconOnly</enum>
                   </property>
                   <property name="autoRaise">
                    <bool>true</bool>
