@@ -131,7 +131,7 @@ class CCD_Plugin:
 
         # delete the marker
         from CCD_Plugin.gui.CCD_Plugin_dockwidget import PickerCoordsOnMap
-        PickerCoordsOnMap.delete_marker()
+        PickerCoordsOnMap.delete_markers()
 
         # remove this statement if widget is to remain
         # for reuse if plugin is reopened

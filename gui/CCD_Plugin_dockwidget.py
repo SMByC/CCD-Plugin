@@ -57,7 +57,7 @@ from CCD_Plugin.gui.advanced_settings import AdvancedSettings
 class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
     closingPlugin = pyqtSignal()
 
-    def __init__(self, id, parent=None):
+    def __init__(self, id, canvas=None, parent=None):
         """Constructor."""
         super(CCD_PluginDockWidget, self).__init__(parent)
         # Set up the user interface from Designer through FORM_CLASS.
@@ -66,6 +66,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # http://qt-project.org/doc/qt-4.8/designer-using-a-ui-file.html
         # #widgets-and-dialogs-with-auto-connect
         self.id = id
+        self.canvas = canvas if canvas is not None else [iface.mapCanvas()]
         self.setupUi(self)
         self.setup_gui()
 
@@ -85,8 +86,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # set action when change the band or index repaint the plot
         self.band_or_index.currentIndexChanged.connect(lambda: self.repaint_plot())
 
-        self.default_point_tool = QgsMapToolPan(iface.mapCanvas())
-        iface.mapCanvas().setMapTool(self.default_point_tool, clean=True)
+        self.default_map_tools = [canvas.mapTool() for canvas in self.canvas]
 
         self.pick_on_map.clicked.connect(self.coordinates_from_map)
         self.generate_button.clicked.connect(lambda: self.new_plot())
@@ -100,7 +100,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         plot_view_settings.setAttribute(QWebSettings.XSSAuditingEnabled, True)
         plot_view_settings.setAttribute(QWebSettings.JavascriptEnabled, True)
         # define the zoom factor based on the dpi
-        dpi = iface.mapCanvas().mapSettings().outputDpi()
+        dpi = self.canvas[0].mapSettings().outputDpi()
         zoom_factor = dpi/96 - 0.4
         zoom_factor = 1 if zoom_factor < 1 else zoom_factor
         self.plot_webview.setZoomFactor(zoom_factor)
@@ -135,7 +135,9 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     def coordinates_from_map(self):
         # set the map tool and actions
-        iface.mapCanvas().setMapTool(PickerCoordsOnMap(self), clean=True)
+        for canvas, default_map_tool in zip(self.canvas, self.default_map_tools):
+            canvas.unsetMapTool(default_map_tool)
+            canvas.setMapTool(PickerCoordsOnMap(self, canvas), clean=True)
 
     def get_config_from_widget(self):
         # get the coordinates
@@ -205,17 +207,17 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
 
     def center_on_point(self):
+        if PickerCoordsOnMap.marker_drawn["canvas"] is None:
+            return
         # get the coordinates
         point = QgsPointXY(self.longitude.value(), self.latitude.value())
         # transform coordinates to map canvas
         crsSrc = QgsCoordinateReferenceSystem(4326)
-        crsDest = iface.mapCanvas().mapSettings().destinationCrs()
+        crsDest = PickerCoordsOnMap.marker_drawn["canvas"].mapSettings().destinationCrs()
         xform = QgsCoordinateTransform(crsSrc, crsDest, QgsProject.instance())
         point = xform.transform(point)
-        # create a marker
-        PickerCoordsOnMap.create_marker(point)
         # center on point
-        iface.mapCanvas().setCenter(point)
+        PickerCoordsOnMap.marker_drawn["canvas"].setCenter(point)
 
     def clean_plot(self):
         if self.html_file and os.path.exists(self.html_file):
@@ -230,37 +232,39 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
 
 class PickerCoordsOnMap(QgsMapTool):
-    marker = None
+    marker_drawn = {"marker": None, "canvas": None}
 
-    def __init__(self, widget):
-        QgsMapTool.__init__(self, iface.mapCanvas())
+    def __init__(self, widget, canvas=None):
         self.widget = widget
+        self.canvas = canvas if canvas is not None else iface.mapCanvas()
+        QgsMapTool.__init__(self, self.canvas)
 
     @staticmethod
-    def delete_marker():
-        if PickerCoordsOnMap.marker:
-            iface.mapCanvas().scene().removeItem(PickerCoordsOnMap.marker)
-            PickerCoordsOnMap.marker = None
+    def delete_markers():
+        if PickerCoordsOnMap.marker_drawn["marker"] is not None:
+            PickerCoordsOnMap.marker_drawn["canvas"].scene().removeItem(PickerCoordsOnMap.marker_drawn["marker"])
+                
+        PickerCoordsOnMap.marker_drawn = {"marker": None, "canvas": None}
 
-    @staticmethod
-    def create_marker(point):
+    def create_marker(self, point):
         # remove the previous marker
-        PickerCoordsOnMap.delete_marker()
+        self.delete_markers()
         # create a marker
-        marker = QgsVertexMarker(iface.mapCanvas())
+        marker = QgsVertexMarker(self.canvas)
         marker.setCenter(point)
         marker.setColor(QColor("red"))
         marker.setIconSize(25)
         marker.setIconType(QgsVertexMarker.ICON_CIRCLE)
         marker.setPenWidth(4)
-        PickerCoordsOnMap.marker = marker
+        PickerCoordsOnMap.marker_drawn["marker"] = marker
+        PickerCoordsOnMap.marker_drawn["canvas"] = self.canvas
 
     def canvasPressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            point = iface.mapCanvas().getCoordinateTransform().toMapCoordinates(event.pos().x(), event.pos().y())
+            point = self.canvas.getCoordinateTransform().toMapCoordinates(event.pos().x(), event.pos().y())
             self.create_marker(point)
             # transform coordinates to WGS84
-            crsSrc = iface.mapCanvas().mapSettings().destinationCrs()
+            crsSrc = self.canvas.mapSettings().destinationCrs()
             crsDest = QgsCoordinateReferenceSystem(4326)
             xform = QgsCoordinateTransform(crsSrc, crsDest, QgsProject.instance())
             point = xform.transform(point)
@@ -275,7 +279,9 @@ class PickerCoordsOnMap(QgsMapTool):
             self.finish()
 
     def finish(self):
-        iface.mapCanvas().unsetMapTool(self)
-        iface.mapCanvas().setMapTool(self.widget.default_point_tool)
+        for canvas, default_map_tool in zip(self.widget.canvas, self.widget.default_map_tools):
+            canvas.unsetMapTool(self)
+            canvas.setMapTool(default_map_tool)
+
         self.widget.pick_on_map.setChecked(False)
 
