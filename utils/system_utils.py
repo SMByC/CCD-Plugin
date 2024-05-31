@@ -30,9 +30,9 @@ from qgis.utils import iface
 
 def error_handler(func):
     @functools.wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(self, *args, **kwargs):
         try:
-            return func(*args, **kwargs)
+            return func(self, *args, **kwargs)
         except Exception as err:
             # restore mouse
             QApplication.restoreOverrideCursor()
@@ -40,8 +40,8 @@ def error_handler(func):
 
             # select the message bar
             from CCD_Plugin.CCD_Plugin import CCD_Plugin
-            if CCD_Plugin.widget:
-                msg_bar = CCD_Plugin.widget.MsgBar
+            if CCD_Plugin.inst[self.id].widget is not None:
+                msg_bar = CCD_Plugin.inst[self.id].widget.MsgBar
             else:
                 msg_bar = iface.messageBar()
 
@@ -84,11 +84,11 @@ def error_handler(func):
 def wait_process(func):
     @error_handler
     @functools.wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(self, *args, **kwargs):
         # mouse wait
         QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
         # do
-        obj_returned = func(*args, **kwargs)
+        obj_returned = func(self, *args, **kwargs)
         # restore mouse
         QApplication.restoreOverrideCursor()
         QApplication.processEvents()

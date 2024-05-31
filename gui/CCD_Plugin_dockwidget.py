@@ -57,7 +57,7 @@ from CCD_Plugin.gui.advanced_settings import AdvancedSettings
 class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
     closingPlugin = pyqtSignal()
 
-    def __init__(self, parent=None):
+    def __init__(self, id, parent=None):
         """Constructor."""
         super(CCD_PluginDockWidget, self).__init__(parent)
         # Set up the user interface from Designer through FORM_CLASS.
@@ -65,6 +65,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # self.<objectname>, and you can use autoconnect slots - see
         # http://qt-project.org/doc/qt-4.8/designer-using-a-ui-file.html
         # #widgets-and-dialogs-with-auto-connect
+        self.id = id
         self.setupUi(self)
         self.setup_gui()
 
@@ -161,7 +162,6 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         return coords, date_range, doy_range, dataset, band_or_index, breakpoint_bands
 
-
     @wait_process
     def new_plot(self):
         from CCD_Plugin.CCD_Plugin import CCD_Plugin
@@ -184,7 +184,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         if not results:
             return
         ccdc_result_info, timeseries = results
-        self.html_file = generate_plot(ccdc_result_info, timeseries, date_range, dataset, band_or_index, CCD_Plugin.tmp_dir)
+        self.html_file = generate_plot(self.id, ccdc_result_info, timeseries, date_range, dataset, band_or_index)
         self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
 
     @wait_process
@@ -201,9 +201,8 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # check if ccd results are already computed
         if (coords, date_range, doy_range, dataset, tuple(breakpoint_bands)) in ccd_results:
             ccdc_result_info, timeseries = ccd_results[(coords, date_range, doy_range, dataset, tuple(breakpoint_bands))]
-            self.html_file = generate_plot(ccdc_result_info, timeseries, date_range, dataset, band_or_index, CCD_Plugin.tmp_dir)
+            self.html_file = generate_plot(self.id, ccdc_result_info, timeseries, date_range, dataset, band_or_index)
             self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
-
 
     def center_on_point(self):
         # get the coordinates

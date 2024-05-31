@@ -34,8 +34,7 @@ import os.path
 
 class CCD_Plugin:
     """QGIS Plugin Implementation."""
-    widget = None
-    tmp_dir = None
+    inst = {}
 
     def __init__(self, iface):
         """Constructor.
@@ -63,7 +62,12 @@ class CCD_Plugin:
 
         self.menu_name_plugin = self.tr("Continuous Change Detection Plugin")
         self.pluginIsActive = False
-        CCD_Plugin.widget = None
+        self.widget = None
+        self.tmp_dir = None
+
+        # save the instance
+        self.id = str(id(self))
+        CCD_Plugin.inst[self.id] = self
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -102,22 +106,22 @@ class CCD_Plugin:
             # dockwidget may not exist if:
             #    first run of plugin
             #    removed on close (see self.onClosePlugin method)
-            if CCD_Plugin.widget == None:
+            if self.widget is None:
                 # Create the dockwidget (after translation) and keep reference
-                CCD_Plugin.widget = CCD_PluginDockWidget()
+                self.widget = CCD_PluginDockWidget(self.id)
 
             # init tmp dir for all process and intermediate files
-            if CCD_Plugin.tmp_dir:
+            if self.tmp_dir:
                 self.removes_temporary_files()
-            CCD_Plugin.tmp_dir = tempfile.mkdtemp()
+            self.tmp_dir = tempfile.mkdtemp()
 
             # connect to provide cleanup on closing of dockwidget
-            CCD_Plugin.widget.closingPlugin.connect(self.onClosePlugin)
+            self.widget.closingPlugin.connect(self.onClosePlugin)
 
             # show the dockwidget
             # TODO: fix to allow choice of dock location
-            self.iface.addDockWidget(Qt.BottomDockWidgetArea, CCD_Plugin.widget)
-            CCD_Plugin.widget.show()
+            self.iface.addDockWidget(Qt.BottomDockWidgetArea, self.widget)
+            self.widget.show()
 
     #--------------------------------------------------------------------------
 
@@ -133,8 +137,8 @@ class CCD_Plugin:
         # for reuse if plugin is reopened
         # Commented next statement since it causes QGIS crashe
         # when closing the docked window:
-        CCD_Plugin.widget.close()
-        CCD_Plugin.widget = None
+        self.widget.close()
+        self.widget = None
 
         # reset some variables
         self.pluginIsActive = False
@@ -149,18 +153,17 @@ class CCD_Plugin:
         self.iface.removePluginMenu(self.menu_name_plugin, self.dockable_action)
         self.iface.removeToolBarIcon(self.dockable_action)
 
-        if CCD_Plugin.widget:
-            self.iface.removeDockWidget(CCD_Plugin.widget)
+        if self.widget:
+            self.iface.removeDockWidget(self.widget)
             # delete the widget
-            del CCD_Plugin.widget
+            del self.widget
 
-    @staticmethod
-    def removes_temporary_files():
-        if not CCD_Plugin.widget:
+    def removes_temporary_files(self):
+        if not self.widget:
             return
 
         # clear CCD_Plugin.tmp_dir
-        if CCD_Plugin.tmp_dir and os.path.isdir(CCD_Plugin.tmp_dir):
-            shutil.rmtree(CCD_Plugin.tmp_dir, ignore_errors=True)
-        CCD_Plugin.tmp_dir = None
+        if self.tmp_dir and os.path.isdir(self.tmp_dir):
+            shutil.rmtree(self.tmp_dir, ignore_errors=True)
+        self.tmp_dir = None
 

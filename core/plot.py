@@ -54,7 +54,8 @@ def createArtificialDates(date_range,first_date):
     return artificial_dates #in milli
 
 
-def generate_plot(ccdc_result_info, timeseries, date_range, dataset, band_to_plot, tmp_dir):
+def generate_plot(id, ccdc_result_info, timeseries, date_range, dataset, band_to_plot):
+    from CCD_Plugin.CCD_Plugin import CCD_Plugin
 
     first_date = int(timeseries['time'][0]) #int(timeseries[1][3])
     # get artificial dates (required for plotting ccdc fitted curves)
@@ -81,10 +82,10 @@ def generate_plot(ccdc_result_info, timeseries, date_range, dataset, band_to_plo
                 coefs[6]*np.cos(t*3*2*np.pi/(365.25*24*60*60*1000))+
                 coefs[7]*np.cos(t*3*2*np.pi/(365.25*24*60*60*1000))
                 for t in artificial_dates_seg]
-           
+
         predicted_values.append(pred)
         prediction_dates.append(artificial_dates_seg)
-    
+
     # get start and break dates
     break_dates = ccdc_result_info['tBreak'][0].copy()
     if 0 in break_dates:
@@ -127,9 +128,8 @@ def generate_plot(ccdc_result_info, timeseries, date_range, dataset, band_to_plo
                              mode='lines', line=dict(color='red', width=1, dash='dash'), name='break lines'))
 
     # get longitude and latitude from CCD_PluginDockWidget
-    from CCD_Plugin.CCD_Plugin import CCD_Plugin
-    lon = CCD_Plugin.widget.longitude.value()
-    lat = CCD_Plugin.widget.latitude.value()
+    lon = CCD_Plugin.inst[id].widget.longitude.value()
+    lat = CCD_Plugin.inst[id].widget.latitude.value()
 
     fig.update_layout(
         title={
@@ -162,7 +162,7 @@ def generate_plot(ccdc_result_info, timeseries, date_range, dataset, band_to_plo
 
     fig.update_yaxes(title_text=title, automargin=True)
 
-    html_file = tempfile.mktemp(suffix=".html", dir=tmp_dir)
+    html_file = tempfile.mktemp(suffix=".html", dir=CCD_Plugin.inst[id].tmp_dir)
     plotly.offline.plot(fig, filename=html_file, auto_open=False, config={'displaylogo': False})
 
     return html_file
