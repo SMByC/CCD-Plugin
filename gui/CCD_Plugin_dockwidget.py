@@ -277,4 +277,5 @@ class PickerCoordsOnMap(QgsMapTool):
     def finish(self):
         iface.mapCanvas().unsetMapTool(self)
         iface.mapCanvas().setMapTool(self.widget.default_point_tool)
+        self.widget.pick_on_map.setChecked(False)
 

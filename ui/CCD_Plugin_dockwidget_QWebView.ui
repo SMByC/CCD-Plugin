@@ -122,6 +122,9 @@
                    <iconset>
                     <normaloff>:/plugins/CCD_Plugin/icons/select_on_canvas.svg</normaloff>:/plugins/CCD_Plugin/icons/select_on_canvas.svg</iconset>
                   </property>
+                  <property name="checkable">
+                   <bool>true</bool>
+                  </property>
                   <property name="toolButtonStyle">
                    <enum>Qt::ToolButtonTextBesideIcon</enum>
                   </property>
