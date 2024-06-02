@@ -29,7 +29,7 @@ from qgis.PyQt import QtWidgets
 from qgis.PyQt.QtGui import QColor, QDesktopServices
 from qgis.PyQt.QtCore import QUrl, pyqtSignal, Qt, QDate
 from qgis.PyQt.QtWidgets import QMessageBox
-from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject, QgsPointXY
+from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject, QgsPointXY, Qgis
 from qgis.gui import QgsMapTool, QgsVertexMarker
 from qgis.utils import iface
 
@@ -187,6 +187,12 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             return
 
         ccdc_result_info, timeseries = results
+
+        if not ccdc_result_info['tBreak']:
+            msg = "No enough data for this period to perform change detection, plotting only the observed values."
+            self.MsgBar.clearWidgets()
+            self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.Info)
+
         self.html_file = generate_plot(self.id, ccdc_result_info, timeseries, (config['start_date'], config['end_date']),
                                        config['dataset'], config['band_or_index'])
         self.plot_webview.load(QUrl.fromLocalFile(self.html_file))

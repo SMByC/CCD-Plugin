@@ -30,13 +30,14 @@ import plotly
 import plotly.graph_objects as go
 import plotly.io as pio
 
-###create artificial dates for plotting the regression (plug values into regression equation)
-def createArtificialDates(date_range,first_date):
+
+# create artificial dates for plotting the regression (plug values into regression equation)
+def create_artificial_dates(date_range, first_date):
     import ee
  
     date_end = date_range[1]
     # create sequence of dates from first date to date_end, spaced by 5 days
-    interval = 5 #days
+    interval = 5  # days
     
     date_end_millis = ee.Date(date_end).millis().getInfo()
     
@@ -45,52 +46,56 @@ def createArtificialDates(date_range,first_date):
     artificial_dates = [first_date+x*interval*24*60*60*1000 for x in range(num_intervals)]
 
     # adjust end of series
-    if artificial_dates[-1]<date_end_millis:
+    if artificial_dates[-1] < date_end_millis:
         artificial_dates.append(date_end_millis)
-    elif artificial_dates[-1]>date_end_millis:
+    elif artificial_dates[-1] > date_end_millis:
         artificial_dates.pop(-1)
     artificial_dates = np.array(artificial_dates)
 
-    return artificial_dates #in milli
+    return artificial_dates  # in milliseconds
 
 
 def generate_plot(id, ccdc_result_info, timeseries, date_range, dataset, band_to_plot):
     from CCD_Plugin.CCD_Plugin import CCD_Plugin
 
-    first_date = int(timeseries['time'][0]) #int(timeseries[1][3])
+    first_date = int(timeseries['time'][0])
     # get artificial dates (required for plotting ccdc fitted curves)
-    artificial_dates = createArtificialDates(date_range,first_date)
+    artificial_dates = create_artificial_dates(date_range, first_date)
 
-    # get number of fitted segments
-    nsegments = len(ccdc_result_info['tBreak'][0])
-
-    # cycle through each segment and plot the predicted values by pluggin into harmonic regression equation
+    break_dates = []
     predicted_values = []
     prediction_dates = []
-    for seg in range(nsegments):
-        artificial_dates_seg = artificial_dates[(artificial_dates<=ccdc_result_info['tEnd'][0][seg])&(artificial_dates>=ccdc_result_info['tStart'][0][seg])]
-        #include tEnd and tStart in the series, if not already included
-        artificial_dates_seg = np.append(artificial_dates_seg, [ccdc_result_info['tEnd'][0][seg],ccdc_result_info['tStart'][0][seg]])
-        artificial_dates_seg = np.sort(np.unique(artificial_dates_seg))
 
-        coefs = ccdc_result_info['{}_coefs'.format(band_to_plot)][0][seg]
-        pred = [coefs[0]+coefs[1]*t+
-                coefs[2]*np.cos(t*1*2*np.pi/(365.25*24*60*60*1000))+
-                coefs[3]*np.cos(t*1*2*np.pi/(365.25*24*60*60*1000))+
-                coefs[4]*np.cos(t*2*2*np.pi/(365.25*24*60*60*1000))+
-                coefs[5]*np.cos(t*2*2*np.pi/(365.25*24*60*60*1000))+
-                coefs[6]*np.cos(t*3*2*np.pi/(365.25*24*60*60*1000))+
-                coefs[7]*np.cos(t*3*2*np.pi/(365.25*24*60*60*1000))
-                for t in artificial_dates_seg]
+    if ccdc_result_info['tBreak']:
 
-        predicted_values.append(pred)
-        prediction_dates.append(artificial_dates_seg)
+        # get number of fitted segments
+        nsegments = len(ccdc_result_info['tBreak'][0])
 
-    # get start and break dates
-    break_dates = ccdc_result_info['tBreak'][0].copy()
-    if 0 in break_dates:
-        break_dates.remove(0) #delete zero from break dates
-    #start_dates = ccdc_result_info['tStart'][0]
+        # cycle through each segment and plot the predicted values by pluggin into harmonic regression equation
+        for seg in range(nsegments):
+            artificial_dates_seg = artificial_dates[(artificial_dates<=ccdc_result_info['tEnd'][0][seg])&(artificial_dates>=ccdc_result_info['tStart'][0][seg])]
+            #include tEnd and tStart in the series, if not already included
+            artificial_dates_seg = np.append(artificial_dates_seg, [ccdc_result_info['tEnd'][0][seg],ccdc_result_info['tStart'][0][seg]])
+            artificial_dates_seg = np.sort(np.unique(artificial_dates_seg))
+
+            coefs = ccdc_result_info['{}_coefs'.format(band_to_plot)][0][seg]
+            pred = [coefs[0]+coefs[1]*t+
+                    coefs[2]*np.cos(t*1*2*np.pi/(365.25*24*60*60*1000))+
+                    coefs[3]*np.cos(t*1*2*np.pi/(365.25*24*60*60*1000))+
+                    coefs[4]*np.cos(t*2*2*np.pi/(365.25*24*60*60*1000))+
+                    coefs[5]*np.cos(t*2*2*np.pi/(365.25*24*60*60*1000))+
+                    coefs[6]*np.cos(t*3*2*np.pi/(365.25*24*60*60*1000))+
+                    coefs[7]*np.cos(t*3*2*np.pi/(365.25*24*60*60*1000))
+                    for t in artificial_dates_seg]
+
+            predicted_values.append(pred)
+            prediction_dates.append(artificial_dates_seg)
+
+        # get start and break dates
+        break_dates = ccdc_result_info['tBreak'][0].copy()
+        if 0 in break_dates:
+            break_dates.remove(0) #delete zero from break dates
+        #start_dates = ccdc_result_info['tStart'][0]
 
     # get observed values (actual time series)
     dates_obs = timeseries['time'] #np.stack(timeseries,axis=1)[:][-2][1:].astype('int64')
@@ -124,8 +129,9 @@ def generate_plot(id, ccdc_result_info, timeseries, date_range, dataset, band_to
                       annotation_font_size=9, annotation_font_color="red")
 
     # add a fake line to add the legend for the break lines
-    fig.add_trace(go.Scatter(x=[datetime_min]*2, y=[np.nanmin(values_obs)]*2, hoverinfo='skip',
-                             mode='lines', line=dict(color='red', width=1, dash='dash'), name='break lines'))
+    if ccdc_result_info['tBreak']:
+        fig.add_trace(go.Scatter(x=[datetime_min]*2, y=[np.nanmin(values_obs)]*2, hoverinfo='skip',
+                                 mode='lines', line=dict(color='red', width=1, dash='dash'), name='break lines'))
 
     # get longitude and latitude from CCD_PluginDockWidget
     lon = CCD_Plugin.inst[id].widget.longitude.value()
