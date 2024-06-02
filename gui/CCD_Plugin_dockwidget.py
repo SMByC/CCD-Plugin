@@ -22,6 +22,7 @@ with the collaboration of Daniel Moraes <moraesd90@gmail.com>
 
 """
 import os
+from collections import OrderedDict
 
 from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
@@ -51,6 +52,7 @@ except ImportError:
 from CCD_Plugin.core.ccd_process import compute_ccd
 from CCD_Plugin.core.plot import generate_plot
 from CCD_Plugin.utils.system_utils import wait_process
+from CCD_Plugin.utils.config import get_plugin_config
 from CCD_Plugin.gui.advanced_settings import AdvancedSettings
 
 
@@ -67,6 +69,9 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # #widgets-and-dialogs-with-auto-connect
         self.id = id
         self.canvas = canvas if canvas is not None else [iface.mapCanvas()]
+        self.config = None
+        self.last_config = None
+
         self.setupUi(self)
         self.setup_gui()
 
@@ -74,7 +79,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # select swir1 band by default
         self.band_or_index.setCurrentIndex(4)
         # set the collection to 2 by default
-        self.box_dataset.setCurrentIndex(1)
+        self.dataset.setCurrentIndex(1)
         # set break point bands/indices
         self.box_breakpoint_bands.addItems(['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'NDVI', 'NBR', 'EVI',
                                            'EVI2', 'BRIGHTNESS', 'GREENNESS', 'WETNESS'])
@@ -146,35 +151,9 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                 canvas.unsetMapTool(default_map_tool)
                 canvas.setMapTool(PickerCoordsOnMap(self, canvas), clean=True)
 
-    def get_config_from_widget(self):
-        # get the coordinates
-        lon = self.longitude.value()
-        lat = self.latitude.value()
-        coords = (lon, lat)
-        # get the date range
-        start_date = self.start_date.date().toString("yyyy-MM-dd")
-        end_date = self.end_date.date().toString("yyyy-MM-dd")
-        date_range = (start_date, end_date)
-        # get days of year range
-        if self.start_doy.isEnabled() and self.end_doy.isEnabled():
-            start_doy = self.start_doy.value()
-            end_doy = self.end_doy.value()
-            doy_range = (start_doy, end_doy)
-        else:
-            doy_range = (1, 365)  # by default
-        # get dataset selected
-        dataset = self.box_dataset.currentText()
-        # get band_or_index to plot
-        band_or_index = self.band_or_index.currentText()
-        # get breakpoint bands (detection bands)
-        breakpoint_bands = self.box_breakpoint_bands.checkedItems()
-
-        return coords, date_range, doy_range, dataset, band_or_index, breakpoint_bands
-
     @wait_process
     def new_plot(self):
         from CCD_Plugin.CCD_Plugin import CCD_Plugin
-        self.clean_plot()
 
         # check import ee lib
         try:
@@ -183,18 +162,36 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         except Exception as err:
             raise Exception("Error importing ee lib, check the installation or your internet connection|{}".format(err))
 
-        # get the config from the widget
-        coords, date_range, doy_range, dataset, band_or_index, breakpoint_bands = self.get_config_from_widget()
-        # get the advanced settings from the dialog
-        numObs, chi, minYears, lda = self.advanced_settings.get_config_from_dialog()
+        # get the current configuration of the plugin
+        config = get_plugin_config(self.id)
 
-        results  = compute_ccd(coords, date_range, doy_range, dataset, breakpoint_bands, None, numObs, chi, minYears, lda)
+        # check if the plugin settings have changed compared to the last plot, except for the band_or_index to plot
+        if self.last_config and self.last_config == OrderedDict((k, v) for k, v in config.items() if k != 'band_or_index'):
+            return
+
+        self.clean_plot()
+
+        results = compute_ccd(
+            coords=(config['lon'], config['lat']),
+            date_range=(config['start_date'], config['end_date']),
+            doy_range=(config['start_doy'], config['end_doy']),
+            dataset=config['dataset'],
+            breakpoint_bands=config['breakpoint_bands'],
+            tmask_bands=None,
+            num_obs=config['num_obs'],
+            chi_square=config['chi_square'],
+            min_years=config['min_years'],
+            lambda_lasso=config['lambda_lasso'])
                     
         if not results:
             return
+
         ccdc_result_info, timeseries = results
-        self.html_file = generate_plot(self.id, ccdc_result_info, timeseries, date_range, dataset, band_or_index)
+        self.html_file = generate_plot(self.id, ccdc_result_info, timeseries, (config['start_date'], config['end_date']),
+                                       config['dataset'], config['band_or_index'])
         self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
+
+        self.last_config = OrderedDict((k, v) for k, v in config.items() if k != 'band_or_index')
 
     @wait_process
     def repaint_plot(self):
@@ -205,11 +202,18 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         if not ccd_results:
             return
 
-        # get the config from the widget
-        coords, date_range, doy_range, dataset, band_or_index, breakpoint_bands = self.get_config_from_widget()
+        # get the current configuration of the plugin
+        config = get_plugin_config(self.id)
+        coords = (config['lon'], config['lat'])
+        date_range = (config['start_date'], config['end_date'])
+        doy_range = (config['start_doy'], config['end_doy'])
+        dataset = config['dataset']
+        band_or_index = config['band_or_index']
+        breakpoint_bands = tuple(config['breakpoint_bands'])
+
         # check if ccd results are already computed
-        if (coords, date_range, doy_range, dataset, tuple(breakpoint_bands)) in ccd_results:
-            ccdc_result_info, timeseries = ccd_results[(coords, date_range, doy_range, dataset, tuple(breakpoint_bands))]
+        if (coords, date_range, doy_range, dataset, breakpoint_bands) in ccd_results:
+            ccdc_result_info, timeseries = ccd_results[(coords, date_range, doy_range, dataset, breakpoint_bands)]
             self.html_file = generate_plot(self.id, ccdc_result_info, timeseries, date_range, dataset, band_or_index)
             self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
 

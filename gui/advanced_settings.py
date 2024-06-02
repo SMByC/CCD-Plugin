@@ -37,12 +37,3 @@ class AdvancedSettings(QDialog, FORM_CLASS):
     def __init__(self):
         QDialog.__init__(self)
         self.setupUi(self)
-
-    def get_config_from_dialog(self):
-        # return the advanced settings
-        numObs = self.numObs_box.value()
-        chi = self.chi_box.value()
-        minYears = self.minYears_box.value()
-        lda = self.lambda_box.value()
-
-        return numObs, chi, minYears, lda

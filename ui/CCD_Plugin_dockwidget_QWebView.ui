@@ -305,7 +305,7 @@
                  </widget>
                 </item>
                 <item>
-                 <widget class="QComboBox" name="box_dataset">
+                 <widget class="QComboBox" name="dataset">
                   <property name="toolTip">
                    <string>Collection of images to get the images and run CCDC</string>
                   </property>
@@ -359,7 +359,7 @@
                 <item>
                  <widget class="QLabel" name="label_2">
                   <property name="text">
-                   <string>Band/Index (plot)</string>
+                   <string>Band/Index to plot</string>
                   </property>
                   <property name="alignment">
                    <set>Qt::AlignCenter</set>
