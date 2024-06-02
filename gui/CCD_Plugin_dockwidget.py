@@ -251,6 +251,7 @@ class PickerCoordsOnMap(QgsMapTool):
         self.widget = widget
         self.canvas = canvas if canvas is not None else iface.mapCanvas()
         QgsMapTool.__init__(self, self.canvas)
+        self.canvas.setFocus()
 
     @staticmethod
     def delete_markers():
