@@ -55,7 +55,7 @@ def create_artificial_dates(date_range, first_date):
     return artificial_dates  # in milliseconds
 
 
-def generate_plot(id, ccdc_result_info, timeseries, date_range, dataset, band_to_plot):
+def generate_plot(id, ccdc_result_info, timeseries, date_range, dataset, band_or_index_to_plot):
     from CCD_Plugin.CCD_Plugin import CCD_Plugin
 
     first_date = int(timeseries['time'][0])
@@ -78,7 +78,7 @@ def generate_plot(id, ccdc_result_info, timeseries, date_range, dataset, band_to
             artificial_dates_seg = np.append(artificial_dates_seg, [ccdc_result_info['tEnd'][0][seg],ccdc_result_info['tStart'][0][seg]])
             artificial_dates_seg = np.sort(np.unique(artificial_dates_seg))
 
-            coefs = ccdc_result_info['{}_coefs'.format(band_to_plot)][0][seg]
+            coefs = ccdc_result_info['{}_coefs'.format(band_or_index_to_plot)][0][seg]
             pred = [coefs[0]+coefs[1]*t+
                     coefs[2]*np.cos(t*1*2*np.pi/(365.25*24*60*60*1000))+
                     coefs[3]*np.cos(t*1*2*np.pi/(365.25*24*60*60*1000))+
@@ -99,7 +99,7 @@ def generate_plot(id, ccdc_result_info, timeseries, date_range, dataset, band_to
 
     # get observed values (actual time series)
     dates_obs = timeseries['time'] #np.stack(timeseries,axis=1)[:][-2][1:].astype('int64')
-    values_obs = np.array(timeseries[band_to_plot],dtype='float') #np.stack(timeseries,axis=1)[:][-1][1:].astype('float')
+    values_obs = np.array(timeseries[band_or_index_to_plot], dtype='float') #np.stack(timeseries,axis=1)[:][-1][1:].astype('float')
     datetime_min = datetime.fromtimestamp(np.min(dates_obs) / 1000)
     datetime_max = datetime.fromtimestamp(np.max(dates_obs) / 1000)
 
@@ -161,10 +161,10 @@ def generate_plot(id, ccdc_result_info, timeseries, date_range, dataset, band_to
     margin_days = int((datetime_max - datetime_min).days*0.01)
     fig.update_xaxes(range=[datetime_min - timedelta(days=margin_days), datetime_max + timedelta(days=margin_days)])
     
-    if band_to_plot in ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2']:
-        title = "Surface Reflectance - {} ({})".format(band_to_plot, dataset)
-    if band_to_plot in ["NBR", "NDVI", "EVI", "EVI2", "BRIGHTNESS", "GREENNESS", "WETNESS"]:
-        title = "Index - {} ({})".format(band_to_plot, dataset)
+    if band_or_index_to_plot in ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2']:
+        title = "Surface Reflectance - {} ({})".format(band_or_index_to_plot, dataset)
+    if band_or_index_to_plot in ["NBR", "NDVI", "EVI", "EVI2", "BRIGHTNESS", "GREENNESS", "WETNESS"]:
+        title = "Index - {} ({})".format(band_or_index_to_plot, dataset)
 
     fig.update_yaxes(title_text=title, automargin=True)
 

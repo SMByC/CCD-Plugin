@@ -77,7 +77,9 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     def setup_gui(self):
         # select swir1 band by default
-        self.band_or_index.setCurrentIndex(4)
+        self.band_or_index_to_plot.setCurrentIndex(4)
+        # disable the item "---"
+        self.band_or_index_to_plot.model().item(6).setEnabled(False)
         # set the collection to 2 by default
         self.dataset.setCurrentIndex(1)
         # set break point bands/indices
@@ -89,7 +91,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # set action center on point
         self.center_on_coordinate.clicked.connect(self.center_on_current_coordinate)
         # set action when change the band or index repaint the plot
-        self.band_or_index.currentIndexChanged.connect(lambda: self.repaint_plot())
+        self.band_or_index_to_plot.currentIndexChanged.connect(lambda: self.repaint_plot())
 
         self.default_map_tools = [canvas.mapTool() for canvas in self.canvas]
         self.pick_on_map.clicked.connect(self.coordinates_from_map)
@@ -171,8 +173,8 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # get the current configuration of the plugin
         config = get_plugin_config(self.id)
 
-        # check if the plugin settings have changed compared to the last plot, except for the band_or_index to plot
-        if self.last_config and self.last_config == OrderedDict((k, v) for k, v in config.items() if k != 'band_or_index'):
+        # check if the plugin settings have changed compared to the last plot, except for the band_or_index_to_plot
+        if self.last_config and self.last_config == OrderedDict((k, v) for k, v in config.items() if k != 'band_or_index_to_plot'):
             return
 
         self.clean_plot()
@@ -200,10 +202,10 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.Info)
 
         self.html_file = generate_plot(self.id, ccdc_result_info, timeseries, (config['start_date'], config['end_date']),
-                                       config['dataset'], config['band_or_index'])
+                                       config['dataset'], config['band_or_index_to_plot'])
         self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
 
-        self.last_config = OrderedDict((k, v) for k, v in config.items() if k != 'band_or_index')
+        self.last_config = OrderedDict((k, v) for k, v in config.items() if k != 'band_or_index_to_plot')
 
     @wait_process
     def repaint_plot(self):
@@ -220,13 +222,13 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         date_range = (config['start_date'], config['end_date'])
         doy_range = (config['start_doy'], config['end_doy'])
         dataset = config['dataset']
-        band_or_index = config['band_or_index']
+        band_or_index_to_plot = config['band_or_index_to_plot']
         breakpoint_bands = tuple(config['breakpoint_bands'])
 
         # check if ccd results are already computed
         if (coords, date_range, doy_range, dataset, breakpoint_bands) in ccd_results:
             ccdc_result_info, timeseries = ccd_results[(coords, date_range, doy_range, dataset, breakpoint_bands)]
-            self.html_file = generate_plot(self.id, ccdc_result_info, timeseries, date_range, dataset, band_or_index)
+            self.html_file = generate_plot(self.id, ccdc_result_info, timeseries, date_range, dataset, band_or_index_to_plot)
             self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
 
     @error_handler

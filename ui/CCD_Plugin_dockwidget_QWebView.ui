@@ -367,7 +367,7 @@
                  </widget>
                 </item>
                 <item>
-                 <widget class="QComboBox" name="band_or_index">
+                 <widget class="QComboBox" name="band_or_index_to_plot">
                   <property name="toolTip">
                    <string>Band or index and predicted curves to display in the plot</string>
                   </property>
