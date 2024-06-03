@@ -9,5 +9,6 @@
         <file>icons/lock.svg</file>
         <file>icons/open.svg</file>
         <file>icons/save.svg</file>
+        <file>icons/settings.svg</file>
     </qresource>
 </RCC>

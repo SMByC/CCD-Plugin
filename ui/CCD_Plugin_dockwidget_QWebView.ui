@@ -237,6 +237,9 @@
                 </item>
                 <item>
                  <widget class="QToolButton" name="center_on_coordinate">
+                  <property name="cursor">
+                   <cursorShape>PointingHandCursor</cursorShape>
+                  </property>
                   <property name="toolTip">
                    <string>Center to the current coordinate</string>
                   </property>
@@ -649,8 +652,12 @@
                <property name="text">
                 <string>Advanced</string>
                </property>
+               <property name="icon">
+                <iconset>
+                 <normaloff>:/plugins/CCD_Plugin/icons/settings.svg</normaloff>:/plugins/CCD_Plugin/icons/settings.svg</iconset>
+               </property>
                <property name="toolButtonStyle">
-                <enum>Qt::ToolButtonTextOnly</enum>
+                <enum>Qt::ToolButtonTextBesideIcon</enum>
                </property>
                <property name="autoRaise">
                 <bool>false</bool>
@@ -659,6 +666,9 @@
              </item>
              <item>
               <widget class="QToolButton" name="restore_configuration">
+               <property name="cursor">
+                <cursorShape>PointingHandCursor</cursorShape>
+               </property>
                <property name="toolTip">
                 <string>Restore plugin configuration from a yml file</string>
                </property>
@@ -676,6 +686,9 @@
              </item>
              <item>
               <widget class="QToolButton" name="save_configuration">
+               <property name="cursor">
+                <cursorShape>PointingHandCursor</cursorShape>
+               </property>
                <property name="toolTip">
                 <string>Save the current plugin configuration to a yml file</string>
                </property>
@@ -701,8 +714,8 @@
                </property>
                <property name="sizeHint" stdset="0">
                 <size>
-                 <width>40</width>
-                 <height>20</height>
+                 <width>0</width>
+                 <height>0</height>
                 </size>
                </property>
               </spacer>
@@ -749,6 +762,9 @@
              </item>
              <item>
               <widget class="QToolButton" name="btm_open_web_browser">
+               <property name="cursor">
+                <cursorShape>PointingHandCursor</cursorShape>
+               </property>
                <property name="toolTip">
                 <string>Open the current plot in a web browser</string>
                </property>
