@@ -7,5 +7,7 @@
         <file>icons/open_in_web_browser.svg</file>
         <file>icons/trash.svg</file>
         <file>icons/lock.svg</file>
+        <file>icons/open.svg</file>
+        <file>icons/save.svg</file>
     </qresource>
 </RCC>

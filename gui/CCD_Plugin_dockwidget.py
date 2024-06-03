@@ -28,7 +28,7 @@ from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
 from qgis.PyQt.QtGui import QColor, QDesktopServices
 from qgis.PyQt.QtCore import QUrl, pyqtSignal, Qt, QDate
-from qgis.PyQt.QtWidgets import QMessageBox
+from qgis.PyQt.QtWidgets import QMessageBox, QFileDialog
 from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject, QgsPointXY, Qgis
 from qgis.gui import QgsMapTool, QgsVertexMarker
 from qgis.utils import iface
@@ -51,8 +51,8 @@ except ImportError:
 
 from CCD_Plugin.core.ccd_process import compute_ccd
 from CCD_Plugin.core.plot import generate_plot
-from CCD_Plugin.utils.system_utils import wait_process
-from CCD_Plugin.utils.config import get_plugin_config
+from CCD_Plugin.utils.system_utils import wait_process, error_handler
+from CCD_Plugin.utils.config import get_plugin_config, restore_plugin_config
 from CCD_Plugin.gui.advanced_settings import AdvancedSettings
 
 
@@ -114,6 +114,12 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # advanced settings dialog
         self.advanced_settings = AdvancedSettings()
         self.btm_advanced_settings.clicked.connect(self.advanced_settings.show)
+
+        # restore the plugin configuration from a yml file
+        self.restore_configuration.clicked.connect(lambda: self.restore_plugin_from_yml())
+
+        # save the plugin configuration to a yml file
+        self.save_configuration.clicked.connect(lambda: self.save_plugin_to_yml())
 
         # open the current html file in the web browser
         self.html_file = None
@@ -222,6 +228,58 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             ccdc_result_info, timeseries = ccd_results[(coords, date_range, doy_range, dataset, breakpoint_bands)]
             self.html_file = generate_plot(self.id, ccdc_result_info, timeseries, date_range, dataset, band_or_index)
             self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
+
+    @error_handler
+    def restore_plugin_from_yml(self):
+        """restore the configuration of the plugin from a yml file"""
+        import yaml
+
+        yml_path, _ = QFileDialog.getOpenFileName(self,
+                                                  "Restore the CCD plugin configuration from a yml file",
+                                                  "", "YAML Files (*.yaml);;All Files (*)")
+
+        if yml_path == '' or not os.path.isfile(yml_path):
+            return
+
+        with open(yml_path, 'r') as stream:
+            try:
+                config = yaml.safe_load(stream)
+            except yaml.YAMLError as err:
+                raise Exception("Error reading the yml file to restore the CCD plugin, see more:|{}".format(err))
+
+        try:
+            restore_plugin_config(self.id, config)
+        except Exception as err:
+            raise Exception("Error restoring the configuration of the CCD plugin, see more:|{}".format(err))
+
+    @error_handler
+    def save_plugin_to_yml(self):
+        """save the configuration of the plugin to a yml file"""
+        import yaml
+
+        def setup_yaml():
+            """Keep dump ordered with orderedDict"""
+            represent_dict_order = lambda self, data: self.represent_mapping('tag:yaml.org,2002:map',
+                                                                             list(data.items()))
+            yaml.add_representer(OrderedDict, represent_dict_order)
+
+        setup_yaml()
+        config = get_plugin_config(self.id)
+        yml_path, _ = QFileDialog.getSaveFileName(self,
+                                                  "Save the CCD plugin configuration to a yml file",
+                                                  "", "YAML Files (*.yaml);;All Files (*)")
+        if yml_path == '':
+            return
+
+        if yml_path:
+            if not yml_path.endswith(".yaml"):
+                yml_path += ".yaml"
+
+        with open(yml_path, 'w') as stream:
+            try:
+                yaml.dump(config, stream, default_flow_style=False)
+            except yaml.YAMLError as err:
+                raise Exception("Error writing the yml file to save the CCD plugin, see more:|{}".format(err))
 
     def center_on_current_coordinate(self):
         if PickerCoordsOnMap.marker_drawn["canvas"] is not None:

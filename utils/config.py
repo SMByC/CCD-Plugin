@@ -20,6 +20,8 @@
 """
 from collections import OrderedDict
 
+from qgis.PyQt.QtCore import QDate
+
 
 def get_plugin_config(id):
     """get the current configuration of the plugin"""
@@ -49,7 +51,34 @@ def get_plugin_config(id):
 
     # other configurations
     config['auto_generate_plot'] = CCD_Plugin.inst[id].widget.auto_generate_plot.isChecked()
-    config['widget_height'] = CCD_Plugin.inst[id].widget.height()
 
     return config
 
+
+def restore_plugin_config(id, config):
+    """restore the configuration of the plugin"""
+    from CCD_Plugin.CCD_Plugin import CCD_Plugin
+
+    if CCD_Plugin.inst[id].widget is None or config is None:
+        return
+
+    # from the plugin widget
+    CCD_Plugin.inst[id].widget.latitude.setValue(config['lat'])
+    CCD_Plugin.inst[id].widget.longitude.setValue(config['lon'])
+    CCD_Plugin.inst[id].widget.dataset.setCurrentText(config['dataset'])
+    CCD_Plugin.inst[id].widget.band_or_index.setCurrentText(config['band_or_index'])
+    CCD_Plugin.inst[id].widget.box_breakpoint_bands.deselectAllOptions()
+    CCD_Plugin.inst[id].widget.box_breakpoint_bands.setCheckedItems(config['breakpoint_bands'])
+    CCD_Plugin.inst[id].widget.start_date.setDate(QDate.fromString(config['start_date'], "yyyy-MM-dd"))
+    CCD_Plugin.inst[id].widget.end_date.setDate(QDate.fromString(config['end_date'], "yyyy-MM-dd"))
+    CCD_Plugin.inst[id].widget.start_doy.setValue(config['start_doy'])
+    CCD_Plugin.inst[id].widget.end_doy.setValue(config['end_doy'])
+
+    # from the advanced settings dialog
+    CCD_Plugin.inst[id].widget.advanced_settings.num_obs.setValue(config['num_obs'])
+    CCD_Plugin.inst[id].widget.advanced_settings.chi_square.setValue(config['chi_square'])
+    CCD_Plugin.inst[id].widget.advanced_settings.min_years.setValue(config['min_years'])
+    CCD_Plugin.inst[id].widget.advanced_settings.lambda_lasso.setValue(config['lambda_lasso'])
+
+    # other configurations
+    CCD_Plugin.inst[id].widget.auto_generate_plot.setChecked(config['auto_generate_plot'])

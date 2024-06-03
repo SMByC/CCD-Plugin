@@ -643,14 +643,51 @@
                <property name="cursor">
                 <cursorShape>PointingHandCursor</cursorShape>
                </property>
-               <property name="text">
+               <property name="toolTip">
                 <string>Advanced settings</string>
+               </property>
+               <property name="text">
+                <string>Advanced</string>
                </property>
                <property name="toolButtonStyle">
                 <enum>Qt::ToolButtonTextOnly</enum>
                </property>
                <property name="autoRaise">
                 <bool>false</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="restore_configuration">
+               <property name="toolTip">
+                <string>Restore plugin configuration from a yml file</string>
+               </property>
+               <property name="icon">
+                <iconset>
+                 <normaloff>:/plugins/CCD_Plugin/icons/open.svg</normaloff>:/plugins/CCD_Plugin/icons/open.svg</iconset>
+               </property>
+               <property name="toolButtonStyle">
+                <enum>Qt::ToolButtonIconOnly</enum>
+               </property>
+               <property name="autoRaise">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="save_configuration">
+               <property name="toolTip">
+                <string>Save the current plugin configuration to a yml file</string>
+               </property>
+               <property name="icon">
+                <iconset>
+                 <normaloff>:/plugins/CCD_Plugin/icons/save.svg</normaloff>:/plugins/CCD_Plugin/icons/save.svg</iconset>
+               </property>
+               <property name="toolButtonStyle">
+                <enum>Qt::ToolButtonIconOnly</enum>
+               </property>
+               <property name="autoRaise">
+                <bool>true</bool>
                </property>
               </widget>
              </item>
