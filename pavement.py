@@ -12,15 +12,6 @@ from paver.easy import *
 py_version = 'py' + str(platform.python_version_tuple()[0]) + '.' + str(platform.python_version_tuple()[1])
 
 
-def get_extlibs():
-    if platform.system() == "Windows":
-        return 'extlibs_windows'
-    if platform.system() == "Darwin":
-        return 'extlibs_macos'
-    if platform.system() == "Linux":
-        return 'extlibs_linux'
-
-
 def get_zip_name():
     if platform.system() == "Windows":
         return 'CCD_Plugin_Windows_{}.zip'.format(py_version)
@@ -42,10 +33,23 @@ def delete_directories(paths):
         shutil.rmtree(directory, ignore_errors=True)
 
 
+def clean_extlibs():
+    # delete the binary files in the extlibs directory
+    for root, dirs, files in os.walk(options.plugin.ext_libs):
+        for f in files:
+            if f.endswith(".so") or f.endswith(".pyd") or f.endswith(".dylib"):
+                os.remove(os.path.join(root, f))
+    # delete all __pycache__ directories
+    for root, dirs, files in os.walk(options.plugin.ext_libs):
+        for d in dirs:
+            if d == "__pycache__":
+                shutil.rmtree(os.path.join(root, d), ignore_errors=True)
+
+
 options(
     plugin=Bunch(
         name='CCD_Plugin',
-        ext_libs=path(get_extlibs()),
+        ext_libs=path('extlibs'),
         source_dir=path('.'),
         package_dir=path('.'),
         tests=['test', 'tests'],
@@ -82,6 +86,7 @@ def setup():
     list_of_dirs = ["numpy*", "scipy*"]
     list_of_dirs = [os.path.join(ext_libs.abspath(), d) for d in list_of_dirs]
     delete_directories(list_of_dirs)
+    clean_extlibs()
 
 
 @task
@@ -124,7 +129,7 @@ def package(options):
 @task
 def package_extlibs(options):
     '''create package for extlibs for the plugin'''
-    package_file = options.plugin.package_dir / '{}_{}.zip'.format(get_extlibs(), py_version)
+    package_file = options.plugin.package_dir / '{}_{}.zip'.format(options.plugin.ext_libs, py_version)
     with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as f:
         make_zip(f, options, src_dir=options.plugin.ext_libs)
 
