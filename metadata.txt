@@ -3,7 +3,7 @@ name=CCD-Plugin
 description=Qgis plugin for Continuous Change Detection (CCDC) algorithm of a time series at a given coordinate
 about=The CCD-Plugin use Google Earth Engine to get Landsat or Sentinel2 datasets and run the Continuous Change Detection (CCDC) algorithm to analyze the trends and breakpoints of change over multi-year time series at a given coordinate.
 
-version=23.11
+version=24.6
 qgisMinimumVersion=3.16
 qgisMaximumVersion=3.99
 
@@ -15,9 +15,25 @@ tracker=https://github.com/SMByC/CCD-Plugin/issues
 repository=https://github.com/SMByC/CCD-Plugin
 
 changelog=
-    23.11:
-    - Allowing more decimals places when setting Chi-square value
-    - Other typos
+    24.6:
+    - Implemented the background process to perform the CCD using QgsTask and taskManager Qgis functions, with that the plugin and Qgis instance don't freeze while the CCD is computing
+    - Set the icon to the avanced settings button. UI adjustments
+    - Disabled to select the item "---" which separate the bands and indices in the combobox
+    - Added option and buttons to save and restore the plugin settings to or from a Yaml file
+    - Allow showing observed values when there is not enough data to perform change detection to have break lines and predicted values, inform the user about that.
+    - Set the focus in canvas to listening the events when map tool is set
+    - Refactoring the way to get the plugin configuration. Check if a result is saved and not recall to process it again when Generate is call. Adjusting other things
+    - Fix action to center on current coordenate
+    - Added a new button for automatically generate plot when a new coordinate is pick on map
+    - Added a new clear markers drawn button
+    - Not finish the map tool click on map after each event, to fix canvas moving after those events
+    - Allow CCD plugin can work with multiple (and not default) canvas
+    - Added some tooltips in lat/lon
+    - Make the "Pick on Map" button checkeable
+    - Refactoring the way to store the widget instance and managing it
+    - Several internal UI adjustments
+    - Fixed bug when getting user locales
+    - Only enable the days of year if the date range is greater than 1 year, because the days of year option is only for a multi-year analysis, fix issue #9
     - All commits in: https://github.com/SMByC/CCD-Plugin/commits
 
 tags=gee,trends,change detection,ccdc,landsat,time series

@@ -119,7 +119,7 @@ class DownloadAndUnzip(QDialog):
 
 def install():
     # define the Qgis plugins directory and url by OS
-    url = "https://github.com/SMByC/CCD-Plugin/releases/download/23.7/extlibs.zip"
+    url = "https://github.com/SMByC/CCD-Plugin/releases/download/24.6/extlibs.zip"
     if platform.system() == "Windows":
         qgis_plugins_dir = os.path.join(os.path.expanduser('~'), 'AppData', 'Roaming', 'QGIS', 'QGIS3', 'profiles', 'default', 'python', 'plugins')
     elif platform.system() == "Linux":
