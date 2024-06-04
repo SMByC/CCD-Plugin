@@ -39,8 +39,8 @@ jobs:
     - name: Upload artifact extlibs by OS
       uses: actions/upload-artifact@v3
       with:
-        name: extlibs_${{ matrix.os }}_py${{ matrix.python-version }}
-        path: ./extlibs_*_py${{ matrix.python-version }}.zip
+        name: extlibs
+        path: ./extlibs.zip
 
   package:
     needs: build

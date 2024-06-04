@@ -129,7 +129,7 @@ def package(options):
 @task
 def package_extlibs(options):
     '''create package for extlibs for the plugin'''
-    package_file = options.plugin.package_dir / '{}_{}.zip'.format(options.plugin.ext_libs, py_version)
+    package_file = options.plugin.package_dir / '{}.zip'.format(options.plugin.ext_libs)
     with zipfile.ZipFile(package_file, "w", zipfile.ZIP_DEFLATED) as f:
         make_zip(f, options, src_dir=options.plugin.ext_libs)
 
