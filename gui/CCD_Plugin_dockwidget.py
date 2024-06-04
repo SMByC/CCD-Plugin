@@ -29,7 +29,8 @@ from qgis.PyQt import QtWidgets
 from qgis.PyQt.QtGui import QColor, QDesktopServices
 from qgis.PyQt.QtCore import QUrl, pyqtSignal, Qt, QDate
 from qgis.PyQt.QtWidgets import QMessageBox, QFileDialog
-from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject, QgsPointXY, Qgis
+from qgis.core import (QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject, QgsPointXY, Qgis,
+                       QgsApplication, QgsTask)
 from qgis.gui import QgsMapTool, QgsVertexMarker
 from qgis.utils import iface
 
@@ -159,10 +160,9 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                 canvas.unsetMapTool(default_map_tool)
                 canvas.setMapTool(PickerCoordsOnMap(self, canvas), clean=True)
 
-    @wait_process
+    @error_handler
     def new_plot(self):
-        from CCD_Plugin.CCD_Plugin import CCD_Plugin
-
+        ### before start the process
         # check import ee lib
         try:
             import ee
@@ -178,8 +178,23 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             return
 
         self.clean_plot()
+        self.generate_button.setEnabled(False)
+        self.plot_webview.load(QUrl.fromLocalFile(os.path.join(plugin_folder, 'ui', 'loading.html')))
 
-        results = compute_ccd(
+        ### start the process
+        # perform CCD as a background task
+        globals()['task'] = QgsTask.fromFunction("Compute CCD", self.compute_ccd,
+                                                 on_finished=self.ccd_completed, config=config)
+        QgsApplication.taskManager().addTask(globals()['task'])
+
+        ### after finish the process
+        self.generate_button.setEnabled(True)
+        self.pick_on_map.setChecked(False)
+        self.coordinates_from_map(False)
+
+    @staticmethod
+    def compute_ccd(task, config):
+        ccdc_result_info, timeseries = compute_ccd(
             coords=(config['lon'], config['lat']),
             date_range=(config['start_date'], config['end_date']),
             doy_range=(config['start_doy'], config['end_doy']),
@@ -190,22 +205,31 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             chi_square=config['chi_square'],
             min_years=config['min_years'],
             lambda_lasso=config['lambda_lasso'])
-                    
-        if not results:
-            return
 
-        ccdc_result_info, timeseries = results
+        return config, ccdc_result_info, timeseries
 
-        if not ccdc_result_info['tBreak']:
-            msg = "No enough data for this period to perform change detection, plotting only the observed values."
+    def ccd_completed(self, exception, result=None):
+        if exception is None and result is not None:
+            # CCD process completed successfully
+            config, ccdc_result_info, timeseries = result
+
+            if not ccdc_result_info['tBreak']:
+                msg = "No enough data for this period to perform change detection, plotting only the observed values."
+                self.MsgBar.clearWidgets()
+                self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.Info, duration=10)
+
+            self.html_file = generate_plot(self.id, ccdc_result_info, timeseries,
+                                           (config['start_date'], config['end_date']),
+                                           config['dataset'], config['band_or_index_to_plot'])
+
+            self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
+
+            self.last_config = OrderedDict((k, v) for k, v in config.items() if k != 'band_or_index_to_plot')
+        else:
+            msg = "Error computing CCD: {}".format(exception)
             self.MsgBar.clearWidgets()
-            self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.Info)
-
-        self.html_file = generate_plot(self.id, ccdc_result_info, timeseries, (config['start_date'], config['end_date']),
-                                       config['dataset'], config['band_or_index_to_plot'])
-        self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
-
-        self.last_config = OrderedDict((k, v) for k, v in config.items() if k != 'band_or_index_to_plot')
+            self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.Warning, duration=10)
+            self.plot_webview.setHtml("")
 
     @wait_process
     def repaint_plot(self):
