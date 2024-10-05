@@ -107,7 +107,20 @@
                  <number>0</number>
                 </property>
                 <item>
+                 <widget class="QLabel" name="label_9">
+                  <property name="text">
+                   <string/>
+                  </property>
+                 </widget>
+                </item>
+                <item>
                  <widget class="QLabel" name="label_3">
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
                   <property name="text">
                    <string>Coordinates:</string>
                   </property>
@@ -148,17 +161,24 @@
                    <cursorShape>PointingHandCursor</cursorShape>
                   </property>
                   <property name="toolTip">
-                   <string>Delete markers drawn</string>
+                   <string>Clear markers drawn</string>
                   </property>
                   <property name="icon">
                    <iconset>
-                    <normaloff>:/plugins/CCD_Plugin/icons/trash.svg</normaloff>:/plugins/CCD_Plugin/icons/trash.svg</iconset>
+                    <normaloff>:/plugins/CCD_Plugin/icons/clear.svg</normaloff>:/plugins/CCD_Plugin/icons/clear.svg</iconset>
                   </property>
                   <property name="toolButtonStyle">
                    <enum>Qt::ToolButtonIconOnly</enum>
                   </property>
                   <property name="autoRaise">
                    <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="label_10">
+                  <property name="text">
+                   <string/>
                   </property>
                  </widget>
                 </item>
@@ -185,6 +205,12 @@
                 </property>
                 <item>
                  <widget class="QLabel" name="label_6">
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
                   <property name="text">
                    <string>Lat:</string>
                   </property>
@@ -214,6 +240,12 @@
                 </item>
                 <item>
                  <widget class="QLabel" name="label_7">
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
                   <property name="text">
                    <string>Lon:</string>
                   </property>
@@ -247,7 +279,7 @@
                    <cursorShape>PointingHandCursor</cursorShape>
                   </property>
                   <property name="toolTip">
-                   <string>Center to the current coordinate</string>
+                   <string>Show and go to the current coordinate</string>
                   </property>
                   <property name="icon">
                    <iconset>
