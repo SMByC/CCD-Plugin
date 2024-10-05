@@ -109,10 +109,9 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         plot_view_settings.setAttribute(QWebSettings.XSSAuditingEnabled, True)
         plot_view_settings.setAttribute(QWebSettings.JavascriptEnabled, True)
         # define the zoom factor based on the dpi
-        dpi = self.canvas[0].mapSettings().outputDpi()
-        zoom_factor = dpi/96 - 0.4
-        zoom_factor = 1 if zoom_factor < 1 else zoom_factor
-        self.plot_webview.setZoomFactor(zoom_factor)
+        # dpi = self.canvas[0].mapSettings().outputDpi()
+        # zoom_factor = dpi/96 - 0.15
+        self.plot_webview.setZoomFactor(0.85)
 
         # advanced settings dialog
         self.advanced_settings = AdvancedSettings()
