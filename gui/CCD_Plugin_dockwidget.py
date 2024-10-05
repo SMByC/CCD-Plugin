@@ -90,7 +90,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # set the current date
         self.end_date.setDate(QDate.currentDate())
         # set action center on point
-        self.center_on_coordinate.clicked.connect(self.center_on_current_coordinate)
+        self.focus_on_the_coordinates.clicked.connect(self.show_ang_go_to_the_coordinates)
         # set action when change the band or index repaint the plot
         self.band_or_index_to_plot.currentIndexChanged.connect(lambda: self.repaint_plot())
 
@@ -306,7 +306,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             except yaml.YAMLError as err:
                 raise Exception("Error writing the yml file to save the CCD plugin, see more:|{}".format(err))
 
-    def center_on_current_coordinate(self):
+    def show_ang_go_to_the_coordinates(self):
         if PickerCoordsOnMap.marker_drawn["canvas"] is not None:
             canvas = PickerCoordsOnMap.marker_drawn["canvas"]
         else:
@@ -318,8 +318,10 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         crsDest = canvas.mapSettings().destinationCrs()
         xform = QgsCoordinateTransform(crsSrc, crsDest, QgsProject.instance())
         point = xform.transform(point)
-        # center on point
+        # create a marker
+        PickerCoordsOnMap(self, canvas).create_marker(point)
         canvas.setCenter(point)
+        canvas.refresh()
 
     def clean_plot(self):
         if self.html_file and os.path.exists(self.html_file):

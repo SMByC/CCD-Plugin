@@ -274,7 +274,7 @@
                  </widget>
                 </item>
                 <item>
-                 <widget class="QToolButton" name="center_on_coordinate">
+                 <widget class="QToolButton" name="focus_on_the_coordinates">
                   <property name="cursor">
                    <cursorShape>PointingHandCursor</cursorShape>
                   </property>
