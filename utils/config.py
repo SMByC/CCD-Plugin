@@ -27,7 +27,7 @@ def get_plugin_config(id):
     """get the current configuration of the plugin"""
     from CCD_Plugin.CCD_Plugin import CCD_Plugin
 
-    if CCD_Plugin.inst[id].widget is None:
+    if id not in CCD_Plugin.inst or CCD_Plugin.inst[id].widget is None:
         return
 
     config = OrderedDict()
@@ -59,7 +59,7 @@ def restore_plugin_config(id, config):
     """restore the configuration of the plugin"""
     from CCD_Plugin.CCD_Plugin import CCD_Plugin
 
-    if CCD_Plugin.inst[id].widget is None or config is None:
+    if id not in CCD_Plugin.inst or CCD_Plugin.inst[id].widget is None or config is None:
         return
 
     # from the plugin widget

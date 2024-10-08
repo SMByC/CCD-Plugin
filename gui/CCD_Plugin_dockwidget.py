@@ -171,6 +171,8 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         # get the current configuration of the plugin
         config = get_plugin_config(self.id)
+        if not config:
+            return
 
         # check if the plugin settings have changed compared to the last plot, except for the band_or_index_to_plot
         if self.last_config and self.last_config == OrderedDict((k, v) for k, v in config.items() if k != 'band_or_index_to_plot'):
