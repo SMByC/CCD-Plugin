@@ -3,7 +3,7 @@ name=CCD-Plugin
 description=Qgis plugin for Continuous Change Detection (CCDC) algorithm of a time series at a given coordinate
 about=The CCD-Plugin use Google Earth Engine to get Landsat or Sentinel2 datasets and run the Continuous Change Detection (CCDC) algorithm to analyze the trends and breakpoints of change over multi-year time series at a given coordinate.
 
-version=24.10
+version=24.10a
 qgisMinimumVersion=3.16
 qgisMaximumVersion=3.99
 
@@ -15,6 +15,8 @@ tracker=https://github.com/SMByC/CCD-Plugin/issues
 repository=https://github.com/SMByC/CCD-Plugin
 
 changelog=
+    24.10a:
+    - Updated the equations and coefficients for Tasseled Cap Transformation for Brightness, Greenness and Wetness indices for Landsat and Sentinel
     24.10:
     - Improving all the base size of the icon set, improving the default resolution. Changing some icons.
     - Changed the default zoom on the plot
