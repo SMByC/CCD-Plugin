@@ -187,22 +187,32 @@ def get_gee_data_landsat(coords, date_range, doy_range, collection):
         image.expression('2.5 * ((NIR - Red) / (NIR + 2.4 * Red + 1))',
                          {'NIR': image.select('NIR'),
                           'Red': image.select('Red')}).rename('EVI2'),
-        image.expression('sqrt((Red - SWIR1) * (Red - SWIR1) + (NIR - SWIR2) * (NIR - SWIR2))',
-                         {'Red': image.select('Red'),
+        # Brightness, Greenness, Wetness based on:
+        # https://yceo.yale.edu/tasseled-cap-transform-landsat-8-oli
+        # Muhammad Hasan Ali Baig, Lifu Zhang, Tong Shuai & Qingxi Tong (2014) Derivation of a tasselled cap
+        # transformation based on Landsat 8 at-satellite reflectance, Remote Sensing Letters, 5:5, 423-431,
+        # DOI: 10.1080/2150704X.2014.915434
+        image.expression('0.3029 * Blue + 0.2786 * Green + 0.4733 * Red + 0.5599 * NIR + 0.508 * SWIR1 + 0.1872 * SWIR2',
+                         {'Blue': image.select('Blue'),
+                          'Green': image.select('Green'),
+                          'Red': image.select('Red'),
+                          'NIR': image.select('NIR'),
                           'SWIR1': image.select('SWIR1'),
-                          'NIR': image.select('NIR'),
                           'SWIR2': image.select('SWIR2')}).rename('BRIGHTNESS'),
-        image.expression('Red + 2.5 * NIR - 1.5 * (Blue + SWIR1) - 0.25 * SWIR2',
-                         {'Red': image.select('Red'),
+        image.expression('-0.2941 * Blue - 0.243 * Green - 0.5424 * Red + 0.7276 * NIR + 0.0713 * SWIR1 - 0.1608 * SWIR2',
+                         {'Blue': image.select('Blue'),
+                          'Green': image.select('Green'),
+                          'Red': image.select('Red'),
                           'NIR': image.select('NIR'),
-                          'Blue': image.select('Blue'),
                           'SWIR1': image.select('SWIR1'),
                           'SWIR2': image.select('SWIR2')}).rename('GREENNESS'),
-        image.expression('4 * (NIR - SWIR1) - (0.25 * SWIR2 + 2.75 * Blue)',
-                         {'NIR': image.select('NIR'),
+        image.expression('0.1511 * Blue + 0.1973 * Green + 0.3283 * Red + 0.3407 * NIR - 0.7117 * SWIR1 - 0.4559 * SWIR2',
+                         {'Blue': image.select('Blue'),
+                          'Green': image.select('Green'),
+                          'Red': image.select('Red'),
+                          'NIR': image.select('NIR'),
                           'SWIR1': image.select('SWIR1'),
-                          'SWIR2': image.select('SWIR2'),
-                          'Blue': image.select('Blue')}).rename('WETNESS'),
+                          'SWIR2': image.select('SWIR2')}).rename('WETNESS')
     ]))
 
     

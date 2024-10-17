@@ -101,24 +101,29 @@ def addEVI2(image):
     return image.addBands(evi2.rename('EVI2'))
 
 
+# Brightness, Greenness, Wetness based on:
+# Shi, T., & Xu, H. (2019). Derivation of tasseled cap transformation coefficients for Sentinel-2 MSI at-sensor
+# reflectance data. IEEE Journal of Selected Topics in Applied Earth Observations and Remote Sensing, 12(10), 4038-4048.
+# https://doi.org/10.1109/JSTARS.2019.2938388
+
 def addBrightness(image):
-    brightness = image.expression('sqrt((Red - SWIR1) * (Red - SWIR1) + (NIR - SWIR2) * (NIR - SWIR2))',
-                                  {'Red': image.select('Red'), 'SWIR1': image.select('SWIR1'), 'NIR': image.select('NIR'),
-                                   'SWIR2': image.select('SWIR2')})
+    brightness = image.expression('0.3510 * Blue + 0.3813 * Green + 0.3437 * Red + 0.7196 * NIR + 0.2396 * SWIR1 + 0.1949 * SWIR2',
+                                  {'Blue': image.select('Blue'), 'Green': image.select('Green'), 'Red': image.select('Red'),
+                                   'NIR': image.select('NIR'), 'SWIR1': image.select('SWIR1'), 'SWIR2': image.select('SWIR2')})
     return image.addBands(brightness.rename('BRIGHTNESS'))
 
 
 def addGreeness(image):
-    greeness = image.expression('Red + 2.5 * NIR - 1.5 * (Blue + SWIR1) - 0.25 * SWIR2',
-                                {'Red': image.select('Red'), 'NIR': image.select('NIR'), 'Blue': image.select('Blue'),
-                                 'SWIR1': image.select('SWIR1'), 'SWIR2': image.select('SWIR2')})
+    greeness = image.expression('- 0.3599 * Blue - 0.3533 * Green - 0.4734 * Red + 0.6633 * NIR + 0.0087 * SWIR1 - 0.2856 * SWIR2',
+                                {'Blue': image.select('Blue'), 'Green': image.select('Green'), 'Red': image.select('Red'),
+                                 'NIR': image.select('NIR'), 'SWIR1': image.select('SWIR1'), 'SWIR2': image.select('SWIR2')})
     return image.addBands(greeness.rename('GREENNESS'))
 
 
 def addWetness(image):
-    wetness = image.expression('4 * (NIR - SWIR1) - (0.25 * SWIR2 + 2.75 * Blue)',
-                               {'NIR': image.select('NIR'), 'SWIR1': image.select('SWIR1'), 'SWIR2': image.select('SWIR2'),
-                                'Blue': image.select('Blue')})
+    wetness = image.expression('0.2578 * Blue + 0.2305 * Green + 0.0883 * Red + 0.1071 * NIR - 0.7611 * SWIR1 - 0.5308 * SWIR2',
+                               {'Blue': image.select('Blue'), 'Green': image.select('Green'), 'Red': image.select('Red'),
+                                'NIR': image.select('NIR'), 'SWIR1': image.select('SWIR1'), 'SWIR2': image.select('SWIR2')})
     return image.addBands(wetness.rename('WETNESS'))
 
 
