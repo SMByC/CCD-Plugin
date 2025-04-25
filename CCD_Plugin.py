@@ -49,11 +49,11 @@ class CCD_Plugin:
         # initialize plugin directory
         self.plugin_dir = os.path.dirname(__file__)
         # initialize locale
-        locale = QSettings().value('locale/userLocale', QLocale().name())[0:2]
-        locale_path = os.path.join(
-            self.plugin_dir,
-            'i18n',
-            'CCD_Plugin_{}.qm'.format(locale))
+        try:
+            locale = QSettings().value('locale/userLocale', QLocale().name(), type=str)[0:2]
+        except:
+            locale = 'en'
+        locale_path = os.path.join(self.plugin_dir, 'i18n', 'CCD_Plugin_{}.qm'.format(locale))
 
         if os.path.exists(locale_path):
             self.translator = QTranslator()
