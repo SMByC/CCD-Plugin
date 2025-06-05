@@ -271,7 +271,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         with open(yml_path, 'r') as stream:
             try:
                 config = yaml.safe_load(stream)
-            except yaml.YAMLError as err:
+            except Exception as err:
                 raise Exception("Error reading the yml file to restore the CCD plugin, see more:|{}".format(err))
 
         try:
