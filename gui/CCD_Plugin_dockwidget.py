@@ -355,9 +355,9 @@ class PickerCoordsOnMap(QgsMapTool):
         marker = QgsVertexMarker(self.canvas)
         marker.setCenter(point)
         marker.setColor(QColor("red"))
-        marker.setIconSize(25)
-        marker.setIconType(QgsVertexMarker.ICON_CIRCLE)
-        marker.setPenWidth(4)
+        marker.setIconSize(30)
+        marker.setIconType(QgsVertexMarker.ICON_CROSS)
+        marker.setPenWidth(3)
         PickerCoordsOnMap.marker_drawn["marker"] = marker
         PickerCoordsOnMap.marker_drawn["canvas"] = self.canvas
 
