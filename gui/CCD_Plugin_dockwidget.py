@@ -135,12 +135,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # only enable the days of year if the date range is greater than 1 year
         start_date = self.start_date.date()
         end_date = self.end_date.date()
-        if start_date.daysTo(end_date) >= 365:
-            self.start_doy.setEnabled(True)
-            self.end_doy.setEnabled(True)
-        else:
-            self.start_doy.setEnabled(False)
-            self.end_doy.setEnabled(False)
+        self.advanced_settings.doy_widget.setEnabled(start_date.daysTo(end_date) >= 365)
 
     def closeEvent(self, event):
         # close
@@ -350,7 +345,7 @@ class PickerCoordsOnMap(QgsMapTool):
     def delete_markers():
         if PickerCoordsOnMap.marker_drawn["marker"] is not None:
             PickerCoordsOnMap.marker_drawn["canvas"].scene().removeItem(PickerCoordsOnMap.marker_drawn["marker"])
-                
+
         PickerCoordsOnMap.marker_drawn = {"marker": None, "canvas": None}
 
     def create_marker(self, point):
@@ -392,4 +387,3 @@ class PickerCoordsOnMap(QgsMapTool):
             canvas.setMapTool(default_map_tool)
 
         self.widget.pick_on_map.setChecked(False)
-

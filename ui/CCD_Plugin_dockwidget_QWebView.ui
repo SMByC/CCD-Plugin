@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>633</width>
-    <height>369</height>
+    <width>524</width>
+    <height>315</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -46,7 +46,7 @@
        <item>
         <widget class="QWidget" name="CCD_settings_widget" native="true">
          <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+          <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
@@ -104,11 +104,20 @@
                  <number>0</number>
                 </property>
                 <item>
-                 <widget class="QLabel" name="label_9">
-                  <property name="text">
-                   <string/>
+                 <spacer name="horizontalSpacer_2">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
                   </property>
-                 </widget>
+                  <property name="sizeType">
+                   <enum>QSizePolicy::Minimum</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>40</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
                 </item>
                 <item>
                  <widget class="QLabel" name="label_3">
@@ -158,7 +167,7 @@
                    <cursorShape>PointingHandCursor</cursorShape>
                   </property>
                   <property name="toolTip">
-                   <string>Clear markers drawn</string>
+                   <string>Clear markers</string>
                   </property>
                   <property name="icon">
                    <iconset>
@@ -173,11 +182,20 @@
                  </widget>
                 </item>
                 <item>
-                 <widget class="QLabel" name="label_10">
-                  <property name="text">
-                   <string/>
+                 <spacer name="horizontalSpacer_3">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
                   </property>
-                 </widget>
+                  <property name="sizeType">
+                   <enum>QSizePolicy::Minimum</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>40</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
                 </item>
                </layout>
               </widget>
@@ -592,66 +610,6 @@
                </property>
                <property name="calendarPopup">
                 <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </widget>
-          </item>
-          <item>
-           <widget class="QWidget" name="widget_6" native="true">
-            <layout class="QGridLayout" name="gridLayout_3">
-             <property name="leftMargin">
-              <number>0</number>
-             </property>
-             <property name="topMargin">
-              <number>0</number>
-             </property>
-             <property name="rightMargin">
-              <number>0</number>
-             </property>
-             <property name="bottomMargin">
-              <number>0</number>
-             </property>
-             <property name="spacing">
-              <number>3</number>
-             </property>
-             <item row="2" column="1">
-              <widget class="QSpinBox" name="end_doy">
-               <property name="toolTip">
-                <string>Days of the year for a multi-year analysis</string>
-               </property>
-               <property name="minimum">
-                <number>2</number>
-               </property>
-               <property name="maximum">
-                <number>365</number>
-               </property>
-               <property name="value">
-                <number>365</number>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="0" colspan="2">
-              <widget class="QLabel" name="label_5">
-               <property name="text">
-                <string>Days of Year</string>
-               </property>
-               <property name="alignment">
-                <set>Qt::AlignCenter</set>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="0">
-              <widget class="QSpinBox" name="start_doy">
-               <property name="toolTip">
-                <string>Days of the year for a multi-year analysis</string>
-               </property>
-               <property name="minimum">
-                <number>1</number>
-               </property>
-               <property name="maximum">
-                <number>364</number>
                </property>
               </widget>
              </item>

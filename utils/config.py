@@ -40,10 +40,10 @@ def get_plugin_config(id):
     config['breakpoint_bands'] = CCD_Plugin.inst[id].widget.box_breakpoint_bands.checkedItems()
     config['start_date'] = CCD_Plugin.inst[id].widget.start_date.date().toString("yyyy-MM-dd")
     config['end_date'] = CCD_Plugin.inst[id].widget.end_date.date().toString("yyyy-MM-dd")
-    config['start_doy'] = CCD_Plugin.inst[id].widget.start_doy.value() if CCD_Plugin.inst[id].widget.start_doy.isEnabled() else 1
-    config['end_doy'] = CCD_Plugin.inst[id].widget.end_doy.value() if CCD_Plugin.inst[id].widget.end_doy.isEnabled() else 365
 
     # from the advanced settings dialog
+    config['start_doy'] = CCD_Plugin.inst[id].widget.advanced_settings.start_doy.value() if CCD_Plugin.inst[id].widget.advanced_settings.start_doy.isEnabled() else 1
+    config['end_doy'] = CCD_Plugin.inst[id].widget.advanced_settings.end_doy.value() if CCD_Plugin.inst[id].widget.advanced_settings.end_doy.isEnabled() else 365
     config['num_obs'] = CCD_Plugin.inst[id].widget.advanced_settings.num_obs.value()
     config['chi_square'] = CCD_Plugin.inst[id].widget.advanced_settings.chi_square.value()
     config['min_years'] = CCD_Plugin.inst[id].widget.advanced_settings.min_years.value()
@@ -71,10 +71,10 @@ def restore_plugin_config(id, config):
     CCD_Plugin.inst[id].widget.box_breakpoint_bands.setCheckedItems(config['breakpoint_bands'])
     CCD_Plugin.inst[id].widget.start_date.setDate(QDate.fromString(config['start_date'], "yyyy-MM-dd"))
     CCD_Plugin.inst[id].widget.end_date.setDate(QDate.fromString(config['end_date'], "yyyy-MM-dd"))
-    CCD_Plugin.inst[id].widget.start_doy.setValue(config['start_doy'])
-    CCD_Plugin.inst[id].widget.end_doy.setValue(config['end_doy'])
 
     # from the advanced settings dialog
+    CCD_Plugin.inst[id].widget.advanced_settings.start_doy.setValue(config['start_doy'])
+    CCD_Plugin.inst[id].widget.advanced_settings.end_doy.setValue(config['end_doy'])
     CCD_Plugin.inst[id].widget.advanced_settings.num_obs.setValue(config['num_obs'])
     CCD_Plugin.inst[id].widget.advanced_settings.chi_square.setValue(config['chi_square'])
     CCD_Plugin.inst[id].widget.advanced_settings.min_years.setValue(config['min_years'])
