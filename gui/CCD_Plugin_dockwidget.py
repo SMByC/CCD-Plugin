@@ -95,7 +95,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.band_or_index_to_plot.currentIndexChanged.connect(lambda: self.repaint_plot())
 
         self.default_map_tools = [canvas.mapTool() for canvas in self.canvas]
-        self.pick_on_map.clicked.connect(self.coordinates_from_map)
+        self.pick_on_map.clicked.connect(self.setup_map_tool)
         self.delete_markers.clicked.connect(PickerCoordsOnMap.delete_markers)
 
         self.generate_button.clicked.connect(lambda: self.new_plot())
@@ -142,17 +142,16 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.closingPlugin.emit()
         event.accept()
 
-    def coordinates_from_map(self, checked):
-        if not checked:
-            # finish, set default map tool to canvas
-            for canvas, default_map_tool in zip(self.canvas, self.default_map_tools):
-                canvas.setMapTool(default_map_tool, clean=True)
-            self.pick_on_map.setChecked(False)
-        else:
+    def setup_map_tool(self, checked):
+        if checked:
             # set the map tool to pick coordinates
             for canvas, default_map_tool in zip(self.canvas, self.default_map_tools):
                 canvas.unsetMapTool(default_map_tool)
                 canvas.setMapTool(PickerCoordsOnMap(self, canvas), clean=True)
+        else:
+            # finish, set default map tool to canvas
+            for canvas, default_map_tool in zip(self.canvas, self.default_map_tools):
+                canvas.setMapTool(default_map_tool, clean=True)
 
     @error_handler
     def new_plot(self):
@@ -185,8 +184,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         ### after finish the process
         self.generate_button.setEnabled(True)
-        self.pick_on_map.setChecked(False)
-        self.coordinates_from_map(False)
+        self.pick_on_map.click()
 
     @staticmethod
     def compute_ccd(task, config):
@@ -379,11 +377,4 @@ class PickerCoordsOnMap(QgsMapTool):
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
-            self.finish()
-
-    def finish(self):
-        for canvas, default_map_tool in zip(self.widget.canvas, self.widget.default_map_tools):
-            canvas.unsetMapTool(self)
-            canvas.setMapTool(default_map_tool)
-
-        self.widget.pick_on_map.setChecked(False)
+            self.widget.pick_on_map.click()
