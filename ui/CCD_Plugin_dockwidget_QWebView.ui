@@ -109,7 +109,7 @@
                    <enum>Qt::Horizontal</enum>
                   </property>
                   <property name="sizeType">
-                   <enum>QSizePolicy::Minimum</enum>
+                   <enum>QSizePolicy::Maximum</enum>
                   </property>
                   <property name="sizeHint" stdset="0">
                    <size>
@@ -187,7 +187,7 @@
                    <enum>Qt::Horizontal</enum>
                   </property>
                   <property name="sizeType">
-                   <enum>QSizePolicy::Minimum</enum>
+                   <enum>QSizePolicy::Maximum</enum>
                   </property>
                   <property name="sizeHint" stdset="0">
                    <size>
@@ -363,7 +363,7 @@
                 <item>
                  <widget class="QComboBox" name="dataset">
                   <property name="toolTip">
-                   <string>Collection of images to get the images and run CCDC</string>
+                   <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Collection of images to get the images and run CCDC&lt;/p&gt;&lt;p&gt;- Landsat C1 (30m): ~1983 → 2021&lt;br&gt;- Landsat C2 (30m): ~1983 → present&lt;br&gt;- Sentinel-2 (10m): ~2018 → present&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                   </property>
                   <property name="currentText">
                    <string>Landsat C2</string>
@@ -548,7 +548,7 @@
              <item row="1" column="0">
               <widget class="QgsCheckableComboBox" name="box_breakpoint_bands">
                <property name="toolTip">
-                <string>Bands or indices to use for change detection (breakpoints)</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Bands or indices to use for change detection (breakpoints)&lt;/p&gt;&lt;p&gt;Note: Regenerate to apply the changes&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
                <property name="editable">
                 <bool>true</bool>
@@ -663,7 +663,7 @@
                 <cursorShape>PointingHandCursor</cursorShape>
                </property>
                <property name="toolTip">
-                <string>Restore plugin configuration from a yml file</string>
+                <string>Restore plugin configuration from a YAML file</string>
                </property>
                <property name="icon">
                 <iconset>
@@ -683,7 +683,7 @@
                 <cursorShape>PointingHandCursor</cursorShape>
                </property>
                <property name="toolTip">
-                <string>Save the current plugin configuration to a yml file</string>
+                <string>Save the current plugin configuration to a YAML file</string>
                </property>
                <property name="icon">
                 <iconset>

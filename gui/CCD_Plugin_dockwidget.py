@@ -117,11 +117,11 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.advanced_settings = AdvancedSettings()
         self.btm_advanced_settings.clicked.connect(self.advanced_settings.show)
 
-        # restore the plugin configuration from a yml file
-        self.restore_configuration.clicked.connect(lambda: self.restore_plugin_from_yml())
+        # restore the plugin configuration from a yaml file
+        self.restore_configuration.clicked.connect(lambda: self.restore_plugin_from_yaml())
 
-        # save the plugin configuration to a yml file
-        self.save_configuration.clicked.connect(lambda: self.save_plugin_to_yml())
+        # save the plugin configuration to a yaml file
+        self.save_configuration.clicked.connect(lambda: self.save_plugin_to_yaml())
 
         # open the current html file in the web browser
         self.html_file = None
@@ -252,22 +252,22 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
 
     @error_handler
-    def restore_plugin_from_yml(self):
-        """restore the configuration of the plugin from a yml file"""
+    def restore_plugin_from_yaml(self):
+        """restore the configuration of the plugin from a YAML file"""
         import yaml
 
-        yml_path, _ = QFileDialog.getOpenFileName(self,
-                                                  "Restore the CCD plugin configuration from a yml file",
+        yaml_path, _ = QFileDialog.getOpenFileName(self,
+                                                  "Restore the CCD plugin configuration from a YAML file",
                                                   "", "YAML Files (*.yaml);;All Files (*)")
 
-        if yml_path == '' or not os.path.isfile(yml_path):
+        if yaml_path == '' or not os.path.isfile(yaml_path):
             return
 
-        with open(yml_path, 'r') as stream:
+        with open(yaml_path, 'r') as stream:
             try:
                 config = yaml.safe_load(stream)
             except Exception as err:
-                raise Exception("Error reading the yml file to restore the CCD plugin, see more:|{}".format(err))
+                raise Exception("Error reading the YAML file to restore the CCD plugin, see more:|{}".format(err))
 
         try:
             restore_plugin_config(self.id, config)
@@ -275,8 +275,8 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             raise Exception("Error restoring the configuration of the CCD plugin, see more:|{}".format(err))
 
     @error_handler
-    def save_plugin_to_yml(self):
-        """save the configuration of the plugin to a yml file"""
+    def save_plugin_to_yaml(self):
+        """save the configuration of the plugin to a YAML file"""
         import yaml
 
         def setup_yaml():
@@ -287,21 +287,21 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         setup_yaml()
         config = get_plugin_config(self.id)
-        yml_path, _ = QFileDialog.getSaveFileName(self,
-                                                  "Save the CCD plugin configuration to a yml file",
+        yaml_path, _ = QFileDialog.getSaveFileName(self,
+                                                  "Save the CCD plugin configuration to a YAML file",
                                                   "", "YAML Files (*.yaml);;All Files (*)")
-        if yml_path == '':
+        if yaml_path == '':
             return
 
-        if yml_path:
-            if not yml_path.endswith(".yaml"):
-                yml_path += ".yaml"
+        if yaml_path:
+            if not yaml_path.endswith(".yaml"):
+                yaml_path += ".yaml"
 
-        with open(yml_path, 'w') as stream:
+        with open(yaml_path, 'w') as stream:
             try:
                 yaml.dump(config, stream, default_flow_style=False)
             except yaml.YAMLError as err:
-                raise Exception("Error writing the yml file to save the CCD plugin, see more:|{}".format(err))
+                raise Exception("Error writing the YAML file to save the CCD plugin, see more:|{}".format(err))
 
     def show_ang_go_to_the_coordinates(self):
         if PickerCoordsOnMap.marker_drawn["canvas"] is not None:
