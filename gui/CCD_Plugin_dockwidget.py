@@ -183,7 +183,6 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         QgsApplication.taskManager().addTask(globals()['task'])
 
         ### after finish the process
-        self.generate_button.setEnabled(True)
         self.pick_on_map.click()
 
     @staticmethod
@@ -224,6 +223,9 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             self.MsgBar.clearWidgets()
             self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.Warning, duration=10)
             self.plot_webview.setHtml("")
+
+        #### finish
+        self.generate_button.setEnabled(True)
 
     @wait_process
     def repaint_plot(self):
@@ -343,7 +345,6 @@ class PickerCoordsOnMap(QgsMapTool):
     def delete_markers():
         if PickerCoordsOnMap.marker_drawn["marker"] is not None:
             PickerCoordsOnMap.marker_drawn["canvas"].scene().removeItem(PickerCoordsOnMap.marker_drawn["marker"])
-
         PickerCoordsOnMap.marker_drawn = {"marker": None, "canvas": None}
 
     def create_marker(self, point):
