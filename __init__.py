@@ -5,7 +5,7 @@
                                  A QGIS plugin
  Continuous Change Detection Plugin
                               -------------------
-        copyright            : (C) 2019-2024 by Xavier Corredor Llano, SMByC
+        copyright            : (C) 2019-2026 by Xavier Corredor Llano, SMByC
         email                : xavier.corredor.llano@gmail.com
  ***************************************************************************/
 
@@ -68,7 +68,7 @@ def classFactory(iface):  # pylint: disable=invalid-name
             msg = "Error loading libraries for CCD-Plugin. " \
                   "Read the install instructions here:\n\n" \
                   "https://github.com/SMByC/CCD-Plugin#installation"
-            QMessageBox.critical(None, 'CCD-Plugin: Error loading', msg, QMessageBox.Ok)
+            QMessageBox.critical(None, 'CCD-Plugin: Error loading', msg, QMessageBox.StandardButton.Ok)
 
     from .CCD_Plugin import CCD_Plugin
     return CCD_Plugin(iface)

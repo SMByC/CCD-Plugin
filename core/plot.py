@@ -5,7 +5,7 @@
                                  A QGIS plugin
  Continuous Change Detection Plugin
                               -------------------
-        copyright            : (C) 2019-2024 by Xavier Corredor Llano, SMByC
+        copyright            : (C) 2019-2026 by Xavier Corredor Llano, SMByC
         email                : xavier.corredor.llano@gmail.com
  ***************************************************************************/
 
@@ -34,15 +34,15 @@ import plotly.io as pio
 # create artificial dates for plotting the regression (plug values into regression equation)
 def create_artificial_dates(date_range, first_date):
     import ee
- 
+
     date_end = date_range[1]
     # create sequence of dates from first date to date_end, spaced by 5 days
     interval = 5  # days
-    
+
     date_end_millis = ee.Date(date_end).millis().getInfo()
-    
+
     num_intervals = int((date_end_millis-first_date)/(interval*24*60*60*1000))
-    
+
     artificial_dates = [first_date+x*interval*24*60*60*1000 for x in range(num_intervals)]
 
     # adjust end of series
@@ -160,7 +160,7 @@ def generate_plot(id, ccdc_result_info, timeseries, date_range, dataset, band_or
     # update min and max xaxes margins
     margin_days = int((datetime_max - datetime_min).days*0.01)
     fig.update_xaxes(range=[datetime_min - timedelta(days=margin_days), datetime_max + timedelta(days=margin_days)])
-    
+
     if band_or_index_to_plot in ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2']:
         title = "Surface Reflectance - {} ({})".format(band_or_index_to_plot, dataset)
     if band_or_index_to_plot in ["NBR", "NDVI", "EVI", "EVI2", "BRIGHTNESS", "GREENNESS", "WETNESS"]:

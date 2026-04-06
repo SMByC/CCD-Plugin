@@ -5,7 +5,7 @@
                                  A QGIS plugin
  Continuous Change Detection Plugin
                               -------------------
-        copyright            : (C) 2019-2024 by Xavier Corredor Llano, SMByC
+        copyright            : (C) 2019-2026 by Xavier Corredor Llano, SMByC
         email                : xavier.corredor.llano@gmail.com
  ***************************************************************************/
 
@@ -39,10 +39,10 @@ class DownloadAndUnzip(QDialog):
         self.output_path = output_path
 
         self.progress_bar = QProgressBar(self)
-        self.progress_bar.setAlignment(Qt.AlignCenter)
+        self.progress_bar.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.progress_label = QLabel("Downloading additional libraries...", self)
-        self.progress_label.setAlignment(Qt.AlignCenter)
+        self.progress_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         progress_layout = QVBoxLayout()
         progress_layout.addWidget(self.progress_label)
@@ -70,7 +70,7 @@ class DownloadAndUnzip(QDialog):
             msg = "Error downloading and extracting additional Python packages required for CCD-Plugin. " \
                   "Read the install instructions here:\n\n" \
                   "https://github.com/SMByC/CCD-Plugin#installation"
-            QMessageBox.critical(None, 'CCD-Plugin: Error installing libs', msg, QMessageBox.Ok)
+            QMessageBox.critical(None, 'CCD-Plugin: Error installing libs', msg, QMessageBox.StandardButton.Ok)
 
         self.close_dialog()
 
@@ -117,15 +117,26 @@ class DownloadAndUnzip(QDialog):
             return False
 
 
+def get_qgis_plugins_dir():
+    """Get the QGIS plugins directory based on the running QGIS major version."""
+    from qgis.core import Qgis
+    major_version = int(Qgis.QGIS_VERSION.split('.')[0])
+    version_dir = 'QGIS{}'.format(major_version)
+
+    if platform.system() == "Windows":
+        base = os.path.join(os.path.expanduser('~'), 'AppData', 'Roaming', 'QGIS')
+    elif platform.system() == "Darwin":
+        base = os.path.join(os.path.expanduser('~'), 'Library', 'Application Support', 'QGIS')
+    else:
+        base = os.path.join(os.path.expanduser('~'), '.local', 'share', 'QGIS')
+
+    return os.path.join(base, version_dir, 'profiles', 'default', 'python', 'plugins')
+
+
 def install():
     # define the Qgis plugins directory and url by OS
     url = "https://github.com/SMByC/CCD-Plugin/releases/download/24.6/extlibs.zip"
-    if platform.system() == "Windows":
-        qgis_plugins_dir = os.path.join(os.path.expanduser('~'), 'AppData', 'Roaming', 'QGIS', 'QGIS3', 'profiles', 'default', 'python', 'plugins')
-    elif platform.system() == "Linux":
-        qgis_plugins_dir = os.path.join(os.path.expanduser('~'), '.local', 'share', 'QGIS', 'QGIS3', 'profiles', 'default', 'python', 'plugins')
-    elif platform.system() == "Darwin":
-        qgis_plugins_dir = os.path.join(os.path.expanduser('~'), 'Library', 'Application Support', 'QGIS', 'QGIS3', 'profiles', 'default', 'python', 'plugins')
+    qgis_plugins_dir = get_qgis_plugins_dir()
 
     # install the extra libraries
     DownloadAndUnzip(url, qgis_plugins_dir)

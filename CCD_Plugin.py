@@ -5,7 +5,7 @@
                                  A QGIS plugin
  Continuous Change Detection Plugin
                               -------------------
-        copyright            : (C) 2019-2024 by Xavier Corredor Llano, SMByC
+        copyright            : (C) 2019-2026 by Xavier Corredor Llano, SMByC
         email                : xavier.corredor.llano@gmail.com
  ***************************************************************************/
 
@@ -120,7 +120,7 @@ class CCD_Plugin:
 
             # show the dockwidget
             # TODO: fix to allow choice of dock location
-            self.iface.addDockWidget(Qt.BottomDockWidgetArea, self.widget)
+            self.iface.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.widget)
             self.widget.show()
 
     #--------------------------------------------------------------------------
@@ -166,4 +166,3 @@ class CCD_Plugin:
         if self.tmp_dir and os.path.isdir(self.tmp_dir):
             shutil.rmtree(self.tmp_dir, ignore_errors=True)
         self.tmp_dir = None
-

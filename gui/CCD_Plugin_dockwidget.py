@@ -5,7 +5,7 @@
                                  A QGIS plugin
  Continuous Change Detection Plugin
                               -------------------
-        copyright            : (C) 2019-2024 by Xavier Corredor Llano, SMByC
+        copyright            : (C) 2019-2026 by Xavier Corredor Llano, SMByC
         email                : xavier.corredor.llano@gmail.com
  ***************************************************************************/
 
@@ -34,19 +34,32 @@ from qgis.core import (QgsCoordinateReferenceSystem, QgsCoordinateTransform, Qgs
 from qgis.gui import QgsMapTool, QgsVertexMarker
 from qgis.utils import iface
 
+plugin_folder = os.path.dirname(os.path.dirname(__file__))
+
+# Try QWebEngine first (Qt6 / QGIS 4.x, and Qt5 with WebEngine), then fall back to QtWebKit (Qt5 / QGIS 3.x)
+HAS_WEBENGINE = False
+HAS_WEBKIT = False
+
 try:
-    from qgis.PyQt.QtWebKit import QWebSettings
-
-    # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
-    plugin_folder = os.path.dirname(os.path.dirname(__file__))
-    FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, 'ui', 'CCD_Plugin_dockwidget_QWebView.ui'))
-
+    from qgis.PyQt.QtWebEngineWidgets import QWebEngineView  # noqa: F401
+    from qgis.PyQt.QtWebEngineCore import QWebEngineSettings
+    HAS_WEBENGINE = True
+    FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, 'ui', 'CCD_Plugin_dockwidget_QWebEngine.ui'))
 except ImportError:
-    # Qt without webkit
-    msg = "CCD-Plugin needs QtWebKit in your QT/Qgis installation. See the options here:\n\n" \
+    pass
+
+if not HAS_WEBENGINE:
+    try:
+        from qgis.PyQt.QtWebKit import QWebSettings
+        HAS_WEBKIT = True
+        FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, 'ui', 'CCD_Plugin_dockwidget_QWebView.ui'))
+    except ImportError:
+        pass
+
+if not HAS_WEBENGINE and not HAS_WEBKIT:
+    msg = "CCD-Plugin needs QtWebEngine or QtWebKit in your Qt/QGIS installation. See the options here:\n\n" \
           "https://github.com/SMByC/CCD-Plugin#installation"
-    QMessageBox.critical(None, 'CCD-Plugin: Error loading', msg, QMessageBox.Ok)
-    # raise Qgis error
+    QMessageBox.critical(None, 'CCD-Plugin: Error loading', msg, QMessageBox.StandardButton.Ok)
     raise ImportError(msg)
 
 
@@ -100,17 +113,16 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         self.generate_button.clicked.connect(lambda: self.new_plot())
 
-        # plot web view
+        # plot web view settings
         plot_view_settings = self.plot_webview.settings()
-        plot_view_settings.setAttribute(QWebSettings.WebGLEnabled, True)
-        plot_view_settings.setAttribute(QWebSettings.Accelerated2dCanvasEnabled, True)
-        plot_view_settings.setAttribute(QWebSettings.PluginsEnabled, True)
-        plot_view_settings.setAttribute(QWebSettings.DnsPrefetchEnabled, True)
-        plot_view_settings.setAttribute(QWebSettings.XSSAuditingEnabled, True)
-        plot_view_settings.setAttribute(QWebSettings.JavascriptEnabled, True)
-        # define the zoom factor based on the dpi
-        # dpi = self.canvas[0].mapSettings().outputDpi()
-        # zoom_factor = dpi/96 - 0.15
+        if HAS_WEBENGINE:
+            plot_view_settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
+            plot_view_settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
+            plot_view_settings.setAttribute(QWebEngineSettings.WebAttribute.WebGLEnabled, True)
+        elif HAS_WEBKIT:
+            plot_view_settings.setAttribute(QWebSettings.JavascriptEnabled, True)
+            plot_view_settings.setAttribute(QWebSettings.WebGLEnabled, True)
+            plot_view_settings.setAttribute(QWebSettings.Accelerated2dCanvasEnabled, True)
         self.plot_webview.setZoomFactor(0.85)
 
         # advanced settings dialog
@@ -209,7 +221,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             if not ccdc_result_info['tBreak']:
                 msg = "No enough data for this period to perform change detection, plotting only the observed values."
                 self.MsgBar.clearWidgets()
-                self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.Info, duration=10)
+                self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.MessageLevel.Info, duration=10)
 
             self.html_file = generate_plot(self.id, ccdc_result_info, timeseries,
                                            (config['start_date'], config['end_date']),
@@ -221,7 +233,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         else:
             msg = "Error computing CCD: {}".format(exception)
             self.MsgBar.clearWidgets()
-            self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.Warning, duration=10)
+            self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.MessageLevel.Warning, duration=10)
             self.plot_webview.setHtml("")
 
         #### finish
@@ -355,13 +367,13 @@ class PickerCoordsOnMap(QgsMapTool):
         marker.setCenter(point)
         marker.setColor(QColor("red"))
         marker.setIconSize(30)
-        marker.setIconType(QgsVertexMarker.ICON_CROSS)
+        marker.setIconType(QgsVertexMarker.IconType.ICON_CROSS)
         marker.setPenWidth(3)
         PickerCoordsOnMap.marker_drawn["marker"] = marker
         PickerCoordsOnMap.marker_drawn["canvas"] = self.canvas
 
     def canvasPressEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             point = self.canvas.getCoordinateTransform().toMapCoordinates(event.pos().x(), event.pos().y())
             self.create_marker(point)
             # transform coordinates to WGS84
@@ -377,5 +389,5 @@ class PickerCoordsOnMap(QgsMapTool):
                 self.widget.new_plot()
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Escape:
+        if event.key() == Qt.Key.Key_Escape:
             self.widget.pick_on_map.click()

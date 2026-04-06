@@ -600,7 +600,7 @@
               <widget class="QDateEdit" name="start_date">
                <property name="dateTime">
                 <datetime>
-                 <hour>5</hour>
+                 <hour>10</hour>
                  <minute>0</minute>
                  <second>0</second>
                  <year>2010</year>
@@ -777,7 +777,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QWebView" name="plot_webview" native="true">
+        <widget class="QWebEngineView" name="plot_webview">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Expanding" vsizetype="Ignored">
            <horstretch>0</horstretch>
@@ -787,7 +787,7 @@
          <property name="acceptDrops">
           <bool>false</bool>
          </property>
-         <property name="url" stdset="0">
+         <property name="url">
           <url>
            <string>about:blank</string>
           </url>
@@ -807,15 +807,15 @@
    <header>qgscheckablecombobox.h</header>
   </customwidget>
   <customwidget>
+   <class>QWebEngineView</class>
+   <extends>QWidget</extends>
+   <header location="global">QtWebEngineWidgets/QWebEngineView</header>
+  </customwidget>
+  <customwidget>
    <class>QgsMessageBar</class>
    <extends>QFrame</extends>
    <header>qgis.gui</header>
    <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>QWebView</class>
-   <extends>QWidget</extends>
-   <header location="global">QtWebKitWidgets/QWebView</header>
   </customwidget>
  </customwidgets>
  <resources/>

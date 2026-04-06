@@ -40,11 +40,10 @@ The plugin needs to work:
 
 ### Known issues
 
-> **Qgis with QT > 5.15:**
-> The plugin won't work without WebKit module, deprecated after QT >= 5.16. We recommend installing
-> Qgis with the QT WebKit module (by default in Windows and Mac packages), other systems like Linux with QT > 5.15 
-> without QT WebKit module by default install python QtWebKit module (e.g. `python3-pyqt5.qtwebkit` or 
-> `python-pyqt5-webkit`) or use alternative installation of Qgis (e.g. using conda).
+> **QGIS 3.x / Qt5:**
+> The plugin prefers QWebEngine if available, otherwise falls back to QtWebKit.
+> On Linux with Qt5 without QtWebKit, install the python QtWebKit module (e.g. `python3-pyqt5.qtwebkit` or 
+> `python-pyqt5-webkit`) or the QtWebEngine module, or use an alternative QGIS installation (e.g. using conda).
 
 > **Download plot as a png:**
 > It is not working inside the plugin, but it works when the plot is opened in a web browser
