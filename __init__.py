@@ -27,22 +27,27 @@ from qgis.PyQt.QtWidgets import QMessageBox
 from CCD_Plugin.utils import extralibs
 
 
-def check_dependencies():
+def check_dependencies() -> bool:
+    """Return True if all required extra libraries are importable."""
     try:
-        import plotly
+        import plotly  # noqa: F401
         return True
     except ImportError:
         return False
 
 
-def pre_init_plugin():
-    extra_libs_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'extlibs'))
+def pre_init_plugin() -> None:
+    """Add the bundled *extlibs* directory into plugin folder so that extra
+    Python packages can be imported before loading the plugin.
+    """
+    extra_libs_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "extlibs")
+    )
     if os.path.isdir(extra_libs_path):
-        # add to python path
         site.addsitedir(extra_libs_path)
-        # register with pkg_resources if available (not bundled in Python 3.12+)
+        # Register with pkg_resources when available (removed in Python 3.12+)
         try:
-            import pkg_resources
+            import pkg_resources  # noqa: F401
             pkg_resources.working_set.add_entry(extra_libs_path)
         except ImportError:
             pass
@@ -55,20 +60,26 @@ def classFactory(iface):  # pylint: disable=invalid-name
     :param iface: A QGIS interface instance.
     :type iface: QgsInterface
     """
-    # load extra python dependencies
+    # Attempt to load bundled extra dependencies first
     pre_init_plugin()
 
     if not check_dependencies():
-        # install extra python dependencies
+        # Extra libs missing – download and install them, then retry
         extralibs.install()
-        # load extra python dependencies
         pre_init_plugin()
 
         if not check_dependencies():
-            msg = "Error loading libraries for CCD-Plugin. " \
-                  "Read the install instructions here:\n\n" \
-                  "https://github.com/SMByC/CCD-Plugin#installation"
-            QMessageBox.critical(None, 'CCD-Plugin: Error loading', msg, QMessageBox.StandardButton.Ok)
+            msg = (
+                "Error loading libraries for CCD-Plugin.\n\n"
+                "Read the install instructions here:\n"
+                "https://github.com/SMByC/CCD-Plugin#installation"
+            )
+            QMessageBox.critical(
+                None,
+                "CCD-Plugin: Error loading",
+                msg,
+                QMessageBox.StandardButton.Ok,
+            )
 
     from .CCD_Plugin import CCD_Plugin
     return CCD_Plugin(iface)
