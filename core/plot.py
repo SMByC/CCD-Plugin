@@ -23,6 +23,7 @@ with the collaboration of:
     Daniel Moraes <moraesd90@gmail.com>
 
 """
+import os
 import tempfile
 import numpy as np
 from datetime import datetime, timedelta
@@ -168,7 +169,8 @@ def generate_plot(id, ccdc_result_info, timeseries, date_range, dataset, band_or
 
     fig.update_yaxes(title_text=title, automargin=True)
 
-    html_file = tempfile.mktemp(suffix=".html", dir=CCD_Plugin.inst[id].tmp_dir)
+    _fd, html_file = tempfile.mkstemp(suffix=".html", dir=CCD_Plugin.inst[id].tmp_dir)
+    os.close(_fd)
     plotly.offline.plot(fig, filename=html_file, auto_open=False, config={'displaylogo': False})
 
     return html_file
