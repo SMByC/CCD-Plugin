@@ -41,7 +41,7 @@ def compute_ccd(coords, date_range, doy_range, dataset, breakpoint_bands, tmask_
 
     # get GEE data from the specific point according to selected collection
     if dataset == "Sentinel-2":
-        gee_data = get_gee_data_sentinel(coords, date_range, doy_range, dataset) #cloud filter selection can be implemented later
+        gee_data = get_gee_data_sentinel(coords, date_range, doy_range, dataset)  # cloud filter selection can be implemented later
     elif dataset == "Landsat C1":
         gee_data = get_gee_data_landsat(coords, date_range, doy_range, 1)
     elif dataset == "Landsat C2":
@@ -50,7 +50,7 @@ def compute_ccd(coords, date_range, doy_range, dataset, breakpoint_bands, tmask_
     # get time series from selected band
     def get_time_series(gee_data):
         gee_data_point = np.array(ee.List(gee_data.getRegion(geometry=point, scale=gee_scale)).getInfo())
-        stacked_gee_data = np.stack(gee_data_point[1:],axis=1)
+        stacked_gee_data = np.stack(gee_data_point[1:], axis=1)
         # timeseries is a dictionary with the followings keys: id, longitude, latitude, time, Blue, Green, Red...
         timeseries = {gee_data_point[0][i]: stacked_gee_data[i] for i in range(len(gee_data_point[0]))}
         return timeseries

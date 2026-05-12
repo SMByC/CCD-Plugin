@@ -28,7 +28,7 @@ import zipfile
 
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import (QApplication, QDialog, QHBoxLayout, QLabel,
-                                  QMessageBox, QProgressBar, QPushButton, QVBoxLayout)
+                                 QMessageBox, QProgressBar, QPushButton, QVBoxLayout)
 from qgis.core import Qgis, QgsApplication, QgsMessageLog
 
 

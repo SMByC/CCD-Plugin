@@ -76,7 +76,6 @@ def prepareBands(image):
     swir2 = image.select('B12').rename('SWIR2').divide(10000)
 
     return image.addBands(blue).addBands(green).addBands(red).addBands(nir).addBands(swir1).addBands(swir2)
-    
 
 
 def addNDVI(image):
@@ -91,7 +90,7 @@ def addNBR(image):
 
 def addEVI(image):
     evi = image.expression('2.5 * ((NIR-Red) / (NIR + 6 * Red - 7.5* Blue +1))',
-        {'NIR': image.select('NIR'), 'Red': image.select('Red'), 'Blue': image.select('Blue')})
+                           {'NIR': image.select('NIR'), 'Red': image.select('Red'), 'Blue': image.select('Blue')})
     return image.addBands(evi.rename('EVI'))
 
 
@@ -149,8 +148,10 @@ def filterS2cloudless(S2SRCol, S2CloudCol):
     S2SRCol = S2SRCol.filter(ee.Filter.lte('CLOUDY_PIXEL_PERCENTAGE', CLOUD_FILTER))
 
     # join S2SR with S2CloudCol
-    joined = ee.ImageCollection(ee.Join.saveFirst('s2cloudless').apply(primary=S2SRCol, secondary=S2CloudCol,
-        condition=ee.Filter.equals(leftField='system:index', rightField='system:index')))
+    joined = ee.ImageCollection(
+        ee.Join.saveFirst('s2cloudless').apply(
+            primary=S2SRCol, secondary=S2CloudCol,
+            condition=ee.Filter.equals(leftField='system:index', rightField='system:index')))
 
     def add_cloud_bands(img):
         # Get s2cloudless image, subset the probability band.

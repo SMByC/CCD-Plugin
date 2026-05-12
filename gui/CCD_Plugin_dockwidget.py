@@ -63,11 +63,11 @@ if not HAS_WEBENGINE and not HAS_WEBKIT:
     raise ImportError(msg)
 
 
-from CCD_Plugin.core.ccd_process import compute_ccd
-from CCD_Plugin.core.plot import generate_plot
-from CCD_Plugin.utils.system_utils import wait_process, error_handler
-from CCD_Plugin.utils.config import get_plugin_config, restore_plugin_config
-from CCD_Plugin.gui.advanced_settings import AdvancedSettings
+from CCD_Plugin.core.ccd_process import compute_ccd  # noqa: E402
+from CCD_Plugin.core.plot import generate_plot  # noqa: E402
+from CCD_Plugin.utils.system_utils import wait_process, error_handler  # noqa: E402
+from CCD_Plugin.utils.config import get_plugin_config, restore_plugin_config  # noqa: E402
+from CCD_Plugin.gui.advanced_settings import AdvancedSettings  # noqa: E402
 
 
 class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
@@ -167,7 +167,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     @error_handler
     def new_plot(self):
-        ### before start the process
+        # before start the process
         # check import ee lib
         try:
             import ee
@@ -188,13 +188,13 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.generate_button.setEnabled(False)
         self.plot_webview.load(QUrl.fromLocalFile(os.path.join(plugin_folder, 'ui', 'loading.html')))
 
-        ### start the process
+        # start the process
         # perform CCD as a background task
         globals()['task'] = QgsTask.fromFunction("Compute CCD", self.compute_ccd,
                                                  on_finished=self.ccd_completed, config=config)
         QgsApplication.taskManager().addTask(globals()['task'])
 
-        ### after finish the process
+        # after finish the process
         self.pick_on_map.click()
 
     @staticmethod
@@ -236,12 +236,11 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.MessageLevel.Warning, duration=10)
             self.plot_webview.setHtml("")
 
-        #### finish
+        # finish
         self.generate_button.setEnabled(True)
 
     @wait_process
     def repaint_plot(self):
-        from CCD_Plugin.CCD_Plugin import CCD_Plugin
         from CCD_Plugin.core.ccd_process import ccd_results
         self.clean_plot()
 
@@ -269,8 +268,8 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         import yaml
 
         yaml_path, _ = QFileDialog.getOpenFileName(self,
-                                                  "Restore the CCD plugin configuration from a YAML file",
-                                                  "", "YAML Files (*.yaml);;All Files (*)")
+                                                   "Restore the CCD plugin configuration from a YAML file",
+                                                   "", "YAML Files (*.yaml);;All Files (*)")
 
         if yaml_path == '' or not os.path.isfile(yaml_path):
             return
@@ -293,15 +292,15 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         def setup_yaml():
             """Keep dump ordered with orderedDict"""
-            represent_dict_order = lambda self, data: self.represent_mapping('tag:yaml.org,2002:map',
-                                                                             list(data.items()))
+            def represent_dict_order(self, data):
+                return self.represent_mapping('tag:yaml.org,2002:map', list(data.items()))
             yaml.add_representer(OrderedDict, represent_dict_order)
 
         setup_yaml()
         config = get_plugin_config(self.id)
         yaml_path, _ = QFileDialog.getSaveFileName(self,
-                                                  "Save the CCD plugin configuration to a YAML file",
-                                                  "", "YAML Files (*.yaml);;All Files (*)")
+                                                   "Save the CCD plugin configuration to a YAML file",
+                                                   "", "YAML Files (*.yaml);;All Files (*)")
         if yaml_path == '':
             return
 

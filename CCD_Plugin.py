@@ -26,7 +26,7 @@ from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 
 # Initialize Qt resources from file resources.py
-from .resources import *
+from . import resources  # noqa: F401
 # Import the code for the widget
 from CCD_Plugin.gui.CCD_Plugin_dockwidget import CCD_PluginDockWidget
 import os.path
@@ -51,7 +51,7 @@ class CCD_Plugin:
         # initialize locale
         try:
             locale = QSettings().value('locale/userLocale', QLocale().name(), type=str)[0:2]
-        except:
+        except Exception:
             locale = 'en'
         locale_path = os.path.join(self.plugin_dir, 'i18n', 'CCD_Plugin_{}.qm'.format(locale))
 
@@ -85,7 +85,7 @@ class CCD_Plugin:
         return QCoreApplication.translate('CCD_Plugin', message)
 
     def initGui(self):
-        ### Main widget menu
+        # Main widget menu
         # Create action that will start plugin configuration
         icon_path = ':/plugins/CCD_Plugin/icons/ccd_plugin.svg'
         self.dockable_action = QAction(QIcon(icon_path), "CCD_Plugin", self.iface.mainWindow())
@@ -123,7 +123,7 @@ class CCD_Plugin:
             self.iface.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.widget)
             self.widget.show()
 
-    #--------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
 
     def onClosePlugin(self):
         """Cleanup necessary items here when plugin is closed"""

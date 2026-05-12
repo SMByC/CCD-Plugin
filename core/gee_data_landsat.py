@@ -93,7 +93,7 @@ def prepare_L4L5L7_C2(image):
     band_list = ['SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B7', 'ST_B6', 'QA_PIXEL']
     name_list = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Temp', 'pixel_qa']
     subBand = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2']
-    scaling = [1]*8  #[10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
+    scaling = [1] * 8  # [10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
 
     opticalBands = image.select('SR_B.').multiply(0.0000275).add(-0.2)
     thermalBand = image.select('ST_B6').multiply(0.00341802).add(149.0)
@@ -117,7 +117,7 @@ def prepare_L8L9_C2(image):
     band_list = ['SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7', 'ST_B10', 'QA_PIXEL']
     name_list = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Temp', 'pixel_qa']
     subBand = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2']
-    scaling = [1]*8  #[10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
+    scaling = [1] * 8  # [10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
 
     opticalBands = image.select('SR_B.').multiply(0.0000275).add(-0.2)
     thermalBand = image.select('ST_B10').multiply(0.00341802).add(149.0)
@@ -154,8 +154,8 @@ def get_gee_data_landsat(coords, date_range, doy_range, collection):
         l8 = collection_filtering(point, 'LANDSAT/LC08/C01/T1_SR', date_range, doy_range)
         l8_prepared = l8.map(prepare_L8_C1)
 
-        all_scenes = ee.ImageCollection(l4_prepared).merge(l5_prepared).merge(l7_prepared)\
-                                        .merge(l8_prepared).sort('system:time_start')
+        all_scenes = (ee.ImageCollection(l4_prepared).merge(l5_prepared).merge(l7_prepared)
+                      .merge(l8_prepared).sort('system:time_start'))
 
     if collection == 2:
         l4 = collection_filtering(point, 'LANDSAT/LT04/C02/T1_L2', date_range, doy_range)
@@ -173,8 +173,8 @@ def get_gee_data_landsat(coords, date_range, doy_range, collection):
         l9 = collection_filtering(point, 'LANDSAT/LC09/C02/T1_L2', date_range, doy_range)
         l9_prepared = l9.map(prepare_L8L9_C2)
 
-        all_scenes = ee.ImageCollection(l4_prepared).merge(l5_prepared).merge(l7_prepared)\
-                                        .merge(l8_prepared).merge(l9_prepared).sort('system:time_start')
+        all_scenes = (ee.ImageCollection(l4_prepared).merge(l5_prepared).merge(l7_prepared)
+                      .merge(l8_prepared).merge(l9_prepared).sort('system:time_start'))
 
     # Add indices: 'NBR', 'NDVI', 'EVI', 'EVI2', 'BRIGHTNESS', 'GREENNESS', 'WETNESS'
     all_gee_data = all_scenes.map(lambda image: image.addBands([
@@ -215,7 +215,6 @@ def get_gee_data_landsat(coords, date_range, doy_range, collection):
                           'SWIR2': image.select('SWIR2')}).rename('WETNESS')
     ]))
 
-    
     filtered_col = all_gee_data.filter("WRS_ROW < 122").filterBounds(point)
 
     return filtered_col

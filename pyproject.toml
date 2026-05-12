@@ -1,3 +1,33 @@
+[project]
+name = "CCD-Plugin"
+version = "25.8"
+description = "Qgis plugin for Continuous Change Detection (CCDC) algorithm of a time series at a given coordinate"
+authors = [
+    { name = "Xavier Corredor Llano, SMByC", email = "xavier.corredor.llano@gmail.com" },
+]
+license = { text = "GPL-2.0-or-later" }
+requires-python = ">=3.9"
+dependencies = [
+    "plotly",
+]
+
+[project.urls]
+Homepage = "https://github.com/SMByC/CCD-Plugin"
+Repository = "https://github.com/SMByC/CCD-Plugin"
+Issues = "https://github.com/SMByC/CCD-Plugin/issues"
+
+[project.optional-dependencies]
+dev = [
+    "flake8",
+    "flake8-qgis",
+]
+
+[dependency-groups]
+dev = [
+    "flake8",
+    "flake8-qgis",
+]
+
 [tool.pyright]
-extraPaths = ["..", "extlibs"]  # include project folder
-# venv = ".venv"
+extraPaths = [".."]  # include project folder
+venv = ".venv"
