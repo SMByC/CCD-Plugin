@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 /***************************************************************************
  CCD Plugin
@@ -18,13 +17,14 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import functools
 import traceback
 
-from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import QApplication, QMessageBox, QPushButton
-from qgis.PyQt.QtGui import QCursor
 from qgis.core import Qgis
+from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtGui import QCursor
+from qgis.PyQt.QtWidgets import QApplication, QMessageBox, QPushButton
 from qgis.utils import iface
 
 
@@ -40,6 +40,7 @@ def error_handler(func):
 
             # select the message bar
             from CCD_Plugin.CCD_Plugin import CCD_Plugin
+
             if self.id in CCD_Plugin.inst and CCD_Plugin.inst[self.id].widget is not None:
                 msg_bar = CCD_Plugin.inst[self.id].widget.MsgBar
             else:
@@ -51,9 +52,11 @@ def error_handler(func):
             def details_message_box(error, more_details):
                 msgBox = QMessageBox()
                 msgBox.setWindowTitle("CCD-Plugin - Error handler")
-                msgBox.setText("<i>{}</i>".format(error))
-                msgBox.setInformativeText("If you consider this as an error of CCD-Plugin, report it in "
-                                          "<a href='https://github.com/SMByC/CCD-Plugin/issues'>issue tracker</a>")
+                msgBox.setText(f"<i>{error}</i>")
+                msgBox.setInformativeText(
+                    "If you consider this as an error of CCD-Plugin, report it in "
+                    "<a href='https://github.com/SMByC/CCD-Plugin/issues'>issue tracker</a>"
+                )
                 msgBox.setDetailedText(more_details)
                 msgBox.setTextFormat(Qt.TextFormat.RichText)
                 msgBox.setStandardButtons(QMessageBox.StandardButton.Ok)
@@ -94,4 +97,5 @@ def wait_process(func):
         QApplication.processEvents()
         # finally return the object by f
         return obj_returned
+
     return wrapper

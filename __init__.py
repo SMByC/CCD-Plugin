@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 /***************************************************************************
  CCD Plugin
@@ -19,6 +18,7 @@
  ***************************************************************************/
  This script initializes the plugin, making it known to QGIS.
 """
+
 import os
 import site
 
@@ -31,6 +31,7 @@ def check_dependencies() -> bool:
     """Return True if all required extra libraries are importable."""
     try:
         import plotly  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -40,14 +41,13 @@ def pre_init_plugin() -> None:
     """Add the bundled *extlibs* directory into plugin folder so that extra
     Python packages can be imported before loading the plugin.
     """
-    extra_libs_path = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "extlibs")
-    )
+    extra_libs_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "extlibs"))
     if os.path.isdir(extra_libs_path):
         site.addsitedir(extra_libs_path)
         # Register with pkg_resources when available (removed in Python 3.12+)
         try:
-            import pkg_resources  # noqa: F401
+            import pkg_resources
+
             pkg_resources.working_set.add_entry(extra_libs_path)
         except ImportError:
             pass
@@ -64,7 +64,7 @@ def classFactory(iface):  # pylint: disable=invalid-name
     pre_init_plugin()
 
     if not check_dependencies():
-        # Extra libs missing – download and install them, then retry
+        # Extra libs missing - download and install them, then retry
         extralibs.install()
         pre_init_plugin()
 
@@ -82,4 +82,5 @@ def classFactory(iface):  # pylint: disable=invalid-name
             )
 
     from .CCD_Plugin import CCD_Plugin
+
     return CCD_Plugin(iface)

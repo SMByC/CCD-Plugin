@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 /***************************************************************************
  CCD Plugin
@@ -21,17 +20,25 @@
 with the collaboration of Daniel Moraes <moraesd90@gmail.com>
 
 """
+
 import os
 from collections import OrderedDict
+from typing import ClassVar
 
-from qgis.PyQt import uic
-from qgis.PyQt import QtWidgets
-from qgis.PyQt.QtGui import QColor, QDesktopServices
-from qgis.PyQt.QtCore import QUrl, pyqtSignal, Qt, QDate
-from qgis.PyQt.QtWidgets import QMessageBox, QFileDialog
-from qgis.core import (QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject, QgsPointXY, Qgis,
-                       QgsApplication, QgsTask)
+from qgis.core import (
+    Qgis,
+    QgsApplication,
+    QgsCoordinateReferenceSystem,
+    QgsCoordinateTransform,
+    QgsPointXY,
+    QgsProject,
+    QgsTask,
+)
 from qgis.gui import QgsMapTool, QgsVertexMarker
+from qgis.PyQt import QtWidgets, uic
+from qgis.PyQt.QtCore import QDate, Qt, QUrl, pyqtSignal
+from qgis.PyQt.QtGui import QColor, QDesktopServices
+from qgis.PyQt.QtWidgets import QFileDialog, QMessageBox
 from qgis.utils import iface
 
 plugin_folder = os.path.dirname(os.path.dirname(__file__))
@@ -41,33 +48,37 @@ HAS_WEBENGINE = False
 HAS_WEBKIT = False
 
 try:
+    from qgis.PyQt.QtWebEngineCore import QWebEngineSettings  # noqa: F401
     from qgis.PyQt.QtWebEngineWidgets import QWebEngineView  # noqa: F401
-    from qgis.PyQt.QtWebEngineCore import QWebEngineSettings
+
     HAS_WEBENGINE = True
-    FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, 'ui', 'CCD_Plugin_dockwidget_QWebEngine.ui'))
+    FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, "ui", "CCD_Plugin_dockwidget_QWebEngine.ui"))
 except ImportError:
     pass
 
 if not HAS_WEBENGINE:
     try:
-        from qgis.PyQt.QtWebKit import QWebSettings
+        from qgis.PyQt.QtWebKit import QWebSettings  # noqa: F401
+
         HAS_WEBKIT = True
-        FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, 'ui', 'CCD_Plugin_dockwidget_QWebView.ui'))
+        FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, "ui", "CCD_Plugin_dockwidget_QWebView.ui"))
     except ImportError:
         pass
 
 if not HAS_WEBENGINE and not HAS_WEBKIT:
-    msg = "CCD-Plugin needs QtWebEngine or QtWebKit in your Qt/QGIS installation. See the options here:\n\n" \
-          "https://github.com/SMByC/CCD-Plugin#installation"
-    QMessageBox.critical(None, 'CCD-Plugin: Error loading', msg, QMessageBox.StandardButton.Ok)
+    msg = (
+        "CCD-Plugin needs QtWebEngine or QtWebKit in your Qt/QGIS installation. See the options here:\n\n"
+        "https://github.com/SMByC/CCD-Plugin#installation"
+    )
+    QMessageBox.critical(None, "CCD-Plugin: Error loading", msg, QMessageBox.StandardButton.Ok)
     raise ImportError(msg)
 
 
 from CCD_Plugin.core.ccd_process import compute_ccd  # noqa: E402
 from CCD_Plugin.core.plot import generate_plot  # noqa: E402
-from CCD_Plugin.utils.system_utils import wait_process, error_handler  # noqa: E402
-from CCD_Plugin.utils.config import get_plugin_config, restore_plugin_config  # noqa: E402
 from CCD_Plugin.gui.advanced_settings import AdvancedSettings  # noqa: E402
+from CCD_Plugin.utils.config import get_plugin_config, restore_plugin_config  # noqa: E402
+from CCD_Plugin.utils.system_utils import error_handler, wait_process  # noqa: E402
 
 
 class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
@@ -75,7 +86,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     def __init__(self, id, canvas=None, parent=None):
         """Constructor."""
-        super(CCD_PluginDockWidget, self).__init__(parent)
+        super().__init__(parent)
         # Set up the user interface from Designer through FORM_CLASS.
         # After self.setupUi() you can access any designer object by doing
         # self.<objectname>, and you can use autoconnect slots - see
@@ -97,9 +108,24 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # set the collection to 2 by default
         self.dataset.setCurrentIndex(1)
         # set break point bands/indices
-        self.box_breakpoint_bands.addItems(['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'NDVI', 'NBR', 'EVI',
-                                           'EVI2', 'BRIGHTNESS', 'GREENNESS', 'WETNESS'])
-        self.box_breakpoint_bands.setCheckedItems(['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2'])
+        self.box_breakpoint_bands.addItems(
+            [
+                "Blue",
+                "Green",
+                "Red",
+                "NIR",
+                "SWIR1",
+                "SWIR2",
+                "NDVI",
+                "NBR",
+                "EVI",
+                "EVI2",
+                "BRIGHTNESS",
+                "GREENNESS",
+                "WETNESS",
+            ]
+        )
+        self.box_breakpoint_bands.setCheckedItems(["Blue", "Green", "Red", "NIR", "SWIR1", "SWIR2"])
         # set the current date
         self.end_date.setDate(QDate.currentDate())
         # set action center on point
@@ -157,12 +183,12 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
     def setup_map_tool(self, checked):
         if checked:
             # set the map tool to pick coordinates
-            for canvas, default_map_tool in zip(self.canvas, self.default_map_tools):
+            for canvas, default_map_tool in zip(self.canvas, self.default_map_tools, strict=True):
                 canvas.unsetMapTool(default_map_tool)
                 canvas.setMapTool(PickerCoordsOnMap(self, canvas), clean=True)
         else:
             # finish, set default map tool to canvas
-            for canvas, default_map_tool in zip(self.canvas, self.default_map_tools):
+            for canvas, default_map_tool in zip(self.canvas, self.default_map_tools, strict=True):
                 canvas.setMapTool(default_map_tool, clean=True)
 
     @error_handler
@@ -171,9 +197,10 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # check import ee lib
         try:
             import ee
+
             ee.Initialize()
         except Exception as err:
-            raise Exception("Error importing ee lib, check the installation or your internet connection|{}".format(err))
+            raise Exception(f"Error importing ee lib, check the installation or your internet connection|{err}")
 
         # get the current configuration of the plugin
         config = get_plugin_config(self.id)
@@ -182,19 +209,20 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         # check if the plugin settings have changed compared to the last plot, except for the band_or_index_to_plot
         if self.last_config and self.last_config == OrderedDict(
-            (k, v) for k, v in config.items() if k != 'band_or_index_to_plot'
+            (k, v) for k, v in config.items() if k != "band_or_index_to_plot"
         ):
             return
 
         self.clean_plot()
         self.generate_button.setEnabled(False)
-        self.plot_webview.load(QUrl.fromLocalFile(os.path.join(plugin_folder, 'ui', 'loading.html')))
+        self.plot_webview.load(QUrl.fromLocalFile(os.path.join(plugin_folder, "ui", "loading.html")))
 
         # start the process
         # perform CCD as a background task
-        globals()['task'] = QgsTask.fromFunction("Compute CCD", self.compute_ccd,
-                                                 on_finished=self.ccd_completed, config=config)
-        QgsApplication.taskManager().addTask(globals()['task'])
+        globals()["task"] = QgsTask.fromFunction(
+            "Compute CCD", self.compute_ccd, on_finished=self.ccd_completed, config=config
+        )
+        QgsApplication.taskManager().addTask(globals()["task"])
 
         # after finish the process
         self.pick_on_map.click()
@@ -202,16 +230,17 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
     @staticmethod
     def compute_ccd(task, config):
         ccdc_result_info, timeseries = compute_ccd(
-            coords=(config['lon'], config['lat']),
-            date_range=(config['start_date'], config['end_date']),
-            doy_range=(config['start_doy'], config['end_doy']),
-            dataset=config['dataset'],
-            breakpoint_bands=config['breakpoint_bands'],
+            coords=(config["lon"], config["lat"]),
+            date_range=(config["start_date"], config["end_date"]),
+            doy_range=(config["start_doy"], config["end_doy"]),
+            dataset=config["dataset"],
+            breakpoint_bands=config["breakpoint_bands"],
             tmask_bands=None,
-            num_obs=config['num_obs'],
-            chi_square=config['chi_square'],
-            min_years=config['min_years'],
-            lambda_lasso=config['lambda_lasso'])
+            num_obs=config["num_obs"],
+            chi_square=config["chi_square"],
+            min_years=config["min_years"],
+            lambda_lasso=config["lambda_lasso"],
+        )
 
         return config, ccdc_result_info, timeseries
 
@@ -220,20 +249,25 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             # CCD process completed successfully
             config, ccdc_result_info, timeseries = result
 
-            if not ccdc_result_info['tBreak']:
+            if not ccdc_result_info["tBreak"]:
                 msg = "No enough data for this period to perform change detection, plotting only the observed values."
                 self.MsgBar.clearWidgets()
                 self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.MessageLevel.Info, duration=10)
 
-            self.html_file = generate_plot(self.id, ccdc_result_info, timeseries,
-                                           (config['start_date'], config['end_date']),
-                                           config['dataset'], config['band_or_index_to_plot'])
+            self.html_file = generate_plot(
+                self.id,
+                ccdc_result_info,
+                timeseries,
+                (config["start_date"], config["end_date"]),
+                config["dataset"],
+                config["band_or_index_to_plot"],
+            )
 
             self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
 
-            self.last_config = OrderedDict((k, v) for k, v in config.items() if k != 'band_or_index_to_plot')
+            self.last_config = OrderedDict((k, v) for k, v in config.items() if k != "band_or_index_to_plot")
         else:
-            msg = "Error computing CCD: {}".format(exception)
+            msg = f"Error computing CCD: {exception}"
             self.MsgBar.clearWidgets()
             self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.MessageLevel.Warning, duration=10)
             self.plot_webview.setHtml("")
@@ -244,6 +278,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
     @wait_process
     def repaint_plot(self):
         from CCD_Plugin.core.ccd_process import ccd_results
+
         self.clean_plot()
 
         if not ccd_results:
@@ -251,12 +286,12 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         # get the current configuration of the plugin
         config = get_plugin_config(self.id)
-        coords = (config['lon'], config['lat'])
-        date_range = (config['start_date'], config['end_date'])
-        doy_range = (config['start_doy'], config['end_doy'])
-        dataset = config['dataset']
-        band_or_index_to_plot = config['band_or_index_to_plot']
-        breakpoint_bands = tuple(config['breakpoint_bands'])
+        coords = (config["lon"], config["lat"])
+        date_range = (config["start_date"], config["end_date"])
+        doy_range = (config["start_doy"], config["end_doy"])
+        dataset = config["dataset"]
+        band_or_index_to_plot = config["band_or_index_to_plot"]
+        breakpoint_bands = tuple(config["breakpoint_bands"])
 
         # check if ccd results are already computed
         if (coords, date_range, doy_range, dataset, breakpoint_bands) in ccd_results:
@@ -271,23 +306,23 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         """restore the configuration of the plugin from a YAML file"""
         import yaml
 
-        yaml_path, _ = QFileDialog.getOpenFileName(self,
-                                                   "Restore the CCD plugin configuration from a YAML file",
-                                                   "", "YAML Files (*.yaml);;All Files (*)")
+        yaml_path, _ = QFileDialog.getOpenFileName(
+            self, "Restore the CCD plugin configuration from a YAML file", "", "YAML Files (*.yaml);;All Files (*)"
+        )
 
-        if yaml_path == '' or not os.path.isfile(yaml_path):
+        if yaml_path == "" or not os.path.isfile(yaml_path):
             return
 
-        with open(yaml_path, 'r') as stream:
+        with open(yaml_path) as stream:
             try:
                 config = yaml.safe_load(stream)
             except Exception as err:
-                raise Exception("Error reading the YAML file to restore the CCD plugin, see more:|{}".format(err))
+                raise Exception(f"Error reading the YAML file to restore the CCD plugin, see more:|{err}")
 
         try:
             restore_plugin_config(self.id, config)
         except Exception as err:
-            raise Exception("Error restoring the configuration of the CCD plugin, see more:|{}".format(err))
+            raise Exception(f"Error restoring the configuration of the CCD plugin, see more:|{err}")
 
     @error_handler
     def save_plugin_to_yaml(self):
@@ -296,27 +331,29 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         def setup_yaml():
             """Keep dump ordered with orderedDict"""
+
             def represent_dict_order(self, data):
-                return self.represent_mapping('tag:yaml.org,2002:map', list(data.items()))
+                return self.represent_mapping("tag:yaml.org,2002:map", list(data.items()))
+
             yaml.add_representer(OrderedDict, represent_dict_order)
 
         setup_yaml()
         config = get_plugin_config(self.id)
-        yaml_path, _ = QFileDialog.getSaveFileName(self,
-                                                   "Save the CCD plugin configuration to a YAML file",
-                                                   "", "YAML Files (*.yaml);;All Files (*)")
-        if yaml_path == '':
+        yaml_path, _ = QFileDialog.getSaveFileName(
+            self, "Save the CCD plugin configuration to a YAML file", "", "YAML Files (*.yaml);;All Files (*)"
+        )
+        if yaml_path == "":
             return
 
         if yaml_path:
             if not yaml_path.endswith(".yaml"):
                 yaml_path += ".yaml"
 
-        with open(yaml_path, 'w') as stream:
+        with open(yaml_path, "w") as stream:
             try:
                 yaml.dump(config, stream, default_flow_style=False)
             except yaml.YAMLError as err:
-                raise Exception("Error writing the YAML file to save the CCD plugin, see more:|{}".format(err))
+                raise Exception(f"Error writing the YAML file to save the CCD plugin, see more:|{err}")
 
     def show_ang_go_to_the_coordinates(self):
         if PickerCoordsOnMap.marker_drawn["canvas"] is not None:
@@ -348,7 +385,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
 
 class PickerCoordsOnMap(QgsMapTool):
-    marker_drawn = {"marker": None, "canvas": None}
+    marker_drawn: ClassVar[dict] = {"marker": None, "canvas": None}
 
     def __init__(self, widget, canvas=None):
         self.widget = widget

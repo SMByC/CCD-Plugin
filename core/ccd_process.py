@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 /***************************************************************************
  CCD Plugin
@@ -21,8 +20,10 @@
 with the collaboration of Daniel Moraes <moraesd90@gmail.com>
 
 """
-import numpy as np
+
 import concurrent.futures
+
+import numpy as np
 
 from CCD_Plugin.core.gee_data_landsat import get_gee_data_landsat
 from CCD_Plugin.core.gee_data_sentinel import get_gee_data_sentinel
@@ -31,12 +32,21 @@ ccd_results = {}
 
 
 def compute_ccd(
-    coords, date_range, doy_range, dataset, breakpoint_bands,
-    tmask_bands, num_obs, chi_square, min_years, lambda_lasso,
+    coords,
+    date_range,
+    doy_range,
+    dataset,
+    breakpoint_bands,
+    tmask_bands,
+    num_obs,
+    chi_square,
+    min_years,
+    lambda_lasso,
 ):
     # documentation: https://developers.google.com/earth-engine/apidocs/ee-algorithms-temporalsegmentation-ccdc
 
     import ee
+
     point = ee.Geometry.Point(coords)
 
     # determine gee scale (30m for LS / 10m for S2)

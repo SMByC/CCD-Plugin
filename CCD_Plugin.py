@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 /***************************************************************************
  CCD Plugin
@@ -19,25 +18,26 @@
  ***************************************************************************/
 """
 
+import os.path
 import shutil
 import tempfile
+from typing import ClassVar
 
-from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QLocale
+from qgis.PyQt.QtCore import QCoreApplication, QLocale, QSettings, Qt, QTranslator
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 
-# Initialize Qt resources from file resources.py
-from . import resources  # noqa: F401
-
 # Import the code for the widget
 from CCD_Plugin.gui.CCD_Plugin_dockwidget import CCD_PluginDockWidget
-import os.path
+
+# Initialize Qt resources from file resources.py
+from . import resources  # noqa: F401
 
 
 class CCD_Plugin:
     """QGIS Plugin Implementation."""
 
-    inst = {}
+    inst: ClassVar[dict] = {}
 
     def __init__(self, iface):
         """Constructor.
@@ -56,7 +56,7 @@ class CCD_Plugin:
             locale = QSettings().value("locale/userLocale", QLocale().name(), type=str)[0:2]
         except Exception:
             locale = "en"
-        locale_path = os.path.join(self.plugin_dir, "i18n", "CCD_Plugin_{}.qm".format(locale))
+        locale_path = os.path.join(self.plugin_dir, "i18n", f"CCD_Plugin_{locale}.qm")
 
         if os.path.exists(locale_path):
             self.translator = QTranslator()
