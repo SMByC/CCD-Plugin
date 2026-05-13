@@ -69,7 +69,10 @@ def prepare_L7_C1(image):
     mask4 = image.select("sr_atmos_opacity").unmask().lt(300)
     # Slightly erode bands to get rid of artifacts due to scan lines
     mask5 = ee.Image(image).mask().reduce(ee.Reducer.min()).focal_min(2.5)
-    return ee.Image(image).addBands(scaled).updateMask(mask1.And(mask2).And(mask3).And(mask4).And(mask5)).select(name_list)
+    return (ee.Image(image)
+            .addBands(scaled)
+            .updateMask(mask1.And(mask2).And(mask3).And(mask4).And(mask5))
+            .select(name_list))
 
 
 def prepare_L8_C1(image):
@@ -109,7 +112,10 @@ def prepare_L4L5L7_C2(image):
     mask4 = no_scaled.select(subBand).reduce(ee.Reducer.max()).lt(1)
     # Mask hazy pixels using AOD threshold
     mask5 = (image.select("SR_ATMOS_OPACITY").unmask(-1)).lt(300)
-    return ee.Image(image).addBands(scaled).updateMask(mask1.And(mask2).And(mask3).And(mask4).And(mask5)).select(name_list)
+    return (ee.Image(image)
+            .addBands(scaled)
+            .updateMask(mask1.And(mask2).And(mask3).And(mask4).And(mask5))
+            .select(name_list))
 
 
 def prepare_L8L9_C2(image):
@@ -133,7 +139,10 @@ def prepare_L8L9_C2(image):
     mask3 = no_scaled.select(subBand).reduce(ee.Reducer.min()).gt(0)
     mask4 = no_scaled.select(subBand).reduce(ee.Reducer.max()).lt(1)
     mask5 = ee.Image(image).select(['SR_QA_AEROSOL']).remap(validTOA, ee.List.repeat(1, len(validTOA)), 0)
-    return ee.Image(image).addBands(scaled).updateMask(mask1.And(mask2).And(mask3).And(mask4).And(mask5)).select(name_list)
+    return (ee.Image(image)
+            .addBands(scaled)
+            .updateMask(mask1.And(mask2).And(mask3).And(mask4).And(mask5))
+            .select(name_list))
 
 
 # filter and merge collections
@@ -192,24 +201,27 @@ def get_gee_data_landsat(coords, date_range, doy_range, collection):
         # Muhammad Hasan Ali Baig, Lifu Zhang, Tong Shuai & Qingxi Tong (2014) Derivation of a tasselled cap
         # transformation based on Landsat 8 at-satellite reflectance, Remote Sensing Letters, 5:5, 423-431,
         # DOI: 10.1080/2150704X.2014.915434
-        image.expression('0.3029 * Blue + 0.2786 * Green + 0.4733 * Red + 0.5599 * NIR + 0.508 * SWIR1 + 0.1872 * SWIR2',
-                         {'Blue': image.select('Blue'),
-                          'Green': image.select('Green'),
-                          'Red': image.select('Red'),
-                          'NIR': image.select('NIR'),
-                          'SWIR1': image.select('SWIR1'),
-                          'SWIR2': image.select('SWIR2')}).rename('BRIGHTNESS'),
-        image.expression('-0.2941 * Blue - 0.243 * Green - 0.5424 * Red + 0.7276 * NIR + 0.0713 * SWIR1 - 0.1608 * SWIR2',
-                         {'Blue': image.select('Blue'),
-                          'Green': image.select('Green'),
-                          'Red': image.select('Red'),
-                          'NIR': image.select('NIR'),
-                          'SWIR1': image.select('SWIR1'),
-                          'SWIR2': image.select('SWIR2')}).rename('GREENNESS'),
-        image.expression('0.1511 * Blue + 0.1973 * Green + 0.3283 * Red + 0.3407 * NIR - 0.7117 * SWIR1 - 0.4559 * SWIR2',
-                         {'Blue': image.select('Blue'),
-                          'Green': image.select('Green'),
-                          'Red': image.select('Red'),
+        image.expression(
+            '0.3029 * Blue + 0.2786 * Green + 0.4733 * Red + 0.5599 * NIR + 0.508 * SWIR1 + 0.1872 * SWIR2',
+            {'Blue': image.select('Blue'),
+             'Green': image.select('Green'),
+             'Red': image.select('Red'),
+             'NIR': image.select('NIR'),
+             'SWIR1': image.select('SWIR1'),
+             'SWIR2': image.select('SWIR2')}).rename('BRIGHTNESS'),
+        image.expression(
+            '-0.2941 * Blue - 0.243 * Green - 0.5424 * Red + 0.7276 * NIR + 0.0713 * SWIR1 - 0.1608 * SWIR2',
+            {'Blue': image.select('Blue'),
+             'Green': image.select('Green'),
+             'Red': image.select('Red'),
+             'NIR': image.select('NIR'),
+             'SWIR1': image.select('SWIR1'),
+             'SWIR2': image.select('SWIR2')}).rename('GREENNESS'),
+        image.expression(
+            '0.1511 * Blue + 0.1973 * Green + 0.3283 * Red + 0.3407 * NIR - 0.7117 * SWIR1 - 0.4559 * SWIR2',
+            {'Blue': image.select('Blue'),
+             'Green': image.select('Green'),
+             'Red': image.select('Red'),
                           'NIR': image.select('NIR'),
                           'SWIR1': image.select('SWIR1'),
                           'SWIR2': image.select('SWIR2')}).rename('WETNESS')

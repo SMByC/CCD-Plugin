@@ -18,6 +18,7 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import shutil
 import tempfile
 
@@ -27,6 +28,7 @@ from qgis.PyQt.QtWidgets import QAction
 
 # Initialize Qt resources from file resources.py
 from . import resources  # noqa: F401
+
 # Import the code for the widget
 from CCD_Plugin.gui.CCD_Plugin_dockwidget import CCD_PluginDockWidget
 import os.path
@@ -34,6 +36,7 @@ import os.path
 
 class CCD_Plugin:
     """QGIS Plugin Implementation."""
+
     inst = {}
 
     def __init__(self, iface):
@@ -50,10 +53,10 @@ class CCD_Plugin:
         self.plugin_dir = os.path.dirname(__file__)
         # initialize locale
         try:
-            locale = QSettings().value('locale/userLocale', QLocale().name(), type=str)[0:2]
+            locale = QSettings().value("locale/userLocale", QLocale().name(), type=str)[0:2]
         except Exception:
-            locale = 'en'
-        locale_path = os.path.join(self.plugin_dir, 'i18n', 'CCD_Plugin_{}.qm'.format(locale))
+            locale = "en"
+        locale_path = os.path.join(self.plugin_dir, "i18n", "CCD_Plugin_{}.qm".format(locale))
 
         if os.path.exists(locale_path):
             self.translator = QTranslator()
@@ -82,12 +85,12 @@ class CCD_Plugin:
         :rtype: QString
         """
         # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
-        return QCoreApplication.translate('CCD_Plugin', message)
+        return QCoreApplication.translate("CCD_Plugin", message)
 
     def initGui(self):
         # Main widget menu
         # Create action that will start plugin configuration
-        icon_path = ':/plugins/CCD_Plugin/icons/ccd_plugin.svg'
+        icon_path = ":/plugins/CCD_Plugin/icons/ccd_plugin.svg"
         self.dockable_action = QAction(QIcon(icon_path), "CCD_Plugin", self.iface.mainWindow())
         # connect the action to the run method
         self.dockable_action.triggered.connect(self.run)
@@ -131,6 +134,7 @@ class CCD_Plugin:
 
         # delete the marker
         from CCD_Plugin.gui.CCD_Plugin_dockwidget import PickerCoordsOnMap
+
         PickerCoordsOnMap.delete_markers()
 
         # remove this statement if widget is to remain
@@ -144,6 +148,7 @@ class CCD_Plugin:
         self.pluginIsActive = False
 
         from qgis.utils import reloadPlugin
+
         reloadPlugin("CCD_Plugin - Thematic Raster Editor")
 
     def unload(self):

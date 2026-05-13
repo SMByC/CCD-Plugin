@@ -229,11 +229,20 @@ doc:
 	@echo "------------------------------------"
 	# cd help; make html
 
-flake8:
+ruff:
 	@echo
 	@echo "-------------------"
-	@echo "Flake8 code quality"
+	@echo "Ruff code quality"
 	@echo "-------------------"
-	@uv run flake8 .
+	@ruff check .
 	@echo "-------------------"
 	@echo "No issues found."
+
+ruff-format:
+	@echo
+	@echo "-------------------"
+	@echo "Ruff format"
+	@echo "-------------------"
+	@ruff format .
+	@echo "-------------------"
+	@echo "Done."

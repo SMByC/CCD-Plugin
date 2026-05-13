@@ -181,7 +181,9 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             return
 
         # check if the plugin settings have changed compared to the last plot, except for the band_or_index_to_plot
-        if self.last_config and self.last_config == OrderedDict((k, v) for k, v in config.items() if k != 'band_or_index_to_plot'):
+        if self.last_config and self.last_config == OrderedDict(
+            (k, v) for k, v in config.items() if k != 'band_or_index_to_plot'
+        ):
             return
 
         self.clean_plot()
@@ -259,7 +261,9 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # check if ccd results are already computed
         if (coords, date_range, doy_range, dataset, breakpoint_bands) in ccd_results:
             ccdc_result_info, timeseries = ccd_results[(coords, date_range, doy_range, dataset, breakpoint_bands)]
-            self.html_file = generate_plot(self.id, ccdc_result_info, timeseries, date_range, dataset, band_or_index_to_plot)
+            self.html_file = generate_plot(
+                self.id, ccdc_result_info, timeseries, date_range, dataset, band_or_index_to_plot
+            )
             self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
 
     @error_handler

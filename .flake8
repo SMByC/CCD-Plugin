@@ -1,4 +1,0 @@
-[flake8]
-exclude = extlibs, resources.py, .venv
-ignore = E501, W503, QGS105, QGS202
-extend-select = E226, W504

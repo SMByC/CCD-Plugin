@@ -18,16 +18,29 @@ Issues = "https://github.com/SMByC/CCD-Plugin/issues"
 
 [project.optional-dependencies]
 dev = [
-    "flake8",
-    "flake8-qgis",
+    "ruff",
 ]
 
 [dependency-groups]
 dev = [
-    "flake8",
-    "flake8-qgis",
+    "ruff",
 ]
 
 [tool.pyright]
 extraPaths = [".."]  # include project folder
 venv = ".venv"
+
+[tool.ruff]
+line-length = 120
+extend-exclude = ["extlibs", "resources.py"]
+
+[tool.ruff.lint]
+preview = true
+explicit-preview-rules = true
+select = ["E", "W", "F"]
+extend-select = ["E226"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

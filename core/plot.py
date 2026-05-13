@@ -74,9 +74,11 @@ def generate_plot(id, ccdc_result_info, timeseries, date_range, dataset, band_or
 
         # cycle through each segment and plot the predicted values by pluggin into harmonic regression equation
         for seg in range(nsegments):
-            artificial_dates_seg = artificial_dates[(artificial_dates <= ccdc_result_info['tEnd'][0][seg]) & (artificial_dates >= ccdc_result_info['tStart'][0][seg])]
+            tEnd = ccdc_result_info['tEnd'][0][seg]
+            tStart = ccdc_result_info['tStart'][0][seg]
+            artificial_dates_seg = artificial_dates[(artificial_dates <= tEnd) & (artificial_dates >= tStart)]
             # include tEnd and tStart in the series, if not already included
-            artificial_dates_seg = np.append(artificial_dates_seg, [ccdc_result_info['tEnd'][0][seg], ccdc_result_info['tStart'][0][seg]])
+            artificial_dates_seg = np.append(artificial_dates_seg, [tEnd, tStart])
             artificial_dates_seg = np.sort(np.unique(artificial_dates_seg))
 
             coefs = ccdc_result_info['{}_coefs'.format(band_or_index_to_plot)][0][seg]
@@ -100,7 +102,7 @@ def generate_plot(id, ccdc_result_info, timeseries, date_range, dataset, band_or
 
     # get observed values (actual time series)
     dates_obs = timeseries['time']  # np.stack(timeseries,axis=1)[:][-2][1:].astype('int64')
-    values_obs = np.array(timeseries[band_or_index_to_plot], dtype='float')  # np.stack(timeseries,axis=1)[:][-1][1:].astype('float')
+    values_obs = np.array(timeseries[band_or_index_to_plot], dtype='float')
     datetime_min = datetime.fromtimestamp(np.min(dates_obs) / 1000)
     datetime_max = datetime.fromtimestamp(np.max(dates_obs) / 1000)
 

@@ -42,8 +42,9 @@ def get_plugin_config(id):
     config['end_date'] = CCD_Plugin.inst[id].widget.end_date.date().toString("yyyy-MM-dd")
 
     # from the advanced settings dialog
-    config['start_doy'] = CCD_Plugin.inst[id].widget.advanced_settings.start_doy.value() if CCD_Plugin.inst[id].widget.advanced_settings.start_doy.isEnabled() else 1
-    config['end_doy'] = CCD_Plugin.inst[id].widget.advanced_settings.end_doy.value() if CCD_Plugin.inst[id].widget.advanced_settings.end_doy.isEnabled() else 365
+    adv = CCD_Plugin.inst[id].widget.advanced_settings
+    config['start_doy'] = adv.start_doy.value() if adv.start_doy.isEnabled() else 1
+    config['end_doy'] = adv.end_doy.value() if adv.end_doy.isEnabled() else 365
     config['num_obs'] = CCD_Plugin.inst[id].widget.advanced_settings.num_obs.value()
     config['chi_square'] = CCD_Plugin.inst[id].widget.advanced_settings.chi_square.value()
     config['min_years'] = CCD_Plugin.inst[id].widget.advanced_settings.min_years.value()
