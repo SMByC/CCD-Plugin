@@ -47,9 +47,8 @@ def pre_init_plugin() -> None:
         # Register with pkg_resources when available (removed in Python 3.12+)
         try:
             import pkg_resources
-
             pkg_resources.working_set.add_entry(extra_libs_path)
-        except ImportError:
+        except:
             pass
 
 
