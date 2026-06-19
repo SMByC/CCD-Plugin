@@ -1,9 +1,9 @@
 """
 /***************************************************************************
  CCD Plugin
-                                 A QGIS plugin
+                                  A QGIS plugin
  Continuous Change Detection Plugin
-                              -------------------
+                               -------------------
         copyright            : (C) 2019-2026 by Xavier Corredor Llano, SMByC
         email                : xavier.corredor.llano@gmail.com
  ***************************************************************************/
@@ -23,9 +23,9 @@ import shutil
 import tempfile
 from typing import ClassVar
 
-from qgis.PyQt.QtCore import QCoreApplication, QLocale, QSettings, Qt, QTranslator
+from qgis.PyQt.QtCore import QCoreApplication, QLocale, QSettings, Qt, QTimer, QTranslator
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction
+from qgis.PyQt.QtWidgets import QWIDGETSIZE_MAX, QAction
 
 # Import the code for the widget
 from CCD_Plugin.gui.CCD_Plugin_dockwidget import CCD_PluginDockWidget
@@ -106,9 +106,11 @@ class CCD_Plugin:
             # dockwidget may not exist if:
             #    first run of plugin
             #    removed on close (see self.onClosePlugin method)
-            if self.widget is None:
+            widget = self.widget
+            if widget is None:
                 # Create the dockwidget (after translation) and keep reference
-                self.widget = CCD_PluginDockWidget(self.id)
+                widget = CCD_PluginDockWidget(self.id)
+                self.widget = widget
 
             # init tmp dir for all process and intermediate files
             if self.tmp_dir:
@@ -116,12 +118,19 @@ class CCD_Plugin:
             self.tmp_dir = tempfile.mkdtemp()
 
             # connect to provide cleanup on closing of dockwidget
-            self.widget.closingPlugin.connect(self.onClosePlugin)
+            widget.closingPlugin.connect(self.onClosePlugin)
+
+            # force initial minimum height
+            target_height = widget.minimumSizeHint().height()
+            widget.setMinimumHeight(target_height)
+            widget.setMaximumHeight(target_height)
 
             # show the dockwidget
-            # TODO: fix to allow choice of dock location
-            self.iface.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.widget)
-            self.widget.show()
+            self.iface.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, widget)
+            widget.show()
+
+            # allow resizing larger afterward
+            QTimer.singleShot(100, lambda: widget.setMaximumHeight(QWIDGETSIZE_MAX))
 
     # --------------------------------------------------------------------------
 
@@ -151,7 +160,7 @@ class CCD_Plugin:
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
         self.removes_temporary_files()
-        # Remove the plugin menu item and icon
+        # Remove the plugin item and icon
         self.iface.removePluginMenu(self.menu_name_plugin, self.dockable_action)
         self.iface.removeToolBarIcon(self.dockable_action)
 
