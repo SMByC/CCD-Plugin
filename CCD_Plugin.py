@@ -30,9 +30,6 @@ from qgis.PyQt.QtWidgets import QAction
 # Import the code for the widget
 from CCD_Plugin.gui.CCD_Plugin_dockwidget import CCD_PluginDockWidget
 
-# Initialize Qt resources from file resources.py
-from . import resources  # noqa: F401
-
 
 class CCD_Plugin:
     """QGIS Plugin Implementation."""
@@ -90,7 +87,7 @@ class CCD_Plugin:
     def initGui(self):
         # Main widget menu
         # Create action that will start plugin configuration
-        icon_path = ":/plugins/CCD_Plugin/icons/ccd_plugin.svg"
+        icon_path = os.path.join(self.plugin_dir, "icons", "ccd_plugin.svg")
         self.dockable_action = QAction(QIcon(icon_path), "CCD_Plugin", self.iface.mainWindow())
         # connect the action to the run method
         self.dockable_action.triggered.connect(self.run)

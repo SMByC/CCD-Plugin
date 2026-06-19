@@ -50,9 +50,7 @@ EXTRAS = metadata.txt LICENSE Readme.md
 
 EXTRA_DIRS = core gui icons ui utils
 
-COMPILED_RESOURCE_FILES = resources.py
-
-PEP8EXCLUDE=pydev,resources.py,conf.py,third_party,ui
+PEP8EXCLUDE=pydev,conf.py,third_party,ui
 
 # QGISDIR points to the location where your plugin should be installed.
 # This varies by platform, relative to your HOME directory:
@@ -73,14 +71,9 @@ HELP = Readme.md
 
 PLUGIN_UPLOAD = python3 plugin_upload.py -u xaviercll
 
-RESOURCE_SRC=$(shell grep '^ *<file' resources.qrc | sed 's@</file>@@g;s/.*>//g' | tr '\n' ' ')
-
 default: compile
 
-compile: $(COMPILED_RESOURCE_FILES)
-
-%.py : %.qrc $(RESOURCES_SRC)
-	pyrcc5 -o $*.py  $<
+compile:
 
 %.qm : %.ts
 	$(LRELEASE) $<
@@ -114,7 +107,6 @@ deploy: compile doc transcompile
 	mkdir -p $(HOME)/$(QGISDIR)/python/plugins/$(PLUGINNAME)
 	cp -vf $(PY_FILES) $(HOME)/$(QGISDIR)/python/plugins/$(PLUGINNAME)
 	#cp -vf $(UI_FILES) $(HOME)/$(QGISDIR)/python/plugins/$(PLUGINNAME)
-	cp -vf $(COMPILED_RESOURCE_FILES) $(HOME)/$(QGISDIR)/python/plugins/$(PLUGINNAME)
 	cp -vf $(EXTRAS) $(HOME)/$(QGISDIR)/python/plugins/$(PLUGINNAME)
 	#cp -vfr i18n $(HOME)/$(QGISDIR)/python/plugins/$(PLUGINNAME)
 	cp -vfr $(HELP) $(HOME)/$(QGISDIR)/python/plugins/$(PLUGINNAME)/help
@@ -161,7 +153,7 @@ zip: compile
 	@echo "---------------------------"
 	rm -f $(PLUGINNAME).zip
 	mkdir -p .pkg_tmp/$(PLUGINNAME)
-	cp -f $(PY_FILES) $(COMPILED_RESOURCE_FILES) $(EXTRAS) .pkg_tmp/$(PLUGINNAME)/
+	cp -f $(PY_FILES) $(EXTRAS) .pkg_tmp/$(PLUGINNAME)/
 	@for d in $(EXTRA_DIRS); do \
 		if [ -d "$$d" ]; then cp -rf $$d .pkg_tmp/$(PLUGINNAME)/; fi; \
 	done
@@ -218,9 +210,10 @@ transclean:
 clean:
 	@echo
 	@echo "------------------------------------"
-	@echo "Removing uic and rcc generated files"
+	@echo "Removing generated files"
 	@echo "------------------------------------"
-	rm $(COMPILED_UI_FILES) $(COMPILED_RESOURCE_FILES)
+	find . -name "*.pyc" -delete
+	find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
 doc:
 	@echo

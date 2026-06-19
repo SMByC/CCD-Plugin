@@ -35,15 +35,14 @@ The sub-datasets to visualize and compute the CCDC algorithm and its breakpoints
 
 The plugin needs to work:
 
+- **QGIS >= 3.36** (compatible with both QGIS 3.x and QGIS 4.x / Qt6).
 - Google Earth Engine [plugin](https://gee-community.github.io/qgis-earthengine-plugin/ ): The user needs to have this plugin installed and an active Google Earth Engine (EE) account.
 - Plotly. Most of the Qgis versions have this library inside, otherwise the plugin install it automatically.
 
 ### Known issues
 
 > **QGIS 3.x / Qt5:**
-> The plugin prefers QWebEngine if available, otherwise falls back to QtWebKit.
-> On Linux with Qt5 without QtWebKit, install the python QtWebKit module (e.g. `python3-pyqt5.qtwebkit` or 
-> `python-pyqt5-webkit`) or the QtWebEngine module, or use an alternative QGIS installation (e.g. using conda).
+> The plugin prefers QWebEngine. On Linux with Qt5 without QtWebEngine, install the python QtWebEngine module or use an alternative QGIS installation (e.g. using conda).
 
 > **Download plot as a png:**
 > It is not working inside the plugin, but it works when the plot is opened in a web browser

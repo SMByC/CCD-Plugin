@@ -4,7 +4,7 @@ description=Qgis plugin for Continuous Change Detection (CCDC) algorithm of a ti
 about=The CCD-Plugin use Google Earth Engine to get Landsat or Sentinel2 datasets and run the Continuous Change Detection (CCDC) algorithm to analyze the trends and breakpoints of change over multi-year time series at a given coordinate.
 
 version=25.8
-qgisMinimumVersion=3.16
+qgisMinimumVersion=3.36
 qgisMaximumVersion=4.99
 supportsQt6=True
 

@@ -135,9 +135,9 @@
    </item>
    <item row="2" column="0">
     <widget class="QDialogButtonBox" name="buttonBox">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
+      <property name="orientation">
+       <enum>Qt::Orientation::Horizontal</enum>
+      </property>
      <property name="standardButtons">
       <set>QDialogButtonBox::Ok</set>
      </property>

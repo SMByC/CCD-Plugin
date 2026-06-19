@@ -33,5 +33,5 @@ FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, "ui", "advanced_setti
 
 class AdvancedSettings(QDialog, FORM_CLASS):
     def __init__(self):
-        QDialog.__init__(self)
+        super().__init__()
         self.setupUi(self)

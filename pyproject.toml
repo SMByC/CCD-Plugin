@@ -33,7 +33,7 @@ venv = ".venv"
 [tool.ruff]
 target-version = "py312"
 line-length = 120
-extend-exclude = ["extlibs", "resources.py"]
+extend-exclude = ["extlibs"]
 
 [tool.ruff.lint]
 preview = true

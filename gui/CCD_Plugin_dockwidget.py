@@ -48,7 +48,7 @@ HAS_WEBENGINE = False
 HAS_WEBKIT = False
 
 try:
-    from qgis.PyQt.QtWebEngineCore import QWebEngineSettings  # noqa: F401
+    from qgis.PyQt.QtWebEngineCore import QWebEngineSettings
     from qgis.PyQt.QtWebEngineWidgets import QWebEngineView  # noqa: F401
 
     HAS_WEBENGINE = True
@@ -58,7 +58,7 @@ except ImportError:
 
 if not HAS_WEBENGINE:
     try:
-        from qgis.PyQt.QtWebKit import QWebSettings  # noqa: F401
+        from qgis.PyQt.QtWebKit import QWebSettings
 
         HAS_WEBKIT = True
         FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, "ui", "CCD_Plugin_dockwidget_QWebView.ui"))
@@ -390,7 +390,7 @@ class PickerCoordsOnMap(QgsMapTool):
     def __init__(self, widget, canvas=None):
         self.widget = widget
         self.canvas = canvas if canvas is not None else iface.mapCanvas()
-        QgsMapTool.__init__(self, self.canvas)
+        super().__init__(self.canvas)
         self.canvas.setFocus()
 
     @staticmethod
