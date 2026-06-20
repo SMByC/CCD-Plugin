@@ -50,7 +50,13 @@ EXTRAS = metadata.txt LICENSE Readme.md
 
 EXTRA_DIRS = core gui icons ui utils
 
-PEP8EXCLUDE=pydev,conf.py,third_party,ui
+COMPILED_RESOURCE_FILES = resources.py
+
+RESOURCE_SRC=$(shell grep '^ *<file' resources.qrc | sed 's@</file>@@g;s/.*>//g' | tr '\n' ' ')
+
+PYRCC := $(shell which pyrcc5 2>/dev/null || which pyrcc6 2>/dev/null)
+
+PEP8EXCLUDE=pydev,resources.py,conf.py,third_party,ui
 
 # QGISDIR points to the location where your plugin should be installed.
 # This varies by platform, relative to your HOME directory:
@@ -73,7 +79,15 @@ PLUGIN_UPLOAD = python3 plugin_upload.py -u xaviercll
 
 default: compile
 
-compile:
+compile: $(COMPILED_RESOURCE_FILES)
+
+resources.py: resources.qrc $(RESOURCE_SRC)
+	@if [ -z "$(PYRCC)" ]; then \
+		echo "ERROR: neither pyrcc5 nor pyrcc6 found. Install python3-pyqt5 or python3-pyqt6."; \
+		exit 1; \
+	fi
+	$(PYRCC) -o $@ $<
+	sed -i 's/^from PyQt[56] import QtCore$$/from qgis.PyQt import QtCore/' $@
 
 %.qm : %.ts
 	$(LRELEASE) $<
@@ -105,7 +119,7 @@ deploy: compile doc transcompile
 	# the Python plugin directory is located at:
 	# $HOME/$(QGISDIR)/python/plugins
 	mkdir -p $(HOME)/$(QGISDIR)/python/plugins/$(PLUGINNAME)
-	cp -vf $(PY_FILES) $(HOME)/$(QGISDIR)/python/plugins/$(PLUGINNAME)
+	cp -vf $(PY_FILES) $(COMPILED_RESOURCE_FILES) $(HOME)/$(QGISDIR)/python/plugins/$(PLUGINNAME)
 	#cp -vf $(UI_FILES) $(HOME)/$(QGISDIR)/python/plugins/$(PLUGINNAME)
 	cp -vf $(EXTRAS) $(HOME)/$(QGISDIR)/python/plugins/$(PLUGINNAME)
 	#cp -vfr i18n $(HOME)/$(QGISDIR)/python/plugins/$(PLUGINNAME)
@@ -153,7 +167,7 @@ zip: compile
 	@echo "---------------------------"
 	rm -f $(PLUGINNAME).zip
 	mkdir -p .pkg_tmp/$(PLUGINNAME)
-	cp -f $(PY_FILES) $(EXTRAS) .pkg_tmp/$(PLUGINNAME)/
+	cp -f $(PY_FILES) $(COMPILED_RESOURCE_FILES) $(EXTRAS) .pkg_tmp/$(PLUGINNAME)/
 	@for d in $(EXTRA_DIRS); do \
 		if [ -d "$$d" ]; then cp -rf $$d .pkg_tmp/$(PLUGINNAME)/; fi; \
 	done
@@ -212,6 +226,7 @@ clean:
 	@echo "------------------------------------"
 	@echo "Removing generated files"
 	@echo "------------------------------------"
+	rm -f $(COMPILED_RESOURCE_FILES)
 	find . -name "*.pyc" -delete
 	find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 

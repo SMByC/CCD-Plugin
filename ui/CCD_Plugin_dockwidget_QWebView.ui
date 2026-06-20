@@ -148,7 +148,7 @@
                   </property>
                   <property name="icon">
                    <iconset>
-                    <normaloff>../icons/select_on_canvas.svg</normaloff>../icons/select_on_canvas.svg</iconset>
+                    <normaloff>:/plugins/CCD_Plugin/icons/select_on_canvas.svg</normaloff>:/plugins/CCD_Plugin/icons/select_on_canvas.svg</iconset>
                   </property>
                   <property name="checkable">
                    <bool>true</bool>
@@ -171,7 +171,7 @@
                   </property>
                   <property name="icon">
                    <iconset>
-                    <normaloff>../icons/clear.svg</normaloff>../icons/clear.svg</iconset>
+                    <normaloff>:/plugins/CCD_Plugin/icons/clear.svg</normaloff>:/plugins/CCD_Plugin/icons/clear.svg</iconset>
                   </property>
                   <property name="toolButtonStyle">
                    <enum>Qt::ToolButtonIconOnly</enum>
@@ -298,7 +298,7 @@
                   </property>
                   <property name="icon">
                    <iconset>
-                    <normaloff>../icons/center_on_point.svg</normaloff>../icons/center_on_point.svg</iconset>
+                    <normaloff>:/plugins/CCD_Plugin/icons/center_on_point.svg</normaloff>:/plugins/CCD_Plugin/icons/center_on_point.svg</iconset>
                   </property>
                   <property name="toolButtonStyle">
                    <enum>Qt::ToolButtonIconOnly</enum>
@@ -647,7 +647,7 @@
                </property>
                <property name="icon">
                 <iconset>
-                 <normaloff>../icons/settings.svg</normaloff>../icons/settings.svg</iconset>
+                 <normaloff>:/plugins/CCD_Plugin/icons/settings.svg</normaloff>:/plugins/CCD_Plugin/icons/settings.svg</iconset>
                </property>
                <property name="toolButtonStyle">
                 <enum>Qt::ToolButtonTextBesideIcon</enum>
@@ -667,7 +667,7 @@
                </property>
                <property name="icon">
                 <iconset>
-                 <normaloff>../icons/open.svg</normaloff>../icons/open.svg</iconset>
+                 <normaloff>:/plugins/CCD_Plugin/icons/open.svg</normaloff>:/plugins/CCD_Plugin/icons/open.svg</iconset>
                </property>
                <property name="toolButtonStyle">
                 <enum>Qt::ToolButtonIconOnly</enum>
@@ -687,7 +687,7 @@
                </property>
                <property name="icon">
                 <iconset>
-                 <normaloff>../icons/save.svg</normaloff>../icons/save.svg</iconset>
+                 <normaloff>:/plugins/CCD_Plugin/icons/save.svg</normaloff>:/plugins/CCD_Plugin/icons/save.svg</iconset>
                </property>
                <property name="toolButtonStyle">
                 <enum>Qt::ToolButtonIconOnly</enum>
@@ -723,7 +723,7 @@
                </property>
                <property name="icon">
                 <iconset>
-                 <normaloff>../icons/lock.svg</normaloff>../icons/lock.svg</iconset>
+                 <normaloff>:/plugins/CCD_Plugin/icons/lock.svg</normaloff>:/plugins/CCD_Plugin/icons/lock.svg</iconset>
                </property>
                <property name="checkable">
                 <bool>true</bool>
@@ -746,7 +746,7 @@
                </property>
                <property name="icon">
                 <iconset>
-                 <normaloff>../icons/generate.svg</normaloff>../icons/generate.svg</iconset>
+                 <normaloff>:/plugins/CCD_Plugin/icons/generate.svg</normaloff>:/plugins/CCD_Plugin/icons/generate.svg</iconset>
                </property>
                <property name="toolButtonStyle">
                 <enum>Qt::ToolButtonTextBesideIcon</enum>
@@ -763,7 +763,7 @@
                </property>
                <property name="icon">
                 <iconset>
-                 <normaloff>../icons/open_in_web_browser.svg</normaloff>../icons/open_in_web_browser.svg</iconset>
+                 <normaloff>:/plugins/CCD_Plugin/icons/open_in_web_browser.svg</normaloff>:/plugins/CCD_Plugin/icons/open_in_web_browser.svg</iconset>
                </property>
                <property name="autoRaise">
                 <bool>true</bool>

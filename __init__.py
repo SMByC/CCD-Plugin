@@ -80,6 +80,8 @@ def classFactory(iface):  # pylint: disable=invalid-name
                 QMessageBox.StandardButton.Ok,
             )
 
+    # Register icons under :/plugins/CCD_Plugin/ before the plugin class is imported
+    from . import resources  # noqa: F401
     from .CCD_Plugin import CCD_Plugin
 
     return CCD_Plugin(iface)
