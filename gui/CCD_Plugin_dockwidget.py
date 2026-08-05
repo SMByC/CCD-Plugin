@@ -74,7 +74,12 @@ if not HAS_WEBENGINE and not HAS_WEBKIT:
     raise ImportError(msg)
 
 
-from CCD_Plugin.core.ccd_process import compute_ccd  # noqa: E402
+from CCD_Plugin.core.ccd_process import (  # noqa: E402
+    DEFAULT_BREAKPOINT_BANDS,
+    compute_ccd,
+    resolve_ccd_bands,
+)
+from CCD_Plugin.core.gee_common import CCD_BANDS  # noqa: E402
 from CCD_Plugin.core.plot import generate_plot  # noqa: E402
 from CCD_Plugin.gui.advanced_settings import AdvancedSettings  # noqa: E402
 from CCD_Plugin.utils.config import get_plugin_config, restore_plugin_config  # noqa: E402
@@ -105,27 +110,14 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.band_or_index_to_plot.setCurrentIndex(4)
         # disable the item "---"
         self.band_or_index_to_plot.model().item(6).setEnabled(False)
-        # set the collection to 2 by default
-        self.dataset.setCurrentIndex(1)
-        # set break point bands/indices
-        self.box_breakpoint_bands.addItems(
-            [
-                "Blue",
-                "Green",
-                "Red",
-                "NIR",
-                "SWIR1",
-                "SWIR2",
-                "NDVI",
-                "NBR",
-                "EVI",
-                "EVI2",
-                "BRIGHTNESS",
-                "GREENNESS",
-                "WETNESS",
-            ]
-        )
-        self.box_breakpoint_bands.setCheckedItems(["Blue", "Green", "Red", "NIR", "SWIR1", "SWIR2"])
+        # set the collection to Landsat C2 by default
+        self.dataset.setCurrentIndex(0)
+        # set break point bands/indices, from the schema every dataset is built to expose
+        self.box_breakpoint_bands.addItems(list(CCD_BANDS))
+        # Blue is deliberately left out: it is the band most affected by residual haze and aerosol,
+        # and including it is a well known source of false breaks. Zhu & Woodcock (2014), the
+        # gee-ccdc-tools toolkit and SEPAL all detect change on Green/Red/NIR/SWIR1/SWIR2 only.
+        self.box_breakpoint_bands.setCheckedItems(list(DEFAULT_BREAKPOINT_BANDS))
         # set the current date
         self.end_date.setDate(QDate.currentDate())
         # set action center on point
@@ -240,6 +232,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             chi_square=config["chi_square"],
             min_years=config["min_years"],
             lambda_lasso=config["lambda_lasso"],
+            cloud_filter=config["cloud_filter"],
         )
 
         return config, ccdc_result_info, timeseries
@@ -249,16 +242,32 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             # CCD process completed successfully
             config, ccdc_result_info, timeseries = result
 
-            if not ccdc_result_info["tBreak"]:
-                msg = "No enough data for this period to perform change detection, plotting only the observed values."
+            notices = []
+            # An empty tBreak means CCDC fitted no segment at all at this pixel, not merely that it
+            # found no break. Read it defensively: reduceRegion omits the key entirely when the
+            # pixel has no output, and this runs in the task callback where a raise is invisible.
+            if not ccdc_result_info.get("tBreak"):
+                notices.append(
+                    "Not enough data for this period to fit the change detection model, "
+                    "plotting only the observed values."
+                )
+            # Earth Engine rejects a CCDC call whose TMask bands are not also breakpoint bands, so
+            # the selection may have been widened; that widens change detection too, so say it.
+            ccd_bands, _ = resolve_ccd_bands(config["breakpoint_bands"])
+            added = [band for band in ccd_bands if band not in config["breakpoint_bands"]]
+            if added:
+                notices.append(
+                    f"{', '.join(added)} added to the breakpoint bands: CCDC requires the TMask bands "
+                    "to be breakpoint bands, so change is also detected on them."
+                )
+            if notices:
                 self.MsgBar.clearWidgets()
-                self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.MessageLevel.Info, duration=10)
+                self.MsgBar.pushMessage("CCD-Plugin", " ".join(notices), level=Qgis.MessageLevel.Info, duration=10)
 
             self.html_file = generate_plot(
                 self.id,
                 ccdc_result_info,
                 timeseries,
-                (config["start_date"], config["end_date"]),
                 config["dataset"],
                 config["band_or_index_to_plot"],
             )
@@ -277,29 +286,42 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     @wait_process
     def repaint_plot(self):
-        from CCD_Plugin.core.ccd_process import ccd_results
-
-        self.clean_plot()
+        from CCD_Plugin.core.ccd_process import ccd_results, make_cache_key
 
         if not ccd_results:
             return
 
         # get the current configuration of the plugin
         config = get_plugin_config(self.id)
-        coords = (config["lon"], config["lat"])
-        date_range = (config["start_date"], config["end_date"])
-        doy_range = (config["start_doy"], config["end_doy"])
         dataset = config["dataset"]
         band_or_index_to_plot = config["band_or_index_to_plot"]
-        breakpoint_bands = tuple(config["breakpoint_bands"])
 
         # check if ccd results are already computed
-        if (coords, date_range, doy_range, dataset, breakpoint_bands) in ccd_results:
-            ccdc_result_info, timeseries = ccd_results[(coords, date_range, doy_range, dataset, breakpoint_bands)]
-            self.html_file = generate_plot(
-                self.id, ccdc_result_info, timeseries, date_range, dataset, band_or_index_to_plot
-            )
-            self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
+        key = make_cache_key(
+            (config["lon"], config["lat"]),
+            (config["start_date"], config["end_date"]),
+            (config["start_doy"], config["end_doy"]),
+            dataset,
+            config["breakpoint_bands"],
+            num_obs=config["num_obs"],
+            chi_square=config["chi_square"],
+            min_years=config["min_years"],
+            lambda_lasso=config["lambda_lasso"],
+            cloud_filter=config["cloud_filter"],
+        )
+        if key not in ccd_results:
+            # Every setting but the plotted band is part of the key, so there is nothing cached to
+            # redraw. Leave the current plot up rather than clearing it for an empty view, and say
+            # why the band switch did not take effect.
+            msg = "The settings changed since the last run. Press Generate to recompute the CCD."
+            self.MsgBar.clearWidgets()
+            self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.MessageLevel.Info, duration=10)
+            return
+
+        self.clean_plot()
+        ccdc_result_info, timeseries = ccd_results[key]
+        self.html_file = generate_plot(self.id, ccdc_result_info, timeseries, dataset, band_or_index_to_plot)
+        self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
 
     @error_handler
     def restore_plugin_from_yaml(self):

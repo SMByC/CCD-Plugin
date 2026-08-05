@@ -4,7 +4,7 @@
                                  A QGIS plugin
  Continuous Change Detection Plugin
                               -------------------
-        copyright            : (C) 2019-2022 by Xavier Corredor Llano, SMByC
+        copyright            : (C) 2019-2026 by Xavier Corredor Llano, SMByC
         email                : xavier.corredor.llano@gmail.com
  ***************************************************************************/
 
@@ -20,263 +20,145 @@
 with the collaboration of Paulo Arevalo Orduz <parevalo@bu.edu>
 https://github.com/parevalo/gee-ccdc-tools
 
+Only Landsat Collection 2 is supported: USGS decommissioned Collection 1 and the
+C01 datasets were removed from the Google Earth Engine data catalog.
+
 """
 
+from dataclasses import dataclass
+from typing import Final
 
-def collection_filtering(point, collection_name, date_range, doy_range):
+from .gee_common import OPTICAL_BANDS, add_indices, filter_collection
+
+# Collection 2 Level-2 scaling (USGS): SR = DN * 2.75e-5 - 0.2 over the valid DN range
+# 7273-43636, which maps exactly onto surface reflectance [0.0, 1.0].
+SR_SCALE: Final = 0.0000275
+SR_OFFSET: Final = -0.2
+# Reflectance below 0 is a legitimate retrieval artefact over dark targets (water, shadow), so a
+# small negative tolerance is kept rather than dropping those observations. Above 1.0 the retrieval
+# is outside the documented valid range and is dominated by residual thin cloud that CFmask missed;
+# those pixels are high-magnitude outliers that would drive false CCDC breaks, so they are rejected.
+SR_MIN: Final = -0.05
+SR_MAX: Final = 1.0
+
+# QA_PIXEL (CFmask) bits rejected: 0 fill, 1 dilated cloud, 2 cirrus (OLI only), 3 cloud,
+# 4 cloud shadow, 5 snow. The cloud/shadow/snow *confidence* bits (8-15) are deliberately not
+# used: requiring high confidence everywhere discards most low/medium-confidence clear pixels,
+# and residual clouds are caught downstream by the CCDC TMask.
+QA_BITS_TM: Final = (0, 1, 3, 4, 5)
+QA_BITS_OLI: Final = (0, 1, 2, 3, 4, 5)
+
+# Atmospheric opacity > 0.3 (scale factor 0.001) marks a hazy retrieval; TM/ETM+ only.
+ATMOS_OPACITY_MAX: Final = 300
+# SR_QA_AEROSOL bits 6-7 hold the aerosol level; only "high" (3) is rejected, so climatology,
+# low and medium aerosol observations are kept. OLI/OLI-2 only.
+AEROSOL_LEVEL_MASK: Final = 0b11000000
+AEROSOL_LEVEL_HIGH: Final = 0b11000000
+
+# Tasseled cap coefficients ordered as OPTICAL_BANDS (Blue, Green, Red, NIR, SWIR1, SWIR2).
+#
+# TM/ETM+ - Crist, E.P. & Cicone, R.C. (1984). A physically-based transformation of Thematic
+# Mapper data - the TM Tasseled Cap. IEEE TGRS, 22(3), 256-263.
+TC_TM: Final = {
+    "BRIGHTNESS": [0.3037, 0.2793, 0.4743, 0.5585, 0.5082, 0.1863],
+    "GREENNESS": [-0.2848, -0.2435, -0.5436, 0.7243, 0.0840, -0.1800],
+    "WETNESS": [0.1509, 0.1973, 0.3279, 0.3406, -0.7112, -0.4572],
+}
+# OLI/OLI-2 - Baig, M.H.A., Zhang, L., Shuai, T. & Tong, Q. (2014). Derivation of a tasselled cap
+# transformation based on Landsat 8 at-satellite reflectance. Remote Sensing Letters, 5(5), 423-431.
+TC_OLI: Final = {
+    "BRIGHTNESS": [0.3029, 0.2786, 0.4733, 0.5599, 0.508, 0.1872],
+    "GREENNESS": [-0.2941, -0.243, -0.5424, 0.7276, 0.0713, -0.1608],
+    "WETNESS": [0.1511, 0.1973, 0.3283, 0.3407, -0.7117, -0.4559],
+}
+# ETM+ deliberately reuses TC_TM rather than the Huang et al. (2002) ETM+ set. Huang's
+# coefficients live in a differently normalised space, so for identical reflectance they return a
+# Wetness up to 0.15 and a Greenness up to 0.07 away from what TC_TM and TC_OLI return - and those
+# two agree with each other to within 0.001. Because L7 scenes are interleaved with L5/L8 scenes
+# rather than following them, mixing the sets does not produce one step at a sensor handover: it
+# splits the series into two clouds of points, inflating the segment RMSE and manufacturing breaks
+# whenever BRIGHTNESS/GREENNESS/WETNESS is used as a breakpoint band.
+
+
+@dataclass(frozen=True, slots=True)
+class SensorSpec:
+    """Per-sensor differences between the Collection 2 Level-2 products."""
+
+    collection: str
+    optical_bands: tuple[str, ...]
+    qa_pixel_bits: tuple[int, ...]
+    # QA_RADSAT bits for the optical bands actually used; bit N flags saturation of band N+1.
+    saturation_mask: int
+    # TM/ETM+ carry SR_ATMOS_OPACITY, OLI/OLI-2 carry SR_QA_AEROSOL; the two encode haze differently
+    aerosol_band: str
+    tc_coefficients: dict
+    # Landsat 7 lost its Scan Line Corrector in 2003; pixels bordering the resulting gaps are
+    # unreliable, so the valid-data mask is eroded by one pixel for that sensor only.
+    erode_scan_gaps: bool = False
+
+
+# QA_RADSAT: TM/ETM+ use B1-B5 (bits 0-4) and B7 (bit 6); OLI uses B2-B7 (bits 1-6).
+TM_BANDS: Final = ("SR_B1", "SR_B2", "SR_B3", "SR_B4", "SR_B5", "SR_B7")
+OLI_BANDS: Final = ("SR_B2", "SR_B3", "SR_B4", "SR_B5", "SR_B6", "SR_B7")
+
+SENSORS: Final = (
+    SensorSpec("LANDSAT/LT04/C02/T1_L2", TM_BANDS, QA_BITS_TM, 0b01011111, "SR_ATMOS_OPACITY", TC_TM),
+    SensorSpec("LANDSAT/LT05/C02/T1_L2", TM_BANDS, QA_BITS_TM, 0b01011111, "SR_ATMOS_OPACITY", TC_TM),
+    SensorSpec(
+        "LANDSAT/LE07/C02/T1_L2", TM_BANDS, QA_BITS_TM, 0b01011111, "SR_ATMOS_OPACITY", TC_TM, erode_scan_gaps=True
+    ),
+    SensorSpec("LANDSAT/LC08/C02/T1_L2", OLI_BANDS, QA_BITS_OLI, 0b01111110, "SR_QA_AEROSOL", TC_OLI),
+    SensorSpec("LANDSAT/LC09/C02/T1_L2", OLI_BANDS, QA_BITS_OLI, 0b01111110, "SR_QA_AEROSOL", TC_OLI),
+)
+
+
+def _haze_mask(image, spec):
+    """Reject hazy retrievals using whichever aerosol product the sensor carries."""
+    aerosol = image.select(spec.aerosol_band)
+    if spec.aerosol_band == "SR_QA_AEROSOL":
+        return aerosol.bitwiseAnd(AEROSOL_LEVEL_MASK).neq(AEROSOL_LEVEL_HIGH)
+    # unmask() fills pixels with no opacity retrieval with 0, i.e. treats them as haze-free rather
+    # than dropping the observation.
+    return aerosol.unmask().lt(ATMOS_OPACITY_MAX)
+
+
+def prepare_image(image, spec):
+    """Scale, rename and mask one Collection 2 Level-2 image into the common band schema."""
     import ee
 
-    # Filter collection by point and date
-    collection = (
-        ee.ImageCollection(collection_name)
-        .filterBounds(point)
-        .filterDate(ee.Date(date_range[0]), ee.Date(date_range[1]))
-        .filter(ee.Filter.dayOfYear(doy_range[0], doy_range[1]))
-    )
-    return collection
+    scaled = image.select(list(spec.optical_bands)).multiply(SR_SCALE).add(SR_OFFSET).rename(list(OPTICAL_BANDS))
+
+    # ANDing "bit N is 0" over a set of bits is the same as testing the whole bitmask at once
+    qa_bitmask = sum(1 << bit for bit in spec.qa_pixel_bits)
+    clear = image.select("QA_PIXEL").bitwiseAnd(qa_bitmask).eq(0)
+    no_saturation = image.select("QA_RADSAT").bitwiseAnd(spec.saturation_mask).eq(0)
+    in_range = scaled.reduce(ee.Reducer.min()).gt(SR_MIN).And(scaled.reduce(ee.Reducer.max()).lte(SR_MAX))
+    mask = clear.And(no_saturation).And(in_range).And(_haze_mask(image, spec))
+
+    if spec.erode_scan_gaps:
+        mask = mask.And(scaled.mask().reduce(ee.Reducer.min()).focal_min(1, "square", "pixels"))
+
+    # Arithmetic operations do not carry image properties across, and system:time_start is needed
+    # by sort(), CCDC and getRegion; copying all of them also keeps the scene metadata (sensor,
+    # WRS path/row, footprint) available for filtering and diagnostics.
+    return ee.Image(scaled.updateMask(mask).copyProperties(image, image.propertyNames()))
 
 
-def prepare_L4L5_C1(image):
-    import ee
-
-    band_list = ["B1", "B2", "B3", "B4", "B5", "B7", "B6", "pixel_qa"]
-    name_list = ["Blue", "Green", "Red", "NIR", "SWIR1", "SWIR2", "Temp", "pixel_qa"]
-    scaling = [1000, 1000, 1000, 1000, 1000, 1000, 1000, 1]
-    scaled = ee.Image(image).select(band_list).rename(name_list).divide(ee.Image.constant(scaling))
-
-    validQA = [66, 130, 68, 132]
-    mask1 = ee.Image(image).select(["pixel_qa"]).remap(validQA, ee.List.repeat(1, len(validQA)), 0)
-    # Gat valid data mask, for pixels without band saturation
-    mask2 = image.select("radsat_qa").eq(0)
-    mask3 = image.select(band_list[0:-1]).reduce(ee.Reducer.min()).gt(0)
-    # Mask hazy pixels. Aggressively filters too many images in arid regions (e.g Egypt)
-    # unless we force include 'nodata' values by unmasking
-    mask4 = image.select("sr_atmos_opacity").unmask().lt(300)
-    return ee.Image(image).addBands(scaled).updateMask(mask1.And(mask2).And(mask3).And(mask4)).select(name_list)
-
-
-def prepare_L7_C1(image):
-    import ee
-
-    band_list = ["B1", "B2", "B3", "B4", "B5", "B7", "B6", "pixel_qa"]
-    name_list = ["Blue", "Green", "Red", "NIR", "SWIR1", "SWIR2", "Temp", "pixel_qa"]
-    scaling = [1000, 1000, 1000, 1000, 1000, 1000, 1000, 1]
-    scaled = ee.Image(image).select(band_list).rename(name_list).divide(ee.Image.constant(scaling))
-
-    validQA = [66, 130, 68, 132]
-    mask1 = ee.Image(image).select(["pixel_qa"]).remap(validQA, ee.List.repeat(1, len(validQA)), 0)
-    # Gat valid data mask, for pixels without band saturation
-    mask2 = image.select("radsat_qa").eq(0)
-    mask3 = image.select(band_list[0:-1]).reduce(ee.Reducer.min()).gt(0)
-    # Mask hazy pixels. Aggressively filters too many images in arid regions (e.g Egypt)
-    # unless we force include 'nodata' values by unmasking
-    mask4 = image.select("sr_atmos_opacity").unmask().lt(300)
-    # Slightly erode bands to get rid of artifacts due to scan lines
-    mask5 = ee.Image(image).mask().reduce(ee.Reducer.min()).focal_min(2.5)
-    return (
-        ee.Image(image).addBands(scaled).updateMask(mask1.And(mask2).And(mask3).And(mask4).And(mask5)).select(name_list)
-    )
-
-
-def prepare_L8_C1(image):
-    import ee
-
-    band_list = ["B2", "B3", "B4", "B5", "B6", "B7", "B10", "pixel_qa"]
-    name_list = ["Blue", "Green", "Red", "NIR", "SWIR1", "SWIR2", "Temp", "pixel_qa"]
-    scaling = [1000, 1000, 1000, 1000, 1000, 1000, 1000, 1]
-    scaled = ee.Image(image).select(band_list).rename(name_list).divide(ee.Image.constant(scaling))
-
-    validTOA = [66, 68, 72, 80, 96, 100, 130, 132, 136, 144, 160, 164]
-    validQA = [322, 386, 324, 388, 836, 900]
-    mask1 = ee.Image(image).select(["pixel_qa"]).remap(validQA, ee.List.repeat(1, len(validQA)), 0)
-    mask2 = image.select("radsat_qa").eq(0)
-    mask3 = image.select(band_list[0:-1]).reduce(ee.Reducer.min()).gt(0)
-    mask4 = ee.Image(image).select(["sr_aerosol"]).remap(validTOA, ee.List.repeat(1, len(validTOA)), 0)
-    return ee.Image(image).addBands(scaled).updateMask(mask1.And(mask2).And(mask3).And(mask4)).select(name_list)
-
-
-def prepare_L4L5L7_C2(image):
-    import ee
-
-    band_list = ["SR_B1", "SR_B2", "SR_B3", "SR_B4", "SR_B5", "SR_B7", "ST_B6", "QA_PIXEL"]
-    name_list = ["Blue", "Green", "Red", "NIR", "SWIR1", "SWIR2", "Temp", "pixel_qa"]
-    subBand = ["Blue", "Green", "Red", "NIR", "SWIR1", "SWIR2"]
-    scaling = [1] * 8  # [10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
-
-    opticalBands = image.select("SR_B.").multiply(0.0000275).add(-0.2)
-    thermalBand = image.select("ST_B6").multiply(0.00341802).add(149.0)
-    no_scaled = (
-        opticalBands.addBands(thermalBand, None, True)
-        .addBands(image.select(["QA_PIXEL"]), None, True)
-        .select(band_list)
-        .rename(name_list)
-    )
-    scaled = no_scaled.multiply(ee.Image.constant(scaling))
-
-    validQA = [5440, 5504]
-    mask1 = ee.Image(image).select(["QA_PIXEL"]).remap(validQA, ee.List.repeat(1, len(validQA)), 0)
-    # Gat valid data mask, for pixels without band saturation
-    mask2 = image.select("QA_RADSAT").eq(0)
-    mask3 = no_scaled.select(subBand).reduce(ee.Reducer.min()).gt(0)
-    mask4 = no_scaled.select(subBand).reduce(ee.Reducer.max()).lt(1)
-    # Mask hazy pixels using AOD threshold
-    mask5 = (image.select("SR_ATMOS_OPACITY").unmask(-1)).lt(300)
-    return (
-        ee.Image(image).addBands(scaled).updateMask(mask1.And(mask2).And(mask3).And(mask4).And(mask5)).select(name_list)
-    )
-
-
-def prepare_L8L9_C2(image):
-    import ee
-
-    band_list = ["SR_B2", "SR_B3", "SR_B4", "SR_B5", "SR_B6", "SR_B7", "ST_B10", "QA_PIXEL"]
-    name_list = ["Blue", "Green", "Red", "NIR", "SWIR1", "SWIR2", "Temp", "pixel_qa"]
-    subBand = ["Blue", "Green", "Red", "NIR", "SWIR1", "SWIR2"]
-    scaling = [1] * 8  # [10000, 10000, 10000, 10000, 10000, 10000, 10, 1]
-
-    opticalBands = image.select("SR_B.").multiply(0.0000275).add(-0.2)
-    thermalBand = image.select("ST_B10").multiply(0.00341802).add(149.0)
-    no_scaled = (
-        opticalBands.addBands(thermalBand, None, True)
-        .addBands(image.select(["QA_PIXEL"]), None, True)
-        .select(band_list)
-        .rename(name_list)
-    )
-    scaled = no_scaled.multiply(ee.Image.constant(scaling))
-
-    validTOA = [2, 4, 32, 66, 68, 96, 100, 130, 132, 160, 164]
-    validQA = [21824, 21888]  # 21826, 21890
-    mask1 = ee.Image(image).select(["QA_PIXEL"]).remap(validQA, ee.List.repeat(1, len(validQA)), 0)
-    mask2 = image.select("QA_RADSAT").eq(0)
-    # Assume that all saturated pixels equal to 20000
-    mask3 = no_scaled.select(subBand).reduce(ee.Reducer.min()).gt(0)
-    mask4 = no_scaled.select(subBand).reduce(ee.Reducer.max()).lt(1)
-    mask5 = ee.Image(image).select(["SR_QA_AEROSOL"]).remap(validTOA, ee.List.repeat(1, len(validTOA)), 0)
-    return (
-        ee.Image(image).addBands(scaled).updateMask(mask1.And(mask2).And(mask3).And(mask4).And(mask5)).select(name_list)
-    )
-
-
-# filter and merge collections
-def get_gee_data_landsat(coords, date_range, doy_range, collection):
+def get_gee_data_landsat(coords, date_range, doy_range):
+    """Filtered, masked and index-augmented Landsat Collection 2 series at a point."""
     import ee
 
     point = ee.Geometry.Point(coords)
 
-    if collection == 1:
-        l4 = collection_filtering(point, "LANDSAT/LT04/C01/T1_SR", date_range, doy_range)
-        l4_prepared = l4.map(prepare_L4L5_C1)
-
-        l5 = collection_filtering(point, "LANDSAT/LT05/C01/T1_SR", date_range, doy_range)
-        l5_prepared = l5.map(prepare_L4L5_C1)
-
-        l7 = collection_filtering(point, "LANDSAT/LE07/C01/T1_SR", date_range, doy_range)
-        l7_prepared = l7.map(prepare_L7_C1)
-
-        l8 = collection_filtering(point, "LANDSAT/LC08/C01/T1_SR", date_range, doy_range)
-        l8_prepared = l8.map(prepare_L8_C1)
-
-        all_scenes = (
-            ee.ImageCollection(l4_prepared)
-            .merge(l5_prepared)
-            .merge(l7_prepared)
-            .merge(l8_prepared)
-            .sort("system:time_start")
+    def build(spec):
+        return filter_collection(spec.collection, point, date_range, doy_range).map(
+            lambda image: add_indices(prepare_image(image, spec), spec.tc_coefficients)
         )
 
-    if collection == 2:
-        l4 = collection_filtering(point, "LANDSAT/LT04/C02/T1_L2", date_range, doy_range)
-        l4_prepared = l4.map(prepare_L4L5L7_C2)
+    collections = [build(spec) for spec in SENSORS]
+    merged = collections[0]
+    for collection in collections[1:]:
+        merged = merged.merge(collection)
 
-        l5 = collection_filtering(point, "LANDSAT/LT05/C02/T1_L2", date_range, doy_range)
-        l5_prepared = l5.map(prepare_L4L5L7_C2)
-
-        l7 = collection_filtering(point, "LANDSAT/LE07/C02/T1_L2", date_range, doy_range)
-        l7_prepared = l7.map(prepare_L4L5L7_C2)
-
-        l8 = collection_filtering(point, "LANDSAT/LC08/C02/T1_L2", date_range, doy_range)
-        l8_prepared = l8.map(prepare_L8L9_C2)
-
-        l9 = collection_filtering(point, "LANDSAT/LC09/C02/T1_L2", date_range, doy_range)
-        l9_prepared = l9.map(prepare_L8L9_C2)
-
-        all_scenes = (
-            ee.ImageCollection(l4_prepared)
-            .merge(l5_prepared)
-            .merge(l7_prepared)
-            .merge(l8_prepared)
-            .merge(l9_prepared)
-            .sort("system:time_start")
-        )
-
-    # Add indices: 'NBR', 'NDVI', 'EVI', 'EVI2', 'BRIGHTNESS', 'GREENNESS', 'WETNESS'
-    all_gee_data = all_scenes.map(
-        lambda image: image.addBands(
-            [
-                image.normalizedDifference(["NIR", "SWIR2"]).rename("NBR"),
-                image.normalizedDifference(["NIR", "Red"]).rename("NDVI"),
-                image.expression(
-                    "2.5 * ((NIR - Red) / (NIR + 6 * Red - 7.5 * Blue + 1))",
-                    {"NIR": image.select("NIR"), "Red": image.select("Red"), "Blue": image.select("Blue")},
-                ).rename("EVI"),
-                image.expression(
-                    "2.5 * ((NIR - Red) / (NIR + 2.4 * Red + 1))",
-                    {"NIR": image.select("NIR"), "Red": image.select("Red")},
-                ).rename("EVI2"),
-                # Brightness, Greenness, Wetness based on:
-                # https://yceo.yale.edu/tasseled-cap-transform-landsat-8-oli
-                # Muhammad Hasan Ali Baig, Lifu Zhang, Tong Shuai & Qingxi Tong (2014) Derivation of a tasselled cap
-                # transformation based on Landsat 8 at-satellite reflectance, Remote Sensing Letters, 5:5, 423-431,
-                # DOI: 10.1080/2150704X.2014.915434
-                image.expression(
-                    "0.3029 * Blue + 0.2786 * Green + 0.4733 * Red + 0.5599 * NIR + 0.508 * SWIR1 + 0.1872 * SWIR2",
-                    {
-                        "Blue": image.select("Blue"),
-                        "Green": image.select("Green"),
-                        "Red": image.select("Red"),
-                        "NIR": image.select("NIR"),
-                        "SWIR1": image.select("SWIR1"),
-                        "SWIR2": image.select("SWIR2"),
-                    },
-                ).rename("BRIGHTNESS"),
-                image.expression(
-                    "-0.2941 * Blue - 0.243 * Green - 0.5424 * Red + 0.7276 * NIR + 0.0713 * SWIR1 - 0.1608 * SWIR2",
-                    {
-                        "Blue": image.select("Blue"),
-                        "Green": image.select("Green"),
-                        "Red": image.select("Red"),
-                        "NIR": image.select("NIR"),
-                        "SWIR1": image.select("SWIR1"),
-                        "SWIR2": image.select("SWIR2"),
-                    },
-                ).rename("GREENNESS"),
-                image.expression(
-                    "0.1511 * Blue + 0.1973 * Green + 0.3283 * Red + 0.3407 * NIR - 0.7117 * SWIR1 - 0.4559 * SWIR2",
-                    {
-                        "Blue": image.select("Blue"),
-                        "Green": image.select("Green"),
-                        "Red": image.select("Red"),
-                        "NIR": image.select("NIR"),
-                        "SWIR1": image.select("SWIR1"),
-                        "SWIR2": image.select("SWIR2"),
-                    },
-                ).rename("WETNESS"),
-            ]
-        )
-    )
-
-    filtered_col = all_gee_data.filter("WRS_ROW < 122").filterBounds(point)
-
-    return filtered_col
-
-
-# Run everything
-# import ee
-# ee.Initialize()
-# coords = [-72.500634, 1.90668]
-# year_range = (2000, 2010)
-# doy_range = (1, 365)
-#
-# click_col = get_gee_data_landsat(coords, year_range, doy_range, 2)
-#
-# print(click_col)
+    # CCDC and the plot both need the series in chronological order
+    return merged.sort("system:time_start")

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>299</width>
-    <height>239</height>
+    <height>310</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -30,7 +30,7 @@
       <item row="0" column="3">
        <widget class="QDoubleSpinBox" name="chi_square">
         <property name="toolTip">
-         <string>The chi-square probability threshold for change detection in the range of 0 to 1</string>
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Chi-square probability threshold for change detection (0 to 1). Default 0.99.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Raise it&lt;/b&gt; (e.g. 0.999) to tolerate more noise and detect fewer changes — fewer false breaks.&lt;br&gt;&lt;b&gt;Lower it&lt;/b&gt; to flag more candidate changes — catches subtler change, at the cost of false breaks.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="buttonSymbols">
          <enum>QAbstractSpinBox::NoButtons</enum>
@@ -66,7 +66,7 @@
       <item row="1" column="1">
        <widget class="QDoubleSpinBox" name="min_years">
         <property name="toolTip">
-         <string>Factors of minimum number of years to apply new fitting</string>
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Minimum length of a temporal segment, as a multiple of one year. Default 1.33.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Higher&lt;/b&gt; forces longer segments, so short-lived fluctuations cannot become their own segment.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="buttonSymbols">
          <enum>QAbstractSpinBox::NoButtons</enum>
@@ -92,7 +92,7 @@
       <item row="1" column="3">
        <widget class="QSpinBox" name="num_obs">
         <property name="toolTip">
-         <string>The number of observations required to flag a change</string>
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Consecutive observations that must exceed the threshold before a change is confirmed. Default 6; useful range 4 to 8.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Higher&lt;/b&gt; means more confidence but longer gaps between segments in cloudy areas.&lt;br&gt;&lt;b&gt;Lower&lt;/b&gt; detects change sooner but confirms more noise as change.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="buttonSymbols">
          <enum>QAbstractSpinBox::NoButtons</enum>
@@ -111,7 +111,7 @@
       <item row="0" column="1">
        <widget class="QDoubleSpinBox" name="lambda_lasso">
         <property name="toolTip">
-         <string>Lambda for LASSO regression fitting</string>
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Lambda for the LASSO harmonic fit. Default 0.002, which is the standard CCDC value of 20 rescaled for 0-1 surface reflectance (20/10000).&lt;/p&gt;&lt;p&gt;&lt;b&gt;Higher&lt;/b&gt; gives smoother, more generalised models; too high underfits.&lt;br&gt;&lt;b&gt;0&lt;/b&gt; disables regularisation and uses plain least squares, which overfits sparse series.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="buttonSymbols">
          <enum>QAbstractSpinBox::NoButtons</enum>
@@ -134,6 +134,48 @@
     </widget>
    </item>
    <item row="2" column="0">
+    <widget class="QGroupBox" name="cloud_mask_widget">
+     <property name="title">
+      <string>Sentinel-2 Cloud Mask</string>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_2">
+      <item>
+       <widget class="QComboBox" name="cloud_filter">
+        <property name="toolTip">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Per-pixel cloud/shadow mask applied to Sentinel-2 (ignored for Landsat, which always uses CFmask/QA_PIXEL).&lt;/p&gt;&lt;p&gt;- Cloud Score+: scores cloud, cirrus, haze and shadow in one band; best quality/retention balance&lt;br&gt;- s2cloudless: cloud probability plus a solar-geometry shadow projection&lt;br&gt;- Sen2Cor: the scene classification (SCL) shipped with L2A, dilated&lt;br&gt;- No Mask: keep every observation (rely on CCDC's TMask alone)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
+        <property name="currentText">
+         <string>Cloud Score+</string>
+        </property>
+        <property name="currentIndex">
+         <number>0</number>
+        </property>
+        <item>
+         <property name="text">
+          <string>Cloud Score+</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>s2cloudless</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Sen2Cor</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>No Mask</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="3" column="0">
     <widget class="QDialogButtonBox" name="buttonBox">
       <property name="orientation">
        <enum>Qt::Orientation::Horizontal</enum>

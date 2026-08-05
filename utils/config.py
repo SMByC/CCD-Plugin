@@ -45,10 +45,11 @@ def get_plugin_config(id):
     adv = CCD_Plugin.inst[id].widget.advanced_settings
     config["start_doy"] = adv.start_doy.value() if adv.start_doy.isEnabled() else 1
     config["end_doy"] = adv.end_doy.value() if adv.end_doy.isEnabled() else 365
-    config["num_obs"] = CCD_Plugin.inst[id].widget.advanced_settings.num_obs.value()
-    config["chi_square"] = CCD_Plugin.inst[id].widget.advanced_settings.chi_square.value()
-    config["min_years"] = CCD_Plugin.inst[id].widget.advanced_settings.min_years.value()
-    config["lambda_lasso"] = CCD_Plugin.inst[id].widget.advanced_settings.lambda_lasso.value()
+    config["num_obs"] = adv.num_obs.value()
+    config["chi_square"] = adv.chi_square.value()
+    config["min_years"] = adv.min_years.value()
+    config["lambda_lasso"] = adv.lambda_lasso.value()
+    config["cloud_filter"] = adv.cloud_filter.currentText()
 
     # other configurations
     config["auto_generate_plot"] = CCD_Plugin.inst[id].widget.auto_generate_plot.isChecked()
@@ -74,12 +75,16 @@ def restore_plugin_config(id, config):
     CCD_Plugin.inst[id].widget.end_date.setDate(QDate.fromString(config["end_date"], "yyyy-MM-dd"))
 
     # from the advanced settings dialog
-    CCD_Plugin.inst[id].widget.advanced_settings.start_doy.setValue(config["start_doy"])
-    CCD_Plugin.inst[id].widget.advanced_settings.end_doy.setValue(config["end_doy"])
-    CCD_Plugin.inst[id].widget.advanced_settings.num_obs.setValue(config["num_obs"])
-    CCD_Plugin.inst[id].widget.advanced_settings.chi_square.setValue(config["chi_square"])
-    CCD_Plugin.inst[id].widget.advanced_settings.min_years.setValue(config["min_years"])
-    CCD_Plugin.inst[id].widget.advanced_settings.lambda_lasso.setValue(config["lambda_lasso"])
+    adv = CCD_Plugin.inst[id].widget.advanced_settings
+    adv.start_doy.setValue(config["start_doy"])
+    adv.end_doy.setValue(config["end_doy"])
+    adv.num_obs.setValue(config["num_obs"])
+    adv.chi_square.setValue(config["chi_square"])
+    adv.min_years.setValue(config["min_years"])
+    adv.lambda_lasso.setValue(config["lambda_lasso"])
+    # optional: configurations saved before the cloud mask was selectable keep the default
+    if "cloud_filter" in config:
+        adv.cloud_filter.setCurrentText(config["cloud_filter"])
 
     # other configurations
     CCD_Plugin.inst[id].widget.auto_generate_plot.setChecked(config["auto_generate_plot"])

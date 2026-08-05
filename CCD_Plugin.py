@@ -173,6 +173,12 @@ class CCD_Plugin:
         if not self.widget:
             return
 
+        # the CCD cache holds the whole time series and coefficient set per entry, and the module
+        # stays imported after a plugin reload, so it has to be emptied explicitly
+        from CCD_Plugin.core.ccd_process import ccd_results
+
+        ccd_results.clear()
+
         # clear CCD_Plugin.tmp_dir
         if self.tmp_dir and os.path.isdir(self.tmp_dir):
             shutil.rmtree(self.tmp_dir, ignore_errors=True)

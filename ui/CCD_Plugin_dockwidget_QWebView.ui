@@ -362,24 +362,19 @@
                 </item>
                 <item>
                  <widget class="QComboBox" name="dataset">
-                  <property name="toolTip">
-                   <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Collection of images to get the images and run CCDC&lt;/p&gt;&lt;p&gt;- Landsat C1 (30m): ~1983 → 2021&lt;br&gt;- Landsat C2 (30m): ~1983 → present&lt;br&gt;- Sentinel-2 (10m): ~2018 → present&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                  </property>
-                  <property name="currentText">
-                   <string>Landsat C2</string>
-                  </property>
-                  <property name="currentIndex">
-                   <number>1</number>
-                  </property>
-                  <property name="sizeAdjustPolicy">
-                   <enum>QComboBox::AdjustToContents</enum>
-                  </property>
-                  <item>
-                   <property name="text">
-                    <string>Landsat C1</string>
+                   <property name="toolTip">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Collection of images to get the images and run CCDC&lt;/p&gt;&lt;p&gt;- Landsat C2 (30m): ~1983 → present&lt;br&gt;- Sentinel-2 (10m): ~2018 → present&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                    </property>
-                  </item>
-                  <item>
+                   <property name="currentText">
+                    <string>Landsat C2</string>
+                   </property>
+                   <property name="currentIndex">
+                    <number>0</number>
+                   </property>
+                   <property name="sizeAdjustPolicy">
+                    <enum>QComboBox::AdjustToContents</enum>
+                   </property>
+                   <item>
                    <property name="text">
                     <string>Landsat C2</string>
                    </property>

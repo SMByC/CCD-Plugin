@@ -19,12 +19,26 @@ Issues = "https://github.com/SMByC/CCD-Plugin/issues"
 [project.optional-dependencies]
 dev = [
     "ruff",
+    "numpy",
+    "earthengine-api",
 ]
 
 [dependency-groups]
 dev = [
     "ruff",
+    "numpy",
+    "earthengine-api",
 ]
+
+# No pytest config on purpose: pytest resolves test modules through the enclosing package, and
+# CCD_Plugin/__init__.py imports qgis, which is not importable outside QGIS. Run the suite with
+# unittest, which imports the test modules directly:
+#
+#   PYTHONPATH="$PWD:$PWD/extlibs" python -m unittest tests.test_plot tests.test_gee_data_landsat
+#
+# The live Earth Engine tests are opt-in and need authenticated credentials:
+#
+#   PYTHONPATH="$PWD:$PWD/extlibs" CCD_RUN_LIVE_GEE=1 python -m unittest tests.test_gee_live
 
 [tool.pyright]
 extraPaths = [".."]  # include project folder

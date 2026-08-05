@@ -4,7 +4,7 @@
                                  A QGIS plugin
  Continuous Change Detection Plugin
                               -------------------
-        copyright            : (C) 2023-2023 by Daniel Moraes
+        copyright            : (C) 2023-2026 by Daniel Moraes
         email                : moraesd90@gmail.com
  ***************************************************************************/
 
@@ -19,249 +19,204 @@
 
 """
 
+from typing import Final
 
-def get_gee_data_sentinel(coords, date_range, doy_range, name, cloud_filter="s2cloudless"):
+from .gee_common import CCD_BANDS, OPTICAL_BANDS, add_indices, filter_collection
+
+S2_SR: Final = "COPERNICUS/S2_SR_HARMONIZED"
+S2_CLOUD_PROBABILITY: Final = "COPERNICUS/S2_CLOUD_PROBABILITY"
+CLOUD_SCORE_PLUS: Final = "GOOGLE/CLOUD_SCORE_PLUS/V1/S2_HARMONIZED"
+
+# L2A bands matching the common optical schema; B8 is the 10 m NIR, B11/B12 the 20 m SWIR.
+S2_BANDS: Final = ("B2", "B3", "B4", "B8", "B11", "B12")
+S2_SCALE: Final = 0.0001
+
+# S2_SR_HARMONIZED shifts processing-baseline 04.00 scenes (2022-01-25 onward) back by the
+# BOA_ADD_OFFSET of -1000 DN so they line up radiometrically with earlier scenes. Scenes before
+# that date were clipped at DN 0 and can never go negative; later scenes reach DN -1000, i.e.
+# -0.1 reflectance, for the very same target. Any floor tighter than -0.1 would therefore mask
+# dark observations in the later era only and hand CCDC an artificial break at the baseline
+# switch, so -0.1 is the only value that treats both eras alike.
+S2_MIN: Final = -0.1
+# Surface reflectance above 1 is not physical; it is residual bright cloud the mask did not catch.
+S2_MAX: Final = 1.0
+
+# Scene classification (SCL) classes that are never usable: 0 no data, 1 saturated/defective,
+# 3 cloud shadow, 8 cloud medium probability, 9 cloud high probability, 10 thin cirrus, 11 snow.
+# Classes 2 (dark area), 4 (vegetation), 5 (not vegetated), 6 (water) and 7 (unclassified) are
+# kept: dropping them (as an allow-list of 4/5/6 does) discards legitimate dark surfaces,
+# terrain shadow and any pixel Sen2Cor could not label, which over broken terrain removes most
+# of the series for no quality gain.
+SCL_REJECTED: Final = (0, 1, 3, 8, 9, 10, 11)
+SCL_SCALE: Final = 20
+
+# Cloud Score+ 'cs_cdf' is a 0-1 clear-confidence score; Google suggests 0.50-0.65 for "clear".
+CS_PLUS_BAND: Final = "cs_cdf"
+CS_PLUS_THRESHOLD: Final = 0.60
+
+# s2cloudless tuning (Earth Engine community cloud-masking recipe)
+CLOUD_PROBABILITY_THRESHOLD: Final = 50
+DARK_NIR_THRESHOLD: Final = 0.15
+CLOUD_PROJECTION_DISTANCE_KM: Final = 1
+CLOUD_BUFFER_METERS: Final = 50
+
+# Order matches the combo box in ui/advanced_settings.ui; the first entry is the default there too.
+CLOUD_FILTERS: Final = ("Cloud Score+", "s2cloudless", "Sen2Cor", "No Mask")
+DEFAULT_CLOUD_FILTER: Final = CLOUD_FILTERS[0]
+
+# Tasseled cap for Sentinel-2 MSI - Shi, T. & Xu, H. (2019). Derivation of tasseled cap
+# transformation coefficients for Sentinel-2 MSI at-sensor reflectance data. IEEE JSTARS,
+# 12(10), 4038-4048. https://doi.org/10.1109/JSTARS.2019.2938388
+# Note: derived for at-sensor reflectance and applied here to L2A surface reflectance, so the
+# absolute values carry a bias. It is constant in time for a single sensor, so it shifts the
+# CCDC intercept without creating breaks; there is no published SR-domain equivalent in wide use.
+TC_S2: Final = {
+    "BRIGHTNESS": [0.3510, 0.3813, 0.3437, 0.7196, 0.2396, 0.1949],
+    "GREENNESS": [-0.3599, -0.3533, -0.4734, 0.6633, 0.0087, -0.2856],
+    "WETNESS": [0.2578, 0.2305, 0.0883, 0.1071, -0.7611, -0.5308],
+}
+
+
+def prepare_bands(image):
+    """Scale the L2A bands into the common optical schema, keeping SCL for the cloud masks."""
     import ee
 
-    geometry = ee.Geometry.Point(coords)
-    if name == "Sentinel-2":
-        name = "COPERNICUS/S2_SR_HARMONIZED"
-    # get image collection
-    img_col = (
-        ee.ImageCollection(name)
-        .filterBounds(geometry)
-        .filterDate(ee.Date(date_range[0]), ee.Date(date_range[1]))
-        .filter(ee.Filter.dayOfYear(doy_range[0], doy_range[1]))
+    scaled = image.select(list(S2_BANDS)).multiply(S2_SCALE).rename(list(OPTICAL_BANDS))
+    in_range = scaled.reduce(ee.Reducer.min()).gt(S2_MIN).And(scaled.reduce(ee.Reducer.max()).lte(S2_MAX))
+    return image.addBands(scaled).updateMask(in_range)
+
+
+def scl_mask(image):
+    """Mask of the SCL classes that are never usable; the floor under every cloud filter."""
+    rejected = image.select("SCL").remap(list(SCL_REJECTED), [1] * len(SCL_REJECTED), 0)
+    return rejected.Not()
+
+
+def _grow_rejection(keep_mask, image, radius_meters):
+    """Take a keep mask and return it with its rejected area grown by a radius.
+
+    Cloud and shadow edges are systematically under-detected, and their rim pixels are a common
+    source of false breaks, so the rejected side is what gets buffered.
+
+    Pinned to the 20 m SCL grid: without an explicit reproject a focal operation runs at whatever
+    scale the consumer requests, so the same collection would be masked differently depending on
+    how it is sampled.
+    """
+    return (
+        keep_mask.Not()
+        .focal_max(radius_meters, "circle", "meters")
+        .reproject(crs=image.select("SCL").projection(), scale=SCL_SCALE)
+        .Not()
     )
 
-    # prepare bands
-    img_col = img_col.map(prepareBands)
 
-    # add indices
-    # add NDVI
-    img_col = img_col.map(addNDVI)
-    # add NBR
-    img_col = img_col.map(addNBR)
-    # add EVI
-    img_col = img_col.map(addEVI)
-    # add EVI2
-    img_col = img_col.map(addEVI2)
-    # add Brightness
-    img_col = img_col.map(addBrightness)
-    # add Greeness
-    img_col = img_col.map(addGreeness)
-    # add Wetness
-    img_col = img_col.map(addWetness)
+def _link_quality_band(collection, quality_name, point, date_range, doy_range, band, property_name):
+    """Attach a per-scene quality image, keeping scenes that have no match.
 
-    # apply cloud filter
-    if cloud_filter == "Sen2Cor":
-        img_col_filtered = img_col.map(filterS2_level2A)
-    elif cloud_filter == "s2cloudless":
-        # get cloud probability collection
-        s2_cloudprob = (
-            ee.ImageCollection("COPERNICUS/S2_CLOUD_PROBABILITY")
-            .filterBounds(geometry)
-            .filterDate(ee.Date(date_range[0]), ee.Date(date_range[1]))
-            .filter(ee.Filter.dayOfYear(doy_range[0], doy_range[1]))
-        )
-        img_col_filtered = filterS2cloudless(img_col, s2_cloudprob)
-    elif cloud_filter == "No Mask":
-        img_col_filtered = img_col
-
-    # names_original = ['B2','B3','B4','B8','B11','B12','NDVI','NBR','EVI','EVI2','BRIGHTNESS','GREENNESS','WETNESS']
-    names_renamed = [
-        "Blue",
-        "Green",
-        "Red",
-        "NIR",
-        "SWIR1",
-        "SWIR2",
-        "NDVI",
-        "NBR",
-        "EVI",
-        "EVI2",
-        "BRIGHTNESS",
-        "GREENNESS",
-        "WETNESS",
-    ]
-    img_col_filtered_renamed = img_col_filtered.select(names_renamed)
-
-    return img_col_filtered_renamed
-
-
-def prepareBands(image):
-    blue = image.select("B2").rename("Blue").divide(10000)
-    green = image.select("B3").rename("Green").divide(10000)
-    red = image.select("B4").rename("Red").divide(10000)
-    nir = image.select("B8").rename("NIR").divide(10000)
-    swir1 = image.select("B11").rename("SWIR1").divide(10000)
-    swir2 = image.select("B12").rename("SWIR2").divide(10000)
-
-    return image.addBands(blue).addBands(green).addBands(red).addBands(nir).addBands(swir1).addBands(swir2)
-
-
-def addNDVI(image):
-    ndvi = image.normalizedDifference(["NIR", "Red"])
-    return image.addBands(ndvi.rename("NDVI"))
-
-
-def addNBR(image):
-    nbr = image.normalizedDifference(["NIR", "SWIR2"])
-    return image.addBands(nbr.rename("NBR"))
-
-
-def addEVI(image):
-    evi = image.expression(
-        "2.5 * ((NIR-Red) / (NIR + 6 * Red - 7.5* Blue +1))",
-        {"NIR": image.select("NIR"), "Red": image.select("Red"), "Blue": image.select("Blue")},
-    )
-    return image.addBands(evi.rename("EVI"))
-
-
-def addEVI2(image):
-    evi2 = image.expression(
-        "2.5 * ((NIR - Red) / (NIR + 2.4 * Red + 1))", {"NIR": image.select("NIR"), "Red": image.select("Red")}
-    )
-    return image.addBands(evi2.rename("EVI2"))
-
-
-# Brightness, Greenness, Wetness based on:
-# Shi, T., & Xu, H. (2019). Derivation of tasseled cap transformation coefficients for Sentinel-2 MSI at-sensor
-# reflectance data. IEEE Journal of Selected Topics in Applied Earth Observations and Remote Sensing, 12(10), 4038-4048.
-# https://doi.org/10.1109/JSTARS.2019.2938388
-
-
-def addBrightness(image):
-    brightness = image.expression(
-        "0.3510 * Blue + 0.3813 * Green + 0.3437 * Red + 0.7196 * NIR + 0.2396 * SWIR1 + 0.1949 * SWIR2",
-        {
-            "Blue": image.select("Blue"),
-            "Green": image.select("Green"),
-            "Red": image.select("Red"),
-            "NIR": image.select("NIR"),
-            "SWIR1": image.select("SWIR1"),
-            "SWIR2": image.select("SWIR2"),
-        },
-    )
-    return image.addBands(brightness.rename("BRIGHTNESS"))
-
-
-def addGreeness(image):
-    greeness = image.expression(
-        "- 0.3599 * Blue - 0.3533 * Green - 0.4734 * Red + 0.6633 * NIR + 0.0087 * SWIR1 - 0.2856 * SWIR2",
-        {
-            "Blue": image.select("Blue"),
-            "Green": image.select("Green"),
-            "Red": image.select("Red"),
-            "NIR": image.select("NIR"),
-            "SWIR1": image.select("SWIR1"),
-            "SWIR2": image.select("SWIR2"),
-        },
-    )
-    return image.addBands(greeness.rename("GREENNESS"))
-
-
-def addWetness(image):
-    wetness = image.expression(
-        "0.2578 * Blue + 0.2305 * Green + 0.0883 * Red + 0.1071 * NIR - 0.7611 * SWIR1 - 0.5308 * SWIR2",
-        {
-            "Blue": image.select("Blue"),
-            "Green": image.select("Green"),
-            "Red": image.select("Red"),
-            "NIR": image.select("NIR"),
-            "SWIR1": image.select("SWIR1"),
-            "SWIR2": image.select("SWIR2"),
-        },
-    )
-    return image.addBands(wetness.rename("WETNESS"))
-
-
-# SCL cloud/shadow filter
-def filterS2_level2A(image):
+    ee.Join.saveFirst defaults to an inner join, which silently drops every scene whose quality
+    image is missing - the series just ends early with no warning. An outer join keeps the scene
+    and leaves the property null so the caller can fall back.
+    """
     import ee
 
-    SCL = image.select("SCL")
-    mask01 = ee.Image(0).where((SCL.lt(8)).And(SCL.gt(3)), 1)  # Put a 1 on good pixels
-    # (SCL.gt(3),1)
-    return image.updateMask(mask01)
-
-
-# s2cloudless filter
-def filterS2cloudless(S2SRCol, S2CloudCol):
-    import ee
-
-    CLOUD_FILTER = 60
-    CLD_PRB_THRESH = 50
-    NIR_DRK_THRESH = 0.2
-    CLD_PRJ_DIST = 1
-    BUFFER = 50
-
-    # filter images based on cloudy percentage (metadata)
-    S2SRCol = S2SRCol.filter(ee.Filter.lte("CLOUDY_PIXEL_PERCENTAGE", CLOUD_FILTER))
-
-    # join S2SR with S2CloudCol
-    joined = ee.ImageCollection(
-        ee.Join.saveFirst("s2cloudless").apply(
-            primary=S2SRCol,
-            secondary=S2CloudCol,
+    quality = filter_collection(quality_name, point, date_range, doy_range).select(band)
+    return ee.ImageCollection(
+        ee.Join.saveFirst(matchKey=property_name, outer=True).apply(
+            primary=collection,
+            secondary=quality,
             condition=ee.Filter.equals(leftField="system:index", rightField="system:index"),
         )
     )
 
-    def add_cloud_bands(img):
-        # Get s2cloudless image, subset the probability band.
-        cld_prb = ee.Image(img.get("s2cloudless")).select("probability")
-        # Condition s2cloudless by the probability threshold value
-        is_cloud = cld_prb.gt(CLD_PRB_THRESH).rename("clouds")
-        # Add the cloud probability layer and cloud mask as image bands
-        return img.addBands(ee.Image([cld_prb, is_cloud]))
 
-    def add_shadow_bands(img):
-        # Identify water pixels from the SCL band
-        not_water = img.select("SCL").neq(6)
-        # Identify dark NIR pixels that are not water (potential cloud shadow pixels)
-        SR_BAND_SCALE = 1e4
-        dark_pixels = img.select("B8").lt(NIR_DRK_THRESH * SR_BAND_SCALE).multiply(not_water).rename("dark_pixels")
-        # Determine the direction to project cloud shadow from clouds (assumes UTM projection)
-        shadow_azimuth = ee.Number(90).subtract(ee.Number(img.get("MEAN_SOLAR_AZIMUTH_ANGLE")))
-        # Project shadows from clouds for the distance specified by the CLD_PRJ_DIST input
-        cld_proj = (
-            img.select("clouds")
-            .directionalDistanceTransform(shadow_azimuth, CLD_PRJ_DIST * 10)
-            .reproject(crs=img.select(0).projection(), scale=100)
+def apply_cloud_score_plus(collection, point, date_range, doy_range):
+    """Mask with Cloud Score+, which scores cloud, cirrus, haze and shadow in a single band."""
+    import ee
+
+    linked = _link_quality_band(collection, CLOUD_SCORE_PLUS, point, date_range, doy_range, CS_PLUS_BAND, "cloud_score")
+
+    def mask_image(image):
+        image = ee.Image(image)
+        score = image.get("cloud_score")
+        # scenes outside the Cloud Score+ archive keep only the SCL floor
+        clear = ee.Image(
+            ee.Algorithms.If(
+                score,
+                ee.Image(score).select(CS_PLUS_BAND).gte(CS_PLUS_THRESHOLD),
+                ee.Image.constant(1),
+            )
+        )
+        return image.updateMask(clear.And(scl_mask(image)))
+
+    return linked.map(mask_image)
+
+
+def apply_s2cloudless(collection, point, date_range, doy_range):
+    """Mask with s2cloudless probabilities plus a solar-geometry cloud-shadow projection."""
+    import ee
+
+    linked = _link_quality_band(
+        collection, S2_CLOUD_PROBABILITY, point, date_range, doy_range, "probability", "cloud_probability"
+    )
+
+    def mask_image(image):
+        image = ee.Image(image)
+        probability = image.get("cloud_probability")
+        # a missing probability scene must not be read as "no cloud everywhere", so fall back to
+        # the SCL cloud classes, which are always present
+        is_cloud = ee.Image(
+            ee.Algorithms.If(
+                probability,
+                ee.Image(probability).select("probability").gt(CLOUD_PROBABILITY_THRESHOLD),
+                image.select("SCL").gte(8),
+            )
+        ).rename("clouds")
+
+        # cloud shadows are dark NIR pixels lying where the sun projects the cloud
+        not_water = image.select("SCL").neq(6)
+        dark = image.select("NIR").lt(DARK_NIR_THRESHOLD).And(not_water)
+        shadow_azimuth = ee.Number(90).subtract(ee.Number(image.get("MEAN_SOLAR_AZIMUTH_ANGLE")))
+        projected = (
+            is_cloud.directionalDistanceTransform(shadow_azimuth, CLOUD_PROJECTION_DISTANCE_KM * 10)
+            .reproject(crs=image.select("SCL").projection(), scale=100)
             .select("distance")
             .mask()
-            .rename("cloud_transform")
         )
-        # Identify the intersection of dark pixels with cloud shadow projection
-        shadows = cld_proj.multiply(dark_pixels).rename("shadows")
-        # Add dark pixels, cloud projection, and identified shadows as image bands
-        return img.addBands(ee.Image([dark_pixels, cld_proj, shadows]))
+        cloud_or_shadow = is_cloud.Or(projected.And(dark))
+        clear = _grow_rejection(cloud_or_shadow.Not(), image, CLOUD_BUFFER_METERS)
+        return image.updateMask(clear.And(scl_mask(image)))
 
-    def add_cld_shdw_mask(img):
-        # Add cloud component bands.
-        img_cloud = add_cloud_bands(img)
-        # Add cloud shadow component bands.
-        img_cloud_shadow = add_shadow_bands(img_cloud)
-        # Combine cloud and shadow mask, set cloud and shadow as value 1, else 0.
-        is_cld_shdw = img_cloud_shadow.select("clouds").add(img_cloud_shadow.select("shadows")).gt(0)
-        # Remove small cloud-shadow patches and dilate remaining pixels by BUFFER input
-        # 20 m scale is for speed, and assumes clouds don't require 10 m precision
-        is_cld_shdw = (
-            is_cld_shdw.focalMin(2)
-            .focalMax(BUFFER * 2 / 20)
-            .reproject(crs=img.select([0]).projection(), scale=20)
-            .rename("cloudmask")
-        )
-        # Add the final cloud-shadow mask to the image
-        return img_cloud_shadow.addBands(is_cld_shdw)
+    return linked.map(mask_image)
 
-    def apply_cld_shdw_mask(img):
-        # Subset the cloudmask band and invert it so clouds/shadow are 0, else 1.
-        not_cld_shdw = img.select("cloudmask").Not()
-        # Subset reflectance bands and update their masks, return the result.
-        return img.updateMask(not_cld_shdw)
 
-    s2_sr = joined.map(add_cld_shdw_mask).map(apply_cld_shdw_mask)
+def apply_sen2cor(collection):
+    """Mask with the Sen2Cor scene classification, dilated to cover under-detected cloud edges."""
+    return collection.map(lambda image: image.updateMask(_grow_rejection(scl_mask(image), image, CLOUD_BUFFER_METERS)))
 
-    return s2_sr
+
+def get_gee_data_sentinel(coords, date_range, doy_range, name, cloud_filter=DEFAULT_CLOUD_FILTER):
+    """Filtered, masked and index-augmented Sentinel-2 L2A series at a point."""
+    import ee
+
+    point = ee.Geometry.Point(coords)
+    collection_name = S2_SR if name == "Sentinel-2" else name
+
+    # No scene-level CLOUDY_PIXEL_PERCENTAGE filter: this is a point analysis, so a scene that is
+    # clear at the point must be kept however cloudy the rest of the tile is.
+    collection = filter_collection(collection_name, point, date_range, doy_range).map(
+        lambda image: add_indices(prepare_bands(image), TC_S2)
+    )
+
+    if cloud_filter == "Cloud Score+":
+        collection = apply_cloud_score_plus(collection, point, date_range, doy_range)
+    elif cloud_filter == "s2cloudless":
+        collection = apply_s2cloudless(collection, point, date_range, doy_range)
+    elif cloud_filter == "Sen2Cor":
+        collection = apply_sen2cor(collection)
+    elif cloud_filter != "No Mask":
+        raise ValueError(f"Unknown cloud filter: {cloud_filter}. Use one of {', '.join(CLOUD_FILTERS)}.")
+
+    # Drop SCL and the raw L1C/L2A bands: CCDC fits coefficients for every band it is handed, and
+    # the raw DN bands would be fitted at 10000x the scale the lambda is tuned for.
+    # CCDC and the plot both need the series in chronological order.
+    return collection.select(list(CCD_BANDS)).sort("system:time_start")
