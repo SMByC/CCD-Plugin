@@ -28,7 +28,7 @@ C01 datasets were removed from the Google Earth Engine data catalog.
 from dataclasses import dataclass
 from typing import Final
 
-from .gee_common import OPTICAL_BANDS, add_indices, filter_collection
+from .gee_common import INDEX_BANDS, OPTICAL_BANDS, add_indices, filter_collection
 
 # Collection 2 Level-2 scaling (USGS): SR = DN * 2.75e-5 - 0.2 over the valid DN range
 # 7273-43636, which maps exactly onto surface reflectance [0.0, 1.0].
@@ -92,9 +92,6 @@ class SensorSpec:
     # TM/ETM+ carry SR_ATMOS_OPACITY, OLI/OLI-2 carry SR_QA_AEROSOL; the two encode haze differently
     aerosol_band: str
     tc_coefficients: dict
-    # Landsat 7 lost its Scan Line Corrector in 2003; pixels bordering the resulting gaps are
-    # unreliable, so the valid-data mask is eroded by one pixel for that sensor only.
-    erode_scan_gaps: bool = False
 
 
 # QA_RADSAT: TM/ETM+ use B1-B5 (bits 0-4) and B7 (bit 6); OLI uses B2-B7 (bits 1-6).
@@ -104,9 +101,7 @@ OLI_BANDS: Final = ("SR_B2", "SR_B3", "SR_B4", "SR_B5", "SR_B6", "SR_B7")
 SENSORS: Final = (
     SensorSpec("LANDSAT/LT04/C02/T1_L2", TM_BANDS, QA_BITS_TM, 0b01011111, "SR_ATMOS_OPACITY", TC_TM),
     SensorSpec("LANDSAT/LT05/C02/T1_L2", TM_BANDS, QA_BITS_TM, 0b01011111, "SR_ATMOS_OPACITY", TC_TM),
-    SensorSpec(
-        "LANDSAT/LE07/C02/T1_L2", TM_BANDS, QA_BITS_TM, 0b01011111, "SR_ATMOS_OPACITY", TC_TM, erode_scan_gaps=True
-    ),
+    SensorSpec("LANDSAT/LE07/C02/T1_L2", TM_BANDS, QA_BITS_TM, 0b01011111, "SR_ATMOS_OPACITY", TC_TM),
     SensorSpec("LANDSAT/LC08/C02/T1_L2", OLI_BANDS, QA_BITS_OLI, 0b01111110, "SR_QA_AEROSOL", TC_OLI),
     SensorSpec("LANDSAT/LC09/C02/T1_L2", OLI_BANDS, QA_BITS_OLI, 0b01111110, "SR_QA_AEROSOL", TC_OLI),
 )
@@ -133,26 +128,34 @@ def prepare_image(image, spec):
     clear = image.select("QA_PIXEL").bitwiseAnd(qa_bitmask).eq(0)
     no_saturation = image.select("QA_RADSAT").bitwiseAnd(spec.saturation_mask).eq(0)
     in_range = scaled.reduce(ee.Reducer.min()).gt(SR_MIN).And(scaled.reduce(ee.Reducer.max()).lte(SR_MAX))
+    # The Landsat 7 SLC-off gaps themselves are already fill, which the QA_PIXEL bit 0 test above
+    # rejects. Eroding one further pixel to drop the gap rims as well was measured 1.5-3.5x slower
+    # over a 40-year series - a focal op has to fetch a neighbourhood for every ETM+ scene - which
+    # is not worth it for the rim alone.
     mask = clear.And(no_saturation).And(in_range).And(_haze_mask(image, spec))
 
-    if spec.erode_scan_gaps:
-        mask = mask.And(scaled.mask().reduce(ee.Reducer.min()).focal_min(1, "square", "pixels"))
+    # Arithmetic operations do not carry image properties across, and system:time_start is what
+    # sort(), CCDC and getRegion need.
+    #
+    # Only that one. Copying image.propertyNames() instead carries ~98 properties per scene -
+    # including system:footprint, a geometry - through the merge and the sort, and measured 2.5x
+    # slower end to end on a 40-year series as well as exhausting the Earth Engine memory limit on
+    # dense points. Nothing downstream reads the scene metadata, so it is pure cost.
+    return ee.Image(scaled.updateMask(mask).copyProperties(image, ["system:time_start"]))
 
-    # Arithmetic operations do not carry image properties across, and system:time_start is needed
-    # by sort(), CCDC and getRegion; copying all of them also keeps the scene metadata (sensor,
-    # WRS path/row, footprint) available for filtering and diagnostics.
-    return ee.Image(scaled.updateMask(mask).copyProperties(image, image.propertyNames()))
 
+def get_gee_data_landsat(coords, date_range, doy_range, indices=INDEX_BANDS):
+    """Filtered, masked and index-augmented Landsat Collection 2 series at a point.
 
-def get_gee_data_landsat(coords, date_range, doy_range):
-    """Filtered, masked and index-augmented Landsat Collection 2 series at a point."""
+    `indices` limits which spectral indices are computed; see gee_common.add_indices.
+    """
     import ee
 
     point = ee.Geometry.Point(coords)
 
     def build(spec):
         return filter_collection(spec.collection, point, date_range, doy_range).map(
-            lambda image: add_indices(prepare_image(image, spec), spec.tc_coefficients)
+            lambda image: add_indices(prepare_image(image, spec), spec.tc_coefficients, indices)
         )
 
     collections = [build(spec) for spec in SENSORS]

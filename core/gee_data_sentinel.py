@@ -21,7 +21,7 @@
 
 from typing import Final
 
-from .gee_common import CCD_BANDS, OPTICAL_BANDS, add_indices, filter_collection
+from .gee_common import INDEX_BANDS, OPTICAL_BANDS, add_indices, filter_collection, resolve_indices
 
 S2_SR: Final = "COPERNICUS/S2_SR_HARMONIZED"
 S2_CLOUD_PROBABILITY: Final = "COPERNICUS/S2_CLOUD_PROBABILITY"
@@ -194,8 +194,11 @@ def apply_sen2cor(collection):
     return collection.map(lambda image: image.updateMask(_grow_rejection(scl_mask(image), image, CLOUD_BUFFER_METERS)))
 
 
-def get_gee_data_sentinel(coords, date_range, doy_range, name, cloud_filter=DEFAULT_CLOUD_FILTER):
-    """Filtered, masked and index-augmented Sentinel-2 L2A series at a point."""
+def get_gee_data_sentinel(coords, date_range, doy_range, name, cloud_filter=DEFAULT_CLOUD_FILTER, indices=INDEX_BANDS):
+    """Filtered, masked and index-augmented Sentinel-2 L2A series at a point.
+
+    `indices` limits which spectral indices are computed; see gee_common.add_indices.
+    """
     import ee
 
     point = ee.Geometry.Point(coords)
@@ -204,7 +207,7 @@ def get_gee_data_sentinel(coords, date_range, doy_range, name, cloud_filter=DEFA
     # No scene-level CLOUDY_PIXEL_PERCENTAGE filter: this is a point analysis, so a scene that is
     # clear at the point must be kept however cloudy the rest of the tile is.
     collection = filter_collection(collection_name, point, date_range, doy_range).map(
-        lambda image: add_indices(prepare_bands(image), TC_S2)
+        lambda image: add_indices(prepare_bands(image), TC_S2, indices)
     )
 
     if cloud_filter == "Cloud Score+":
@@ -219,4 +222,5 @@ def get_gee_data_sentinel(coords, date_range, doy_range, name, cloud_filter=DEFA
     # Drop SCL and the raw L1C/L2A bands: CCDC fits coefficients for every band it is handed, and
     # the raw DN bands would be fitted at 10000x the scale the lambda is tuned for.
     # CCDC and the plot both need the series in chronological order.
-    return collection.select(list(CCD_BANDS)).sort("system:time_start")
+    schema = [*OPTICAL_BANDS, *resolve_indices(indices)]
+    return collection.select(schema).sort("system:time_start")

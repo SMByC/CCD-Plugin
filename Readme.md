@@ -16,8 +16,8 @@ the image collection by iteratively fitting harmonic functions to the data.
 Landsat always uses the Collection 2 QA bands: CFmask (`QA_PIXEL`) for fill, cloud, dilated cloud, cloud shadow,
 snow and — on Landsat 8/9 only — cirrus; `QA_RADSAT` for saturation; and the per-sensor haze product
 (`SR_ATMOS_OPACITY` for TM/ETM+, `SR_QA_AEROSOL` for OLI/OLI-2). The cloud *confidence* bits are deliberately
-not used, so low and medium confidence clear pixels are kept. Reflectance outside the valid range is dropped,
-and Landsat 7 pixels bordering the SLC-off scan gaps are eroded away.
+not used, so low and medium confidence clear pixels are kept, and reflectance outside the valid range is dropped.
+The Landsat 7 SLC-off scan gaps are fill, so the QA fill bit already removes them.
 
 For Sentinel-2 the mask is selectable in *Advanced settings*:
 
@@ -33,8 +33,8 @@ since only the pixel at the requested coordinate matters.
 
 ### Availability of dataset collections (GEE)
 
-- **Landsat C2** (30m resolution): ~1983 → present
-- **Sentinel-2** (10m resolution): ~2018 → present
+- **Landsat C2** (30m resolution): 1982 → present (dense coverage from 1984)
+- **Sentinel-2** (10m resolution): 2017-03 → present (global only from late 2018)
 
 > Landsat Collection 1 was decommissioned by USGS and removed from the GEE data catalog, so it is no longer supported.
 

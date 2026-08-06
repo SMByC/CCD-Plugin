@@ -199,25 +199,35 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         if not config:
             return
 
-        # check if the plugin settings have changed compared to the last plot, except for the band_or_index_to_plot
-        if self.last_config and self.last_config == OrderedDict(
-            (k, v) for k, v in config.items() if k != "band_or_index_to_plot"
-        ):
+        # nothing but the plotted band changed since the last run, and that is redrawn from cache
+        if self.last_config and self.settings_unchanged(config):
             return
 
-        self.clean_plot()
-        self.generate_button.setEnabled(False)
-        self.plot_webview.load(QUrl.fromLocalFile(os.path.join(plugin_folder, "ui", "loading.html")))
+        self.start_ccd_task(config)
 
-        # start the process
-        # perform CCD as a background task
+        # after finish the process
+        self.pick_on_map.click()
+
+    @staticmethod
+    def comparable_settings(config):
+        """Everything that drives the computation except which band ends up on screen."""
+        return OrderedDict((k, v) for k, v in config.items() if k != "band_or_index_to_plot")
+
+    def settings_unchanged(self, config):
+        """True when only the plotted band differs from the run that produced the current plot."""
+        return self.last_config == self.comparable_settings(config)
+
+    def start_ccd_task(self, config):
+        """Run CCD for this configuration as a background task."""
+        self.clean_plot()
+        # the band combo starts runs too, so lock it as well or a second task can race the first
+        self.generate_button.setEnabled(False)
+        self.band_or_index_to_plot.setEnabled(False)
+        self.plot_webview.load(QUrl.fromLocalFile(os.path.join(plugin_folder, "ui", "loading.html")))
         globals()["task"] = QgsTask.fromFunction(
             "Compute CCD", self.compute_ccd, on_finished=self.ccd_completed, config=config
         )
         QgsApplication.taskManager().addTask(globals()["task"])
-
-        # after finish the process
-        self.pick_on_map.click()
 
     @staticmethod
     def compute_ccd(task, config):
@@ -233,6 +243,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             min_years=config["min_years"],
             lambda_lasso=config["lambda_lasso"],
             cloud_filter=config["cloud_filter"],
+            plot_band=config["band_or_index_to_plot"],
         )
 
         return config, ccdc_result_info, timeseries
@@ -274,19 +285,23 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
             self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
 
-            self.last_config = OrderedDict((k, v) for k, v in config.items() if k != "band_or_index_to_plot")
+            self.last_config = self.comparable_settings(config)
         else:
             msg = f"Error computing CCD: {exception}"
             self.MsgBar.clearWidgets()
             self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.MessageLevel.Warning, duration=10)
             self.plot_webview.setHtml("")
+            # forget the last run so Generate can retry these very settings; otherwise new_plot
+            # sees no change and returns without doing anything
+            self.last_config = None
 
         # finish
         self.generate_button.setEnabled(True)
+        self.band_or_index_to_plot.setEnabled(True)
 
     @wait_process
     def repaint_plot(self):
-        from CCD_Plugin.core.ccd_process import ccd_results, make_cache_key
+        from CCD_Plugin.core.ccd_process import ccd_results, lookup_result, make_cache_key, resolve_computed_indices
 
         if not ccd_results:
             return
@@ -309,17 +324,22 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             lambda_lasso=config["lambda_lasso"],
             cloud_filter=config["cloud_filter"],
         )
-        if key not in ccd_results:
-            # Every setting but the plotted band is part of the key, so there is nothing cached to
-            # redraw. Leave the current plot up rather than clearing it for an empty view, and say
-            # why the band switch did not take effect.
-            msg = "The settings changed since the last run. Press Generate to recompute the CCD."
-            self.MsgBar.clearWidgets()
-            self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.MessageLevel.Info, duration=10)
+        cached = lookup_result(key, resolve_computed_indices(config["breakpoint_bands"], band_or_index_to_plot))
+        if cached is None:
+            if self.last_config and self.settings_unchanged(config):
+                # Only the plotted band differs, and it needs an index the last run did not build,
+                # so recompute rather than making the user press Generate for a band switch.
+                self.start_ccd_task(config)
+            else:
+                # Something else changed too. Recomputing here would silently apply settings the
+                # user never confirmed, so leave the current plot up and say why nothing happened.
+                msg = "The settings changed since the last run. Press Generate to recompute the CCD."
+                self.MsgBar.clearWidgets()
+                self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.MessageLevel.Info, duration=10)
             return
 
         self.clean_plot()
-        ccdc_result_info, timeseries = ccd_results[key]
+        ccdc_result_info, timeseries = cached
         self.html_file = generate_plot(self.id, ccdc_result_info, timeseries, dataset, band_or_index_to_plot)
         self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
 
