@@ -37,7 +37,7 @@ from qgis.core import (
 from qgis.gui import QgsMapTool, QgsVertexMarker
 from qgis.PyQt import QtWidgets, uic
 from qgis.PyQt.QtCore import QDate, Qt, QUrl, pyqtSignal
-from qgis.PyQt.QtGui import QColor, QDesktopServices
+from qgis.PyQt.QtGui import QColor, QDesktopServices, QPalette
 from qgis.PyQt.QtWidgets import QFileDialog, QMessageBox
 from qgis.utils import iface
 
@@ -80,10 +80,25 @@ from CCD_Plugin.core.ccd_process import (  # noqa: E402
     resolve_ccd_bands,
 )
 from CCD_Plugin.core.gee_common import CCD_BANDS  # noqa: E402
-from CCD_Plugin.core.plot import generate_plot  # noqa: E402
+from CCD_Plugin.core.loading import loading_page_html  # noqa: E402
+from CCD_Plugin.core.plot import PlotStyle, generate_plot  # noqa: E402
 from CCD_Plugin.gui.advanced_settings import AdvancedSettings  # noqa: E402
 from CCD_Plugin.utils.config import get_plugin_config, restore_plugin_config  # noqa: E402
 from CCD_Plugin.utils.system_utils import error_handler, wait_process  # noqa: E402
+
+
+def _relative_luminance(color: QColor) -> float:
+    channels = (color.redF(), color.greenF(), color.blueF())
+    linear = tuple(
+        channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4 for channel in channels
+    )
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def _plot_style_from_palette(palette: QPalette) -> PlotStyle:
+    background = palette.color(QPalette.ColorRole.Base)
+    text = palette.color(QPalette.ColorRole.Text)
+    return PlotStyle.DARK if _relative_luminance(background) < _relative_luminance(text) else PlotStyle.LIGHT
 
 
 class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
@@ -103,6 +118,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.last_config = None
 
         self.setupUi(self)
+        self.plot_style = _plot_style_from_palette(self.palette())
         self.setup_gui()
 
     def setup_gui(self):
@@ -142,6 +158,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             plot_view_settings.setAttribute(QWebSettings.WebGLEnabled, True)
             plot_view_settings.setAttribute(QWebSettings.Accelerated2dCanvasEnabled, True)
         self.plot_webview.setZoomFactor(0.85)
+        self.plot_webview.urlChanged.connect(self._retain_plot_style)
 
         # advanced settings dialog
         self.advanced_settings = AdvancedSettings()
@@ -160,6 +177,11 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # enable/disable days of year when start day or end day is changed
         self.start_date.dateChanged.connect(lambda: self.enable_disable_days_of_year())
         self.end_date.dateChanged.connect(lambda: self.enable_disable_days_of_year())
+
+    def _retain_plot_style(self, url: QUrl) -> None:
+        fragment = url.fragment()
+        if fragment in (PlotStyle.LIGHT.value, PlotStyle.DARK.value):
+            self.plot_style = PlotStyle(fragment)
 
     def enable_disable_days_of_year(self):
         # only enable the days of year if the date range is greater than 1 year
@@ -210,11 +232,11 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     @staticmethod
     def comparable_settings(config):
-        """Everything that drives the computation except which band ends up on screen."""
-        return OrderedDict((k, v) for k, v in config.items() if k != "band_or_index_to_plot")
+        """Everything that drives the computation, excluding presentation-only settings."""
+        return OrderedDict((k, v) for k, v in config.items() if k not in {"band_or_index_to_plot", "plot_style"})
 
     def settings_unchanged(self, config):
-        """True when only the plotted band differs from the run that produced the current plot."""
+        """True when computation settings match the run that produced the current plot."""
         return self.last_config == self.comparable_settings(config)
 
     def start_ccd_task(self, config):
@@ -223,7 +245,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # the band combo starts runs too, so lock it as well or a second task can race the first
         self.generate_button.setEnabled(False)
         self.band_or_index_to_plot.setEnabled(False)
-        self.plot_webview.load(QUrl.fromLocalFile(os.path.join(plugin_folder, "ui", "loading.html")))
+        self.plot_webview.setHtml(loading_page_html(self.plot_style))
         globals()["task"] = QgsTask.fromFunction(
             "Compute CCD", self.compute_ccd, on_finished=self.ccd_completed, config=config
         )
@@ -281,6 +303,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                 timeseries,
                 config["dataset"],
                 config["band_or_index_to_plot"],
+                style=self.plot_style,
             )
 
             self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
@@ -340,7 +363,14 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         self.clean_plot()
         ccdc_result_info, timeseries = cached
-        self.html_file = generate_plot(self.id, ccdc_result_info, timeseries, dataset, band_or_index_to_plot)
+        self.html_file = generate_plot(
+            self.id,
+            ccdc_result_info,
+            timeseries,
+            dataset,
+            band_or_index_to_plot,
+            style=self.plot_style,
+        )
         self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
 
     @error_handler
@@ -362,9 +392,11 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                 raise Exception(f"Error reading the YAML file to restore the CCD plugin, see more:|{err}")
 
         try:
-            restore_plugin_config(self.id, config)
+            style_changed = restore_plugin_config(self.id, config)
         except Exception as err:
             raise Exception(f"Error restoring the configuration of the CCD plugin, see more:|{err}")
+        if style_changed:
+            self.repaint_plot()
 
     @error_handler
     def save_plugin_to_yaml(self):

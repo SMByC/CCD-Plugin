@@ -22,6 +22,8 @@ from collections import OrderedDict
 
 from qgis.PyQt.QtCore import QDate
 
+from CCD_Plugin.core.plot import resolve_plot_style
+
 
 def get_plugin_config(id):
     """get the current configuration of the plugin"""
@@ -37,6 +39,7 @@ def get_plugin_config(id):
     config["lon"] = CCD_Plugin.inst[id].widget.longitude.value()
     config["dataset"] = CCD_Plugin.inst[id].widget.dataset.currentText()
     config["band_or_index_to_plot"] = CCD_Plugin.inst[id].widget.band_or_index_to_plot.currentText()
+    config["plot_style"] = CCD_Plugin.inst[id].widget.plot_style.value
     config["breakpoint_bands"] = CCD_Plugin.inst[id].widget.box_breakpoint_bands.checkedItems()
     config["start_date"] = CCD_Plugin.inst[id].widget.start_date.date().toString("yyyy-MM-dd")
     config["end_date"] = CCD_Plugin.inst[id].widget.end_date.date().toString("yyyy-MM-dd")
@@ -62,7 +65,11 @@ def restore_plugin_config(id, config):
     from CCD_Plugin.CCD_Plugin import CCD_Plugin
 
     if id not in CCD_Plugin.inst or CCD_Plugin.inst[id].widget is None or config is None:
-        return
+        return False
+
+    widget = CCD_Plugin.inst[id].widget
+    resolved_style = resolve_plot_style(config.get("plot_style"), widget.plot_style)
+    style_changed = resolved_style != widget.plot_style
 
     # from the plugin widget
     CCD_Plugin.inst[id].widget.latitude.setValue(config["lat"])
@@ -88,3 +95,7 @@ def restore_plugin_config(id, config):
 
     # other configurations
     CCD_Plugin.inst[id].widget.auto_generate_plot.setChecked(config["auto_generate_plot"])
+
+    if style_changed:
+        widget.plot_style = resolved_style
+    return style_changed

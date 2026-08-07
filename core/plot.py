@@ -23,9 +23,11 @@ with the collaboration of:
 """
 
 import tempfile
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Final
+from enum import Enum
+from typing import Final, TypeAlias, assert_never
 
 import plotly.graph_objects as go
 
@@ -36,6 +38,19 @@ from .plot_data import build_model_segments as build_model_segments
 from .plot_data import evaluate_ccdc_model as evaluate_ccdc_model
 from .plot_data import normalize_observations as normalize_observations
 from .plot_data import sample_segment_dates as sample_segment_dates
+
+_PlotlyValue: TypeAlias = (  # noqa: UP040
+    str
+    | int
+    | float
+    | bool
+    | datetime
+    | list["_PlotlyValue"]
+    | tuple["_PlotlyValue", ...]
+    | Mapping[str, "_PlotlyValue"]
+    | None
+)
+_ThemeLayoutPayload: TypeAlias = dict[str, _PlotlyValue]  # noqa: UP040
 
 OBSERVATION_COLOR: Final = "#3F83B5"
 # Each CCDC segment is a separate model fit, so each gets its own colour: consecutive segments
@@ -79,6 +94,70 @@ SURFACE_REFLECTANCE_BANDS: Final = frozenset(OPTICAL_BANDS)
 SPECTRAL_INDEX_BANDS: Final = frozenset(INDEX_BANDS)
 
 
+class PlotStyle(Enum):
+    LIGHT = "light"
+    DARK = "dark"
+
+
+def resolve_plot_style(value: str | None, fallback: PlotStyle) -> PlotStyle:
+    return fallback if value is None else PlotStyle(value)
+
+
+@dataclass(frozen=True, slots=True)
+class PlotTheme:
+    observation_color: str
+    model_colors: tuple[str, ...]
+    model_legend_color: str
+    change_color: str
+    pending_change_color: str
+    grid_color: str
+    text_color: str
+    muted_text_color: str
+    background_color: str
+    overlay_background: str
+    control_background: str
+    control_text_color: str
+    control_border_color: str
+    control_active_background: str
+    control_hover_background: str
+
+
+LIGHT_THEME: Final = PlotTheme(
+    observation_color=OBSERVATION_COLOR,
+    model_colors=MODEL_COLORS,
+    model_legend_color=MODEL_LEGEND_COLOR,
+    change_color=CHANGE_COLOR,
+    pending_change_color=PENDING_CHANGE_COLOR,
+    grid_color=GRID_COLOR,
+    text_color=TEXT_COLOR,
+    muted_text_color=MUTED_TEXT_COLOR,
+    background_color=BACKGROUND_COLOR,
+    overlay_background=OVERLAY_BACKGROUND,
+    control_background=OVERLAY_BACKGROUND,
+    control_text_color=TEXT_COLOR,
+    control_border_color=GRID_COLOR,
+    control_active_background="#F4FAFF",
+    control_hover_background="#F4FAFF",
+)
+DARK_THEME: Final = PlotTheme(
+    observation_color="#68B4E3",
+    model_colors=("#65C47A", "#B68BDD", "#C4C55A", "#45B4E8", "#DE7BA5"),
+    model_legend_color="#B5BEC8",
+    change_color="#FF8585",
+    pending_change_color="#F0B965",
+    grid_color="#4C5864",
+    text_color="#E6EDF3",
+    muted_text_color="#AAB6C2",
+    background_color="#20252B",
+    overlay_background="rgba(32, 37, 43, 0.88)",
+    control_background="#2C333A",
+    control_text_color="#E6EDF3",
+    control_border_color="#4C5864",
+    control_active_background="#3B4652",
+    control_hover_background="#46535E",
+)
+
+
 @dataclass(frozen=True, slots=True)
 class PlotSpec:
     dataset: str
@@ -105,7 +184,147 @@ def _y_axis_title(spec: PlotSpec) -> str:
     return "Value"
 
 
-def build_figure(ccdc_result_info, timeseries, spec: PlotSpec) -> go.Figure:
+def _theme_settings(style: PlotStyle) -> tuple[PlotTheme, int]:
+    match style:
+        case PlotStyle.LIGHT:
+            return LIGHT_THEME, 0
+        case PlotStyle.DARK:
+            return DARK_THEME, 1
+        case unreachable:
+            assert_never(unreachable)
+
+
+def _page_theme_script(style: PlotStyle) -> str:
+    theme, _ = _theme_settings(style)
+    return f"""
+const graphDiv = document.getElementById("{{plot_id}}");
+const backgrounds = Object.freeze({{
+    "Light": "{LIGHT_THEME.background_color}",
+    "Dark": "{DARK_THEME.background_color}"
+}});
+const horizontalPadding = 7;
+const minimumWidth = 30;
+const buttonGap = 2;
+const visibleHeight = 20;
+const textBaselineY = 13;
+const setPageBackground = (color) => {{
+    document.documentElement.style.backgroundColor = color;
+    document.body.style.backgroundColor = color;
+}};
+const currentActiveIndex = () => graphDiv._fullLayout.updatemenus[0].active;
+const ensureThemeControlStyles = () => {{
+    graphDiv.classList.add("ccd-theme-controls");
+    if (!graphDiv.querySelector('style[data-ccd-theme-controls="true"]')) {{
+        const style = document.createElement("style");
+        style.dataset.ccdThemeControls = "true";
+        style.textContent = `
+.ccd-theme-controls.ccd-theme-dark .updatemenu-item-rect {{
+    fill: {DARK_THEME.control_background} !important;
+}}
+.ccd-theme-controls.ccd-theme-dark .updatemenu-button.ccd-theme-active .updatemenu-item-rect {{
+    fill: {DARK_THEME.control_active_background} !important;
+}}
+.ccd-theme-controls.ccd-theme-dark .updatemenu-button:hover .updatemenu-item-rect {{
+    fill: {DARK_THEME.control_hover_background} !important;
+}}
+`;
+        graphDiv.appendChild(style);
+    }}
+}};
+const adjustThemeControls = () => {{
+    const buttons = Array.from(graphDiv.querySelectorAll(".updatemenu-button"));
+    const rects = Array.from(graphDiv.querySelectorAll(".updatemenu-item-rect"));
+    const texts = Array.from(graphDiv.querySelectorAll(".updatemenu-item-text"));
+    if (!buttons.length || buttons.length !== rects.length || buttons.length !== texts.length) {{
+        return;
+    }}
+    const activeIndex = currentActiveIndex();
+    graphDiv.classList.toggle("ccd-theme-dark", activeIndex === 1);
+    const imageCornerX = 0;
+    const imageCornerY = 0;
+    let currentX = imageCornerX;
+    const rowY = imageCornerY;
+    buttons.forEach((button, index) => {{
+        const rect = rects[index];
+        const text = texts[index];
+        const width = Math.max(minimumWidth, text.getBBox().width + 2 * horizontalPadding);
+        button.setAttribute("transform", `translate(${{currentX}},${{rowY}})`);
+        rect.setAttribute("width", width);
+        rect.setAttribute("height", visibleHeight);
+        text.setAttribute("x", horizontalPadding);
+        text.setAttribute("y", textBaselineY);
+        currentX += width + buttonGap;
+        button.classList.toggle("ccd-theme-active", index === activeIndex);
+    }});
+}};
+let adjustmentFrame = 0;
+const scheduleThemeControlAdjustment = () => {{
+    if (adjustmentFrame) {{
+        cancelAnimationFrame(adjustmentFrame);
+    }}
+    adjustmentFrame = requestAnimationFrame(() => {{
+        adjustmentFrame = 0;
+        adjustThemeControls();
+    }});
+}};
+ensureThemeControlStyles();
+setPageBackground("{theme.background_color}");
+graphDiv.on("plotly_buttonclicked", (event) => {{
+    setPageBackground(backgrounds[event.button.label]);
+    window.location.hash = event.button.label.toLowerCase();
+    scheduleThemeControlAdjustment();
+}});
+graphDiv.on("plotly_afterplot", scheduleThemeControlAdjustment);
+scheduleThemeControlAdjustment();
+"""
+
+
+def _trace_colors(theme: PlotTheme, has_observations: bool, segment_count: int) -> list[str]:
+    colors = [theme.observation_color] if has_observations else []
+    if segment_count:
+        colors.append(theme.model_legend_color)
+        colors.extend(theme.model_colors[index % len(theme.model_colors)] for index in range(segment_count))
+    return colors
+
+
+def _theme_layout_payload(figure: go.Figure, source: PlotTheme, target: PlotTheme) -> _ThemeLayoutPayload:
+    payload: _ThemeLayoutPayload = {
+        "paper_bgcolor": target.background_color,
+        "plot_bgcolor": target.background_color,
+        "font.color": target.text_color,
+        "title.text": figure.layout.title.text.replace(source.muted_text_color, target.muted_text_color),
+        "title.font.color": target.text_color,
+        "xaxis.gridcolor": target.grid_color,
+        "xaxis.spikecolor": target.grid_color,
+        "xaxis.tickfont.color": target.text_color,
+        "xaxis.title.font.color": target.text_color,
+        "yaxis.gridcolor": target.grid_color,
+        "yaxis.tickfont.color": target.text_color,
+        "yaxis.title.font.color": target.text_color,
+        "legend.bgcolor": target.overlay_background,
+        "legend.font.color": target.text_color,
+        "updatemenus[0].bgcolor": target.control_background,
+        "updatemenus[0].bordercolor": target.control_border_color,
+        "updatemenus[0].font.color": target.control_text_color,
+    }
+    for index, shape in enumerate(figure.layout.shapes):
+        payload[f"shapes[{index}].line.color"] = (
+            target.change_color if shape.name == "Change" else target.pending_change_color
+        )
+    for index, _annotation in enumerate(figure.layout.annotations):
+        if index < len(figure.layout.shapes):
+            shape = figure.layout.shapes[index]
+            payload[f"annotations[{index}].font.color"] = (
+                target.change_color if shape.name == "Change" else target.pending_change_color
+            )
+            payload[f"annotations[{index}].bgcolor"] = target.overlay_background
+        else:
+            payload[f"annotations[{index}].font.color"] = target.text_color
+    return payload
+
+
+def build_figure(ccdc_result_info, timeseries, spec: PlotSpec, *, style: PlotStyle = PlotStyle.LIGHT) -> go.Figure:
+    theme, active_style_index = _theme_settings(style)
     observation_times, observation_values = normalize_observations(timeseries, spec.band)
     segments = build_model_segments(ccdc_result_info, spec.band)
     figure = go.Figure()
@@ -117,7 +336,7 @@ def build_figure(ccdc_result_info, timeseries, spec: PlotSpec) -> go.Figure:
                 y=observation_values,
                 name="Observed",
                 mode="markers",
-                marker={"color": OBSERVATION_COLOR, "size": 4.5, "opacity": 0.72},
+                marker={"color": theme.observation_color, "size": 4.5, "opacity": 0.72},
                 hovertemplate="Date %{x|%Y-%m-%d}<br>Value %{y:.4f}<extra></extra>",
             )
         )
@@ -136,7 +355,7 @@ def build_figure(ccdc_result_info, timeseries, spec: PlotSpec) -> go.Figure:
                 mode="lines",
                 legendgroup="model",
                 showlegend=True,
-                line={"color": MODEL_LEGEND_COLOR, "width": MODEL_LINE_WIDTH},
+                line={"color": theme.model_legend_color, "width": MODEL_LINE_WIDTH},
                 opacity=MODEL_LINE_OPACITY,
                 hoverinfo="skip",
             )
@@ -159,7 +378,7 @@ def build_figure(ccdc_result_info, timeseries, spec: PlotSpec) -> go.Figure:
                 mode="lines",
                 legendgroup="model",
                 showlegend=False,
-                line={"color": MODEL_COLORS[index % len(MODEL_COLORS)], "width": MODEL_LINE_WIDTH},
+                line={"color": theme.model_colors[index % len(theme.model_colors)], "width": MODEL_LINE_WIDTH},
                 opacity=MODEL_LINE_OPACITY,
                 hovertemplate=(
                     f"Segment {segment.number}<br>Model value %{{y:.4f}}<br>" + "<br>".join(details) + "<extra></extra>"
@@ -179,12 +398,12 @@ def build_figure(ccdc_result_info, timeseries, spec: PlotSpec) -> go.Figure:
         confirmed = segment.is_confirmed_break
         break_date = _utc_datetime(segment.break_ms)
         if confirmed:
-            color, dash, width = CHANGE_COLOR, "dash", 1
+            color, dash, width = theme.change_color, "dash", 1
             label, group = "Change", "change"
             first = break_count == 0
             break_count += 1
         else:
-            color, dash, width = PENDING_CHANGE_COLOR, "dot", 1
+            color, dash, width = theme.pending_change_color, "dot", 1
             label, group = "In progress", "pending"
             first = pending_count == 0
             pending_count += 1
@@ -217,7 +436,7 @@ def build_figure(ccdc_result_info, timeseries, spec: PlotSpec) -> go.Figure:
             yanchor="bottom",
             font={"color": color, "size": 9},
             # the label lands on top of the scatter, so back it just enough to stay legible
-            bgcolor=OVERLAY_BACKGROUND,
+            bgcolor=theme.overlay_background,
             borderpad=1,
         )
 
@@ -227,10 +446,10 @@ def build_figure(ccdc_result_info, timeseries, spec: PlotSpec) -> go.Figure:
     x_axis = {
         "automargin": True,
         "fixedrange": False,
-        "gridcolor": GRID_COLOR,
+        "gridcolor": theme.grid_color,
         "nticks": 9,
         "showspikes": True,
-        "spikecolor": GRID_COLOR,
+        "spikecolor": theme.grid_color,
         "spikemode": "across",
         "spikethickness": 1,
         # years read fine horizontally and a slanted label costs plot height for no gain
@@ -254,15 +473,15 @@ def build_figure(ccdc_result_info, timeseries, spec: PlotSpec) -> go.Figure:
             yref="paper",
             text="No valid observations or fitted model segments",
             showarrow=False,
-            font={"color": TEXT_COLOR, "size": 12},
+            font={"color": theme.text_color, "size": 12},
         )
 
     figure.update_layout(
         autosize=True,
         hovermode="closest",
-        paper_bgcolor=BACKGROUND_COLOR,
-        plot_bgcolor=BACKGROUND_COLOR,
-        font={"color": TEXT_COLOR, "family": SYSTEM_FONT, "size": 11},
+        paper_bgcolor=theme.background_color,
+        plot_bgcolor=theme.background_color,
+        font={"color": theme.text_color, "family": SYSTEM_FONT, "size": 11},
         # What the series is on the first line, where it came from on a smaller, muted second one.
         # Two lines via <br> rather than the native title.subtitle, which has no gap control and
         # leaves them further apart than they need to be. Anchored bottom-to-the-plot so the block
@@ -271,7 +490,7 @@ def build_figure(ccdc_result_info, timeseries, spec: PlotSpec) -> go.Figure:
         title={
             "text": (
                 f"{spec.band} · {spec.dataset}"
-                f"<br><span style='font-size:11px;color:{MUTED_TEXT_COLOR}'>"
+                f"<br><span style='font-size:11px;color:{theme.muted_text_color}'>"
                 f"Lat: {spec.latitude:.5f}  Lon: {spec.longitude:.5f}"
                 f"  ·  {observation_values.size} obs"
                 f"  ·  {len(segments)} segment{'' if len(segments) == 1 else 's'}"
@@ -285,7 +504,7 @@ def build_figure(ccdc_result_info, timeseries, spec: PlotSpec) -> go.Figure:
             "y": 1,
             "yanchor": "bottom",
             "pad": {"b": 18},
-            "font": {"size": 13},
+            "font": {"color": theme.text_color, "size": 13},
         },
         # Floated into the top-right of the plot area instead of stacked under the title, where it
         # was competing with it for the top margin: the title is anchored to the figure and the
@@ -296,9 +515,9 @@ def build_figure(ccdc_result_info, timeseries, spec: PlotSpec) -> go.Figure:
             "xanchor": "right",
             "y": 1,
             "yanchor": "top",
-            "bgcolor": OVERLAY_BACKGROUND,
+            "bgcolor": theme.overlay_background,
             "borderwidth": 0,
-            "font": {"size": 10},
+            "font": {"color": theme.text_color, "size": 10},
         },
         # Every margin at 75% of what it was, which is as tight as the header goes: plotly
         # positions the title block by its *first* line, so the top has to clear (t - title pad.b)
@@ -309,15 +528,54 @@ def build_figure(ccdc_result_info, timeseries, spec: PlotSpec) -> go.Figure:
         xaxis=x_axis,
         yaxis={
             "automargin": True,
-            "gridcolor": GRID_COLOR,
+            "gridcolor": theme.grid_color,
             "title_text": _y_axis_title(spec),
             "zeroline": False,
         },
     )
+    light_trace_colors = _trace_colors(LIGHT_THEME, bool(observation_times.size), len(segments))
+    dark_trace_colors = _trace_colors(DARK_THEME, bool(observation_times.size), len(segments))
+    figure.update_layout(
+        updatemenus=[
+            {
+                "active": active_style_index,
+                "bgcolor": theme.control_background,
+                "bordercolor": theme.control_border_color,
+                "buttons": [
+                    {
+                        "args": [
+                            {"marker.color": light_trace_colors, "line.color": light_trace_colors},
+                            _theme_layout_payload(figure, theme, LIGHT_THEME),
+                        ],
+                        "label": "Light",
+                        "method": "update",
+                    },
+                    {
+                        "args": [
+                            {"marker.color": dark_trace_colors, "line.color": dark_trace_colors},
+                            _theme_layout_payload(figure, theme, DARK_THEME),
+                        ],
+                        "label": "Dark",
+                        "method": "update",
+                    },
+                ],
+                "direction": "right",
+                "font": {"color": theme.control_text_color, "size": 10},
+                "showactive": True,
+                "type": "buttons",
+                "x": 0,
+                "xanchor": "left",
+                "y": 1,
+                "yanchor": "bottom",
+            }
+        ]
+    )
     return figure
 
 
-def generate_plot(id, ccdc_result_info, timeseries, dataset, band_or_index_to_plot):
+def generate_plot(
+    id, ccdc_result_info, timeseries, dataset, band_or_index_to_plot, *, style: PlotStyle = PlotStyle.LIGHT
+):
     from CCD_Plugin.CCD_Plugin import CCD_Plugin
 
     plugin = CCD_Plugin.inst[id]
@@ -327,7 +585,7 @@ def generate_plot(id, ccdc_result_info, timeseries, dataset, band_or_index_to_pl
         longitude=float(plugin.widget.longitude.value()),
         latitude=float(plugin.widget.latitude.value()),
     )
-    figure = build_figure(ccdc_result_info, timeseries, spec)
+    figure = build_figure(ccdc_result_info, timeseries, spec, style=style)
     with tempfile.NamedTemporaryFile(suffix=".html", dir=plugin.tmp_dir, delete=False) as output:
         html_file = output.name
     figure.write_html(
@@ -338,6 +596,7 @@ def generate_plot(id, ccdc_result_info, timeseries, dataset, band_or_index_to_pl
         # temp directory is removed on unload, so the sibling file resolves and is cleaned up.
         include_plotlyjs="directory",
         auto_open=False,
+        post_script=_page_theme_script(style),
         config={
             "displaylogo": False,
             "responsive": True,
