@@ -39,7 +39,7 @@ from .plot_data import evaluate_ccdc_model as evaluate_ccdc_model
 from .plot_data import normalize_observations as normalize_observations
 from .plot_data import sample_segment_dates as sample_segment_dates
 
-_PlotlyValue: TypeAlias = (  # noqa: UP040
+_PlotlyValue: TypeAlias = (
     str
     | int
     | float
@@ -50,7 +50,7 @@ _PlotlyValue: TypeAlias = (  # noqa: UP040
     | Mapping[str, "_PlotlyValue"]
     | None
 )
-_ThemeLayoutPayload: TypeAlias = dict[str, _PlotlyValue]  # noqa: UP040
+_ThemeLayoutPayload: TypeAlias = dict[str, _PlotlyValue]
 
 OBSERVATION_COLOR: Final = "#3F83B5"
 # Each CCDC segment is a separate model fit, so each gets its own colour: consecutive segments

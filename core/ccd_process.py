@@ -168,6 +168,30 @@ def _store_result(key, indices, value):
         ccd_results.popitem(last=False)
 
 
+# getRegion's only textual column. Named rather than detected, because a scene id that happens to
+# be all digits would otherwise be converted to float and lose its identity (and, past ~15 digits,
+# its value). Everything else - longitude, latitude, time and the bands - is numeric.
+TEXT_COLUMNS: Final = frozenset({"id"})
+
+
+def _column_array(name, values):
+    """One getRegion column as a numpy array, numeric where the column allows it.
+
+    Stacking the rows instead lets numpy pick a single dtype for the whole table, and every row
+    carries the scene id, so the numeric columns came back as fixed-width unicode (the id is the
+    longest element) whenever no value was masked, and as object arrays when one was. That worked
+    only because float -> str -> float happens to round-trip, and it stored a multi-decade series
+    at many times the cost of float64. Masked values become NaN, which is what the plot filters on.
+    """
+    if name in TEXT_COLUMNS:
+        return np.array(values, dtype=object)
+    try:
+        return np.array([np.nan if value is None else float(value) for value in values], dtype=float)
+    except (TypeError, ValueError):
+        # anything else Earth Engine unexpectedly reports as text
+        return np.array(values, dtype=object)
+
+
 def _build_timeseries(region_rows):
     """Turn a getRegion result into a column dictionary, rejecting fully masked points."""
     if len(region_rows) < 2:
@@ -177,15 +201,23 @@ def _build_timeseries(region_rows):
     # getRegion returns a row for every scene, including ones where the pixel is fully masked
     # (all values None), so a non-empty result does not by itself mean there is anything to fit.
     optical_columns = [header.index(band) for band in OPTICAL_BANDS if band in header]
+    if not optical_columns:
+        raise CCDComputationError(f"No optical bands in the Earth Engine result. Columns: {', '.join(header)}.")
     if not any(row[column] is not None for row in region_rows[1:] for column in optical_columns):
         raise CCDComputationError(
             "Every observation here is masked (cloud/shadow/snow). "
             "Try a wider date/DOY range or a less strict cloud filter."
         )
 
-    stacked = np.stack(region_rows[1:], axis=1)
     # keys are: id, longitude, latitude, time, Blue, Green, Red, ... NDVI, NBR, ...
-    return {name: stacked[index] for index, name in enumerate(header)}
+    # A ragged table would raise a bare ValueError from the strict zips, and the GUI prints
+    # whatever reaches it verbatim, so report it the way every other failure here is reported.
+    try:
+        columns = list(zip(*region_rows[1:], strict=True))
+        pairs = list(zip(header, columns, strict=True))
+    except ValueError:
+        raise CCDComputationError("Malformed result from Earth Engine: the rows do not match the header.")
+    return {name: _column_array(name, column) for name, column in pairs}
 
 
 def compute_ccd(
@@ -207,7 +239,28 @@ def compute_ccd(
 
     point = ee.Geometry.Point(coords)
     ccd_bands, tmask_bands = resolve_ccd_bands(breakpoint_bands, tmask_bands)
+    cache_key = make_cache_key(
+        coords,
+        date_range,
+        doy_range,
+        dataset,
+        breakpoint_bands,
+        num_obs=num_obs,
+        chi_square=chi_square,
+        min_years=min_years,
+        lambda_lasso=lambda_lasso,
+        tmask_bands=tmask_bands,
+        cloud_filter=cloud_filter,
+    )
     indices = resolve_computed_indices(breakpoint_bands, plot_band, tmask_bands)
+    # Fold in whatever a previous run for this exact configuration already built, so this result is
+    # always a superset of it and replaces it without losing a view. Only the plotted band can
+    # differ within one key, so without this two runs that plot different indices (NDVI, then EVI)
+    # build disjoint sets, neither is a subset of the other, and they evict each other in turn -
+    # switching back then costs a full Earth Engine round trip every time.
+    existing = ccd_results.get(cache_key)
+    if existing is not None:
+        indices = resolve_indices([*existing[0], *indices])
 
     if dataset == "Sentinel-2":
         gee_data = get_gee_data_sentinel(coords, date_range, doy_range, dataset, cloud_filter, indices)
@@ -270,22 +323,6 @@ def compute_ccd(
         timeseries = future_timeseries.result()
         ccdc_info = future_ccdc.result()
 
-    _store_result(
-        make_cache_key(
-            coords,
-            date_range,
-            doy_range,
-            dataset,
-            breakpoint_bands,
-            num_obs=num_obs,
-            chi_square=chi_square,
-            min_years=min_years,
-            lambda_lasso=lambda_lasso,
-            tmask_bands=tmask_bands,
-            cloud_filter=cloud_filter,
-        ),
-        indices,
-        (ccdc_info, timeseries),
-    )
+    _store_result(cache_key, indices, (ccdc_info, timeseries))
 
     return ccdc_info, timeseries

@@ -112,6 +112,9 @@ class DownloadAndUnzip(QDialog):
 
         downloaded_ok = self.download_file()
         extracted_ok = (not self._cancelled) and downloaded_ok and self.extract_zip()
+        #: whether the libraries were downloaded and extracted; read by install() before it
+        #: replaces any existing installation
+        self.succeeded = bool(extracted_ok)
 
         if extracted_ok:
             self.progress_label.setText("Done!")
@@ -227,12 +230,67 @@ def get_extlibs_install_path() -> str:
     )
 
 
+STAGING_PREFIX = ".extlibs-incoming-"
+
+
+def _sweep_stale_staging(parent_dir: str, extlibs_dir: str) -> None:
+    """Remove leftovers from a run that never finished.
+
+    The staging tree is only cleaned by install()'s own `finally`, which does not run if QGIS is
+    closed or crashes mid-download, so without this sweep every interrupted attempt would leave
+    another copy behind in the user's profile with nothing to ever collect it.
+    """
+    shutil.rmtree(f"{extlibs_dir}.previous", ignore_errors=True)
+    try:
+        leftovers = [name for name in os.listdir(parent_dir) if name.startswith(STAGING_PREFIX)]
+    except OSError:
+        return
+    for name in leftovers:
+        _log(f"Removing leftover staging directory: {name}")
+        shutil.rmtree(os.path.join(parent_dir, name), ignore_errors=True)
+
+
 def install() -> None:
-    """Download and install the extra Python libraries required by CCD-Plugin."""
+    """Download and install the extra Python libraries required by CCD-Plugin.
+
+    Staged: the download is extracted beside the target and only swapped in once it is complete.
+    Clearing the target first meant a failed or cancelled download - no network, or the release
+    asset missing - left no libraries at all, turning a recoverable retry into a broken install.
+
+    Never raises. classFactory() calls this unguarded, so escaping here would abort the whole
+    plugin load with a traceback instead of the install-instructions dialog it falls through to.
+    """
     extlibs_dir = get_extlibs_install_path()
-    if os.path.isdir(extlibs_dir):
-        _log(f"Removing existing extlibs at: {extlibs_dir}")
-        shutil.rmtree(extlibs_dir, ignore_errors=True)
-    os.makedirs(extlibs_dir, exist_ok=True)
-    _log(f"Installing extra libs to: {extlibs_dir}")
-    DownloadAndUnzip(EXTLIBS_DOWNLOAD_URL, extlibs_dir)
+    parent_dir = os.path.dirname(extlibs_dir)
+    staging_dir = None
+    try:
+        os.makedirs(parent_dir, exist_ok=True)
+        _sweep_stale_staging(parent_dir, extlibs_dir)
+        # staged in the same directory so the swap is a rename, not a cross-filesystem copy
+        staging_dir = tempfile.mkdtemp(prefix=STAGING_PREFIX, dir=parent_dir)
+
+        _log(f"Downloading extra libs for staging at: {staging_dir}")
+        if not DownloadAndUnzip(EXTLIBS_DOWNLOAD_URL, staging_dir).succeeded:
+            _log("Keeping the existing extlibs: the download did not complete.", level="Warning")
+            return
+
+        previous_dir = f"{extlibs_dir}.previous"
+        if os.path.isdir(extlibs_dir):
+            os.replace(extlibs_dir, previous_dir)
+        try:
+            os.replace(staging_dir, extlibs_dir)
+        except OSError:
+            # put the working installation back rather than leaving nothing in place
+            if os.path.isdir(previous_dir):
+                os.replace(previous_dir, extlibs_dir)
+            raise
+        staging_dir = None  # consumed by the swap
+        shutil.rmtree(previous_dir, ignore_errors=True)
+        _log(f"Installed extra libs to: {extlibs_dir}")
+    except Exception as exc:
+        # the completed download is deliberately left in place for the next attempt to sweep,
+        # rather than deleted here and re-fetched from scratch
+        _log(f"Install error: {exc}", level="Critical")
+    else:
+        if staging_dir:
+            shutil.rmtree(staging_dir, ignore_errors=True)

@@ -143,6 +143,9 @@ class CCD_Plugin:
 
         PickerCoordsOnMap.delete_markers()
 
+        # give the canvases their default tool back before the dock goes away
+        self.widget.release_map_tools()
+
         # remove this statement if widget is to remain
         # for reuse if plugin is reopened
         # Commented next statement since it causes QGIS crashe
@@ -153,10 +156,6 @@ class CCD_Plugin:
         # reset some variables
         self.pluginIsActive = False
 
-        from qgis.utils import reloadPlugin
-
-        reloadPlugin("CCD_Plugin - Thematic Raster Editor")
-
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
         self.removes_temporary_files()
@@ -165,9 +164,16 @@ class CCD_Plugin:
         self.iface.removeToolBarIcon(self.dockable_action)
 
         if self.widget:
+            # hand the canvases back their default tool, and drop the cached pickers: each one
+            # holds a reference to this widget and is owned by its canvas, so leaving them in
+            # place keeps the dock reachable no matter what happens below
+            self.widget.release_map_tools()
             self.iface.removeDockWidget(self.widget)
-            # delete the widget
-            del self.widget
+            # Drop the reference rather than deleteLater(): a CCD task still in flight holds the
+            # widget alive through its on_finished bound method, and deleting the C++ object out
+            # from under that callback turns a late finish into a RuntimeError. Releasing this
+            # reference lets it be collected once nothing else refers to it.
+            self.widget = None
 
     def removes_temporary_files(self):
         if not self.widget:

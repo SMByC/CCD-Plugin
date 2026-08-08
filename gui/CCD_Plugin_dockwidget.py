@@ -48,10 +48,18 @@ HAS_WEBENGINE = False
 HAS_WEBKIT = False
 
 try:
-    from qgis.PyQt.QtWebEngineCore import QWebEngineSettings
+    try:
+        # Qt6 moved QWebEngineSettings out of QtWebEngineWidgets; under Qt5 it is still there.
+        # Import it from both, or a Qt5 QGIS that ships WebEngine but no WebKit - increasingly
+        # common on Linux - would be told it has neither.
+        from qgis.PyQt.QtWebEngineCore import QWebEngineSettings
+    except ImportError:
+        from qgis.PyQt.QtWebEngineWidgets import QWebEngineSettings
     from qgis.PyQt.QtWebEngineWidgets import QWebEngineView  # noqa: F401
 
     HAS_WEBENGINE = True
+    # This .ui is loaded by both bindings, so its enums are written unscoped (Qt5 style):
+    # PyQt6's uic accepts that form, while PyQt5's uic cannot parse the Qt6-scoped one.
     FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, "ui", "CCD_Plugin_dockwidget_QWebEngine.ui"))
 except ImportError:
     pass
@@ -116,6 +124,8 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.canvas = canvas if canvas is not None else [iface.mapCanvas()]
         self.config = None
         self.last_config = None
+        self.task = None
+        self.map_tools = {}
 
         self.setupUi(self)
         self.plot_style = _plot_style_from_palette(self.palette())
@@ -137,7 +147,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # set the current date
         self.end_date.setDate(QDate.currentDate())
         # set action center on point
-        self.focus_on_the_coordinates.clicked.connect(self.show_ang_go_to_the_coordinates)
+        self.focus_on_the_coordinates.clicked.connect(self.show_and_go_to_the_coordinates)
         # set action when change the band or index repaint the plot
         self.band_or_index_to_plot.currentIndexChanged.connect(lambda: self.repaint_plot())
 
@@ -194,12 +204,36 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.closingPlugin.emit()
         event.accept()
 
+    def picker_for(self, canvas):
+        """The picker tool for `canvas`, built once.
+
+        QgsMapTool parents itself to its canvas, so a fresh tool per toggle was never freed and
+        they accumulated for the life of the session.
+        """
+        picker = self.map_tools.get(canvas)
+        if picker is None:
+            picker = PickerCoordsOnMap(self, canvas)
+            self.map_tools[canvas] = picker
+        return picker
+
+    def release_map_tools(self):
+        """Hand every canvas back its default tool and drop the cached pickers.
+
+        Without this the picker stays the active tool after the dock goes away: the canvas still
+        owns it, so map clicks keep running against an orphaned widget, and the reference chain
+        canvas -> picker -> picker.widget keeps the whole dock alive.
+        """
+        for canvas, default_map_tool in zip(self.canvas, self.default_map_tools, strict=True):
+            if isinstance(canvas.mapTool(), PickerCoordsOnMap):
+                canvas.setMapTool(default_map_tool, clean=True)
+        self.map_tools.clear()
+
     def setup_map_tool(self, checked):
         if checked:
             # set the map tool to pick coordinates
             for canvas, default_map_tool in zip(self.canvas, self.default_map_tools, strict=True):
                 canvas.unsetMapTool(default_map_tool)
-                canvas.setMapTool(PickerCoordsOnMap(self, canvas), clean=True)
+                canvas.setMapTool(self.picker_for(canvas), clean=True)
         else:
             # finish, set default map tool to canvas
             for canvas, default_map_tool in zip(self.canvas, self.default_map_tools, strict=True):
@@ -223,17 +257,43 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         # nothing but the plotted band changed since the last run, and that is redrawn from cache
         if self.last_config and self.settings_unchanged(config):
+            # say so rather than returning silently, or the button just looks dead
+            self.MsgBar.clearWidgets()
+            self.MsgBar.pushMessage(
+                "CCD-Plugin",
+                "These settings already produced the current plot, nothing to recompute.",
+                level=Qgis.MessageLevel.Info,
+                duration=5,
+            )
+            # deliberately stays in pick mode: nothing was computed, so the user is most likely
+            # still picking and should not have the tool taken away
             return
 
         self.start_ccd_task(config)
 
         # after finish the process
-        self.pick_on_map.click()
+        self.finish_picking()
 
-    @staticmethod
-    def comparable_settings(config):
+    def finish_picking(self):
+        """Leave pick-on-map mode, if it is what started this run.
+
+        Only a toggle *off*: a bare click() also fires when the user pressed Generate directly,
+        which switched the canvas over to the picker instead of releasing it.
+        """
+        if self.pick_on_map.isChecked():
+            self.pick_on_map.click()
+
+    # Presentation and UI preferences: none of these reach compute_ccd, so a change to one must not
+    # look like a settings change. auto_generate_plot especially - it is a plain checkbox, and
+    # counting it here made toggling it force a full Earth Engine recomputation on the next run.
+    NON_COMPUTATION_SETTINGS: ClassVar[frozenset] = frozenset(
+        {"band_or_index_to_plot", "plot_style", "auto_generate_plot"}
+    )
+
+    @classmethod
+    def comparable_settings(cls, config):
         """Everything that drives the computation, excluding presentation-only settings."""
-        return OrderedDict((k, v) for k, v in config.items() if k not in {"band_or_index_to_plot", "plot_style"})
+        return OrderedDict((k, v) for k, v in config.items() if k not in cls.NON_COMPUTATION_SETTINGS)
 
     def settings_unchanged(self, config):
         """True when computation settings match the run that produced the current plot."""
@@ -246,10 +306,10 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.generate_button.setEnabled(False)
         self.band_or_index_to_plot.setEnabled(False)
         self.plot_webview.setHtml(loading_page_html(self.plot_style))
-        globals()["task"] = QgsTask.fromFunction(
-            "Compute CCD", self.compute_ccd, on_finished=self.ccd_completed, config=config
-        )
-        QgsApplication.taskManager().addTask(globals()["task"])
+        # Held on the instance, not in module globals: the plugin is multi-instance, and a second
+        # dock starting a run would otherwise drop the only Python reference to the first one's task.
+        self.task = QgsTask.fromFunction("Compute CCD", self.compute_ccd, on_finished=self.ccd_completed, config=config)
+        QgsApplication.taskManager().addTask(self.task)
 
     @staticmethod
     def compute_ccd(task, config):
@@ -391,11 +451,20 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             except Exception as err:
                 raise Exception(f"Error reading the YAML file to restore the CCD plugin, see more:|{err}")
 
+        # The band combo repaints on currentIndexChanged, and restore_plugin_config sets it before
+        # the dates, DOY and advanced settings. Left connected, that repaint runs against a
+        # half-restored configuration and reports the settings as changed. Restore first, then
+        # repaint once, below.
+        previous_band = self.band_or_index_to_plot.currentText()
+        self.band_or_index_to_plot.blockSignals(True)
         try:
             style_changed = restore_plugin_config(self.id, config)
         except Exception as err:
             raise Exception(f"Error restoring the configuration of the CCD plugin, see more:|{err}")
-        if style_changed:
+        finally:
+            self.band_or_index_to_plot.blockSignals(False)
+
+        if style_changed or self.band_or_index_to_plot.currentText() != previous_band:
             self.repaint_plot()
 
     @error_handler
@@ -429,7 +498,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             except yaml.YAMLError as err:
                 raise Exception(f"Error writing the YAML file to save the CCD plugin, see more:|{err}")
 
-    def show_ang_go_to_the_coordinates(self):
+    def show_and_go_to_the_coordinates(self):
         if PickerCoordsOnMap.marker_drawn["canvas"] is not None:
             canvas = PickerCoordsOnMap.marker_drawn["canvas"]
         else:
@@ -441,8 +510,8 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         crsDest = canvas.mapSettings().destinationCrs()
         xform = QgsCoordinateTransform(crsSrc, crsDest, QgsProject.instance())
         point = xform.transform(point)
-        # create a marker
-        PickerCoordsOnMap(self, canvas).create_marker(point)
+        # create a marker; drawing one needs no map tool, so do not build one just to place it
+        PickerCoordsOnMap.create_marker(canvas, point)
         canvas.setCenter(point)
         canvas.refresh()
 
@@ -465,6 +534,15 @@ class PickerCoordsOnMap(QgsMapTool):
         self.widget = widget
         self.canvas = canvas if canvas is not None else iface.mapCanvas()
         super().__init__(self.canvas)
+
+    def activate(self):
+        """Take keyboard focus every time the tool is set, not just when it is built.
+
+        The canvas only delivers keyPressEvent while it holds focus, so Escape stops leaving pick
+        mode once focus has moved to the dock. The tool is now built once and reused, so grabbing
+        focus in __init__ would do it only on the first activation.
+        """
+        super().activate()
         self.canvas.setFocus()
 
     @staticmethod
@@ -473,23 +551,29 @@ class PickerCoordsOnMap(QgsMapTool):
             PickerCoordsOnMap.marker_drawn["canvas"].scene().removeItem(PickerCoordsOnMap.marker_drawn["marker"])
         PickerCoordsOnMap.marker_drawn = {"marker": None, "canvas": None}
 
-    def create_marker(self, point):
+    @classmethod
+    def create_marker(cls, canvas, point):
+        """Draw the single coordinate marker on `canvas`, replacing any previous one.
+
+        A classmethod because placing a marker is independent of the map tool: building a tool
+        just to draw one parented an extra QgsMapTool to the canvas on every call.
+        """
         # remove the previous marker
-        self.delete_markers()
+        cls.delete_markers()
         # create a marker
-        marker = QgsVertexMarker(self.canvas)
+        marker = QgsVertexMarker(canvas)
         marker.setCenter(point)
         marker.setColor(QColor("red"))
         marker.setIconSize(30)
         marker.setIconType(QgsVertexMarker.IconType.ICON_CROSS)
         marker.setPenWidth(3)
-        PickerCoordsOnMap.marker_drawn["marker"] = marker
-        PickerCoordsOnMap.marker_drawn["canvas"] = self.canvas
+        cls.marker_drawn["marker"] = marker
+        cls.marker_drawn["canvas"] = canvas
 
     def canvasPressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             point = self.canvas.getCoordinateTransform().toMapCoordinates(event.pos().x(), event.pos().y())
-            self.create_marker(point)
+            self.create_marker(self.canvas, point)
             # transform coordinates to WGS84
             crsSrc = self.canvas.mapSettings().destinationCrs()
             crsDest = QgsCoordinateReferenceSystem(4326)

@@ -21,7 +21,7 @@
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from numbers import Real
-from typing import Final
+from typing import Final, TypeAlias
 
 import numpy as np
 
@@ -29,8 +29,11 @@ MILLISECONDS_PER_YEAR: Final = 365.25 * 24 * 60 * 60 * 1000
 MILLISECONDS_PER_DAY: Final = 24 * 60 * 60 * 1000
 CCDC_COEFFICIENT_COUNT: Final = 8
 
-type NumericValue = int | float | None
-type ReduceRegionValue = Sequence[Sequence[NumericValue | Sequence[NumericValue]]]
+# Spelled with TypeAlias rather than the PEP 695 `type` statement, which is a hard SyntaxError
+# before 3.12. The plugin's floor is 3.11, set by datetime.UTC and typing.assert_never in
+# plot.py; ruff's target-version is pinned there too, so UP040 does not push this back.
+NumericValue: TypeAlias = int | float | None
+ReduceRegionValue: TypeAlias = Sequence[Sequence[NumericValue | Sequence[NumericValue]]]
 
 
 # CCDC reports changeProb per segment: 1 once a break is confirmed, 0 when the segment simply
