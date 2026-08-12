@@ -26,7 +26,7 @@ import tempfile
 import urllib.request
 import zipfile
 
-from qgis.core import Qgis, QgsApplication, QgsMessageLog
+from qgis.core import Qgis, QgsMessageLog
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import (
     QApplication,
@@ -220,14 +220,14 @@ class DownloadAndUnzip(QDialog):
 
 
 def get_extlibs_install_path() -> str:
-    """Return the ``extlibs`` directory inside this plugin."""
-    return os.path.join(
-        QgsApplication.qgisSettingsDirPath(),
-        "python",
-        "plugins",
-        "CCD_Plugin",
-        "extlibs",
-    )
+    """Return the ``extlibs`` directory inside this plugin.
+
+    Derived from this file rather than from the active profile, so the libraries always land in the
+    directory ``pre_init_plugin()`` puts on ``sys.path``. Built from the profile path they can
+    disagree - a plugin loaded from outside the active profile, QGIS_PLUGINPATH - and then the
+    install goes somewhere nothing ever imports from, leaving it to download again on every start.
+    """
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "extlibs")
 
 
 STAGING_PREFIX = ".extlibs-incoming-"

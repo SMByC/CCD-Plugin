@@ -156,6 +156,8 @@ extlibs:
 	pip install --target=extlibs -r requirements.txt
 	find extlibs -type d \( -name "__pycache__" -o -name "*.egg-info" -o -name "tests" -o -name "test" -o -name "bin" -o -name "examples" \) -prune -exec rm -rf {} +
 	find extlibs -type f \( -name "*.pyc" -o -name "*.pyo" -o -name "*.so" -o -name "*.dll" -o -name "*.dylib" \) -delete
+	# plotly's Jupyter payload: ~14 MB of notebook widget bundles this plugin never loads
+	rm -rf extlibs/share extlibs/plotly/labextension extlibs/plotly/package_data/widgetbundle.js
 	cd extlibs && zip -9r ../extlibs.zip .
 	rm -rf extlibs
 	@echo "Created package: extlibs.zip"
