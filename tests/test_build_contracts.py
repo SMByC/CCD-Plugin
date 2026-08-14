@@ -9,28 +9,29 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class BuildContractTest(unittest.TestCase):
-    def test_dependency_sources_leave_plotly_unpinned_and_lock_it(self):
-        # Given: project, extlibs, and lock dependency declarations.
+    def test_requirements_is_the_only_runtime_dependency_source(self):
+        # Given: the project metadata and runtime requirements declaration.
         pyproject = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
         requirements = (PROJECT_ROOT / "requirements.txt").read_text(encoding="utf-8")
-        lockfile = tomllib.loads((PROJECT_ROOT / "uv.lock").read_text(encoding="utf-8"))
+        gitignore = (PROJECT_ROOT / ".gitignore").read_text(encoding="utf-8")
 
-        # When/Then: source declarations stay intentionally unpinned while uv resolves Plotly.
-        plotly_dependencies = [
-            dependency for dependency in pyproject["project"]["dependencies"] if dependency.startswith("plotly")
-        ]
-        self.assertEqual(plotly_dependencies, ["plotly"])
+        # When/Then: Plotly is unpinned in the sole runtime source and lockfiles stay absent.
         self.assertEqual(requirements.splitlines(), ["plotly"])
-        self.assertTrue(any(package["name"] == "plotly" for package in lockfile["package"]))
+        self.assertNotIn("dependencies", pyproject["project"])
+        self.assertFalse((PROJECT_ROOT / "uv.lock").exists())
+        self.assertIn("uv.lock", gitignore.splitlines())
 
-    def test_make_uses_frozen_uv_without_legacy_upload_or_digest(self):
+    def test_make_uses_lockless_uv_without_legacy_upload_or_digest(self):
         # Given: the non-GUI automation surface.
         makefile = (PROJECT_ROOT / "Makefile").read_text(encoding="utf-8")
 
-        # When/Then: tests and extlibs are lockfile-bound without superseded release code.
-        self.assertIn("uv run --frozen python -m unittest", makefile)
-        self.assertIn("uv export --frozen --no-dev --no-emit-project", makefile)
-        self.assertIn("uv pip install --target=extlibs", makefile)
+        # When/Then: tests and extlibs bypass project locking without superseded release code.
+        self.assertIn(
+            "uv run --no-project --with-requirements requirements.txt --with numpy python -m unittest", makefile
+        )
+        self.assertIn("uv pip install --target=extlibs -r requirements.txt", makefile)
+        for forbidden in ("uv export", "--frozen", "--require-hashes", ".extlibs-requirements.txt", "uv.lock"):
+            self.assertNotIn(forbidden, makefile)
         self.assertNotIn("plugin_upload", makefile)
         self.assertNotRegex(makefile, r"(?m)^(?:upload|package):")
         self.assertNotIn("extlibs-sha256", makefile)
@@ -91,30 +92,37 @@ class BuildContractTest(unittest.TestCase):
         self.assertIn("usage:", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
 
-    def test_extlibs_cleanup_removes_install_metadata_and_lock_files(self):
+    def test_extlibs_stamps_installed_plotly_version_before_cleanup(self):
         # Given: the extlibs build recipe.
         makefile = (PROJECT_ROOT / "Makefile").read_text(encoding="utf-8")
 
-        # When/Then: packaging metadata and uv lock markers are removed.
+        # When/Then: Plotly keeps its installed version after packaging metadata is removed.
+        version_capture = 'from importlib.metadata import version; print(version(\'plotly\'))'
+        self.assertIn(version_capture, makefile)
+        self.assertIn('__version__ = \\"$${PLOTLY_VERSION}\\"', makefile)
+        self.assertLess(makefile.index(version_capture), makefile.index('-name "*.dist-info"'))
         self.assertIn('-name "*.dist-info"', makefile)
         self.assertIn('-name "*.egg-info"', makefile)
         self.assertIn('-name ".lock"', makefile)
         self.assertIn(".PHONY: extlibs", makefile)
-        self.assertIn('__version__ = "6.7.0"', makefile)
-        self.assertIn("import narwhals, packaging, plotly", makefile)
+        self.assertNotIn("6.7.0", makefile)
+        self.assertIn("import plotly, plotly.graph_objects; assert plotly.__version__", makefile)
 
     def test_workflows_build_plugin_and_extlibs_artifacts(self):
         # Given: manual and tagged release workflows.
         package = (PROJECT_ROOT / ".github" / "workflows" / "package.yml").read_text(encoding="utf-8")
         release = (PROJECT_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
 
-        # When/Then: both use the pinned isolated CLI and deterministic build inputs.
+        # When/Then: both use the pinned isolated CLI without dependency caching.
         for workflow in (package, release):
             self.assertIn("actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2", workflow)
             self.assertIn("actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0", workflow)
             self.assertIn("astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc # v6.4.3", workflow)
             self.assertIn("qgis-plugin-ci==2.10.0", workflow)
             self.assertIn('python-version: "3.12"', workflow)
+            self.assertNotIn("enable-cache", workflow)
+            self.assertNotIn("cache-dependency-glob", workflow)
+            self.assertNotIn("uv.lock", workflow)
             self.assertIn("make extlibs", workflow)
             self.assertIn("scripts/stage_plugin.py", workflow)
             self.assertIn("resources.py", workflow)

@@ -87,7 +87,7 @@ resources.py: resources.qrc $(RESOURCE_SRC)
 	$(LRELEASE) $<
 
 test: compile
-	PYTHONPATH="$(CURDIR):$(CURDIR)/extlibs" uv run --frozen python -m unittest discover -s tests -p 'test_*.py' -v
+	PYTHONPATH="$(CURDIR):$(CURDIR)/extlibs" uv run --no-project --with-requirements requirements.txt --with numpy python -m unittest discover -s tests -p 'test_*.py' -v
 
 qgis-smoke: compile
 	CCD_RUN_QGIS4_SMOKE=1 QTWEBENGINE_DISABLE_SANDBOX=1 \
@@ -136,15 +136,14 @@ extlibs:
 	@echo "Building extlibs.zip"
 	@echo "---------------------------"
 	rm -rf extlibs extlibs.zip
-	uv export --frozen --no-dev --no-emit-project --no-header --output-file .extlibs-requirements.txt
-	uv pip install --target=extlibs --require-hashes -r .extlibs-requirements.txt
-	rm -f .extlibs-requirements.txt
+	uv pip install --target=extlibs -r requirements.txt
+	PLOTLY_VERSION=$$(PYTHONPATH="$(CURDIR)/extlibs" python3 -c "from importlib.metadata import version; print(version('plotly'))"); \
+		sed -i "/^import importlib\.metadata$$/d;s/^__version__ = importlib\.metadata\.version(\"plotly\")$$/__version__ = \"$${PLOTLY_VERSION}\"/" extlibs/plotly/__init__.py
 	find extlibs -type d \( -name "__pycache__" -o -name "*.dist-info" -o -name "*.egg-info" -o -name "tests" -o -name "test" -o -name "bin" -o -name "examples" \) -prune -exec rm -rf {} +
 	find extlibs -type f \( -name ".lock" -o -name "*.pyc" -o -name "*.pyo" -o -name "*.so" -o -name "*.dll" -o -name "*.dylib" \) -delete
-	sed -i '/^import importlib\.metadata$$/d;s/^__version__ = importlib\.metadata\.version("plotly")$$/__version__ = "6.7.0"/' extlibs/plotly/__init__.py
 	# plotly's Jupyter payload: ~14 MB of notebook widget bundles this plugin never loads
 	rm -rf extlibs/share extlibs/plotly/labextension extlibs/plotly/package_data/widgetbundle.js
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(CURDIR)/extlibs" python3 -c "import narwhals, packaging, plotly; assert plotly.__version__ == '6.7.0'; assert narwhals.__package__ == 'narwhals'; assert packaging.__package__ == 'packaging'"
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(CURDIR)/extlibs" python3 -c "import plotly, plotly.graph_objects; assert plotly.__version__"
 	cd extlibs && zip -9r ../extlibs.zip .
 	rm -rf extlibs
 	@echo "Created package: extlibs.zip"
