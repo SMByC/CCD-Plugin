@@ -87,9 +87,9 @@ The plugin needs to work:
 - Google Earth Engine [plugin](https://gee-community.github.io/qgis-earthengine-plugin/ ): The user needs to have this plugin installed and an active Google Earth Engine (EE) account.
 - Plotly. Most of the Qgis versions have this library inside, otherwise the plugin install it automatically.
 
-Each numeric GitHub release includes `extlibs.zip`, built reproducibly from `uv.lock`. If automatic installation is
-not available, download that asset from the release matching the plugin version and extract its contents into an
-`extlibs` directory inside `CCD_Plugin`.
+Each numeric GitHub release includes `extlibs.zip`, built with the latest compatible dependencies resolved from
+`requirements.txt`. If automatic installation is not available, download that asset from the release matching the
+plugin version and extract its contents into an `extlibs` directory inside `CCD_Plugin`.
 
 Release packages are built with `qgis-plugin-ci` from a staged `CCD_Plugin/` directory. The stage keeps the tracked
 Qt 6 `resources.py` and omits `resources.qrc`, tests, development files, and generated build artifacts so the archive
