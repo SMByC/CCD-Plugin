@@ -1,10 +1,19 @@
+import concurrent.futures
+import sys
+import threading
+import types
 import unittest
+from collections import OrderedDict
+from unittest.mock import Mock, patch
 
+import core.ccd_process as ccd_process_module
 from core.ccd_process import (
     DATASET_AVAILABILITY,
     _no_images_message,
     _store_result,
     ccd_results,
+    clear_results_cache,
+    compute_ccd,
     lookup_result,
     resolve_computed_indices,
 )
@@ -61,8 +70,8 @@ class ComputedIndicesTest(unittest.TestCase):
 
 class CacheLookupTest(unittest.TestCase):
     def setUp(self):
-        ccd_results.clear()
-        self.addCleanup(ccd_results.clear)
+        clear_results_cache()
+        self.addCleanup(clear_results_cache)
 
     def test_a_run_serves_any_view_needing_a_subset_of_its_indices(self):
         # Given: a run that built NDVI.
@@ -99,6 +108,122 @@ class CacheLookupTest(unittest.TestCase):
 
     def test_missing_key_is_a_miss(self):
         self.assertIsNone(lookup_result("nothing here", ()))
+
+    def test_cancelled_result_is_not_stored(self):
+        # Given: unload cancellation has been observed before cache publication.
+        # When: a completed Earth Engine result reaches the cache boundary.
+        stored = _store_result("k", (), ("fit", "series"), cancelled=lambda: True)
+
+        # Then: the cancelled run cannot repopulate the cleared cache.
+        self.assertFalse(stored)
+        self.assertNotIn("k", ccd_results)
+
+    def test_clear_is_atomic_with_cancellation_check_and_store(self):
+        # Given: cache publication is paused while holding its publication lock.
+        cancellation_checked = threading.Event()
+        allow_store = threading.Event()
+
+        def cancellation_probe():
+            cancellation_checked.set()
+            allow_store.wait(timeout=2)
+            return False
+
+        publishing = threading.Thread(
+            target=_store_result,
+            args=("k", (), ("fit", "series")),
+            kwargs={"cancelled": cancellation_probe},
+        )
+        publishing.start()
+        self.assertTrue(cancellation_checked.wait(timeout=2))
+
+        # When: unload clear races the accepted cache publication.
+        cleared = threading.Event()
+        clearing = threading.Thread(target=lambda: (clear_results_cache(), cleared.set()))
+        clearing.start()
+        self.assertFalse(cleared.wait(timeout=0.05))
+        allow_store.set()
+        publishing.join(timeout=2)
+        clearing.join(timeout=2)
+
+        # Then: clear runs after publication and leaves no stale result.
+        self.assertTrue(cleared.is_set())
+        self.assertNotIn("k", ccd_results)
+
+    def test_lookup_is_atomic_with_cache_clear(self):
+        # Given: a lookup paused after reading an entry but before updating its LRU position.
+        lookup_read = threading.Event()
+        allow_lookup = threading.Event()
+        cleared = threading.Event()
+
+        class PausingCache(OrderedDict):
+            def get(self, key, default=None):
+                value = super().get(key, default)
+                lookup_read.set()
+                allow_lookup.wait(timeout=2)
+                return value
+
+        cache = PausingCache({"k": (("NDVI",), "fit", "series")})
+        with (
+            patch.object(ccd_process_module, "ccd_results", cache),
+            concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor,
+        ):
+            lookup = executor.submit(lookup_result, "k", ("NDVI",))
+            self.assertTrue(lookup_read.wait(timeout=2))
+
+            # When: teardown tries to clear the cache during the compound lookup.
+            clearing = executor.submit(lambda: (clear_results_cache(), cleared.set()))
+            cleared_during_lookup = cleared.wait(timeout=0.05)
+            allow_lookup.set()
+
+            # Then: clear waits for the lookup transaction, which returns without an LRU race.
+            self.assertFalse(cleared_during_lookup)
+            self.assertEqual(lookup.result(timeout=2), ("fit", "series"))
+            clearing.result(timeout=2)
+
+    def test_compute_snapshots_cached_indices_under_lock_before_earth_engine_work(self):
+        # Given: cache and Earth Engine seams that record whether the result lock is held.
+        class RecordingLock:
+            def __init__(self):
+                self.held = False
+
+            def __enter__(self):
+                self.held = True
+
+            def __exit__(self, _exception_type, _exception, _traceback):
+                self.held = False
+
+        lock = RecordingLock()
+        cache = Mock()
+
+        def read_cached(_key):
+            self.assertTrue(lock.held)
+            return None
+
+        def request_earth_engine_data(*_args):
+            self.assertFalse(lock.held)
+            raise RuntimeError("Earth Engine work reached")
+
+        cache.get.side_effect = read_cached
+        fake_ee = types.SimpleNamespace(Geometry=types.SimpleNamespace(Point=lambda coords: coords))
+        with (
+            patch.dict(sys.modules, {"ee": fake_ee}),
+            patch.object(ccd_process_module, "_RESULTS_LOCK", lock),
+            patch.object(ccd_process_module, "ccd_results", cache),
+            patch.object(ccd_process_module, "get_gee_data_landsat", request_earth_engine_data),
+            self.assertRaisesRegex(RuntimeError, "Earth Engine work reached"),
+        ):
+            compute_ccd(
+                coords=(0, 0),
+                date_range=("2020-01-01", "2021-01-01"),
+                doy_range=(1, 365),
+                dataset="Landsat C2",
+                breakpoint_bands=("Green", "Red", "NIR", "SWIR1", "SWIR2"),
+                tmask_bands=None,
+                num_obs=6,
+                chi_square=0.99,
+                min_years=1.33,
+                lambda_lasso=0.002,
+            )
 
 
 if __name__ == "__main__":

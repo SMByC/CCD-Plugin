@@ -34,16 +34,15 @@ class LoadingPageContractTest(unittest.TestCase):
         self.assertRegex(document, r"(?s)\.spinner\s*\{[^}]*left\s*:\s*50%")
         self.assertRegex(document, r"(?s)\.spinner\s*\{[^}]*transform\s*:\s*translate\(")
 
-    def test_spinner_supports_standard_and_webkit_rotation(self):
-        # Given: a generated loading page for a QtWebKit-compatible browser.
+    def test_spinner_uses_standard_rotation_without_webkit_legacy_css(self):
+        # Given: a generated loading page for Qt WebEngine.
         document = loading_page_html(PlotStyle.DARK)
 
         # When: the browser reads the spinner animation declarations.
-        # Then: both standard and prefixed animation paths rotate the spinner.
+        # Then: the standard animation path rotates the spinner without WebKit prefixes.
         self.assertRegex(document, r"animation\s*:\s*spin\b")
-        self.assertRegex(document, r"-webkit-animation\s*:\s*spin\b")
         self.assertRegex(document, r"@keyframes\s+spin\b")
-        self.assertRegex(document, r"@-webkit-keyframes\s+spin\b")
+        self.assertNotIn("-webkit-", document)
 
     def test_generated_page_is_asset_free_and_theme_specific(self):
         # Given: both theme variants are generated without external page assets.

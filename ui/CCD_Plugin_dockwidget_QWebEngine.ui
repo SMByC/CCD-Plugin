@@ -39,7 +39,7 @@
     <item>
      <widget class="QgsMessageBar" name="MsgBar">
       <property name="frameShape">
-       <enum>QFrame::NoFrame</enum>
+        <enum>QFrame::Shape::NoFrame</enum>
       </property>
       <property name="lineWidth">
        <number>0</number>
@@ -118,10 +118,10 @@
                 <item>
                  <spacer name="horizontalSpacer_2">
                   <property name="orientation">
-                   <enum>Qt::Horizontal</enum>
+                    <enum>Qt::Orientation::Horizontal</enum>
                   </property>
                   <property name="sizeType">
-                   <enum>QSizePolicy::Maximum</enum>
+                    <enum>QSizePolicy::Policy::Maximum</enum>
                   </property>
                   <property name="sizeHint" stdset="0">
                    <size>
@@ -143,7 +143,7 @@
                    <string>Coordinates:</string>
                   </property>
                   <property name="alignment">
-                   <set>Qt::AlignCenter</set>
+                    <set>Qt::AlignmentFlag::AlignCenter</set>
                   </property>
                  </widget>
                 </item>
@@ -166,7 +166,7 @@
                    <bool>true</bool>
                   </property>
                   <property name="toolButtonStyle">
-                   <enum>Qt::ToolButtonTextBesideIcon</enum>
+                    <enum>Qt::ToolButtonStyle::ToolButtonTextBesideIcon</enum>
                   </property>
                   <property name="autoRaise">
                    <bool>true</bool>
@@ -186,7 +186,7 @@
                     <normaloff>:/plugins/CCD_Plugin/icons/clear.svg</normaloff>:/plugins/CCD_Plugin/icons/clear.svg</iconset>
                   </property>
                   <property name="toolButtonStyle">
-                   <enum>Qt::ToolButtonIconOnly</enum>
+                    <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
                   </property>
                   <property name="autoRaise">
                    <bool>true</bool>
@@ -196,10 +196,10 @@
                 <item>
                  <spacer name="horizontalSpacer_3">
                   <property name="orientation">
-                   <enum>Qt::Horizontal</enum>
+                    <enum>Qt::Orientation::Horizontal</enum>
                   </property>
                   <property name="sizeType">
-                   <enum>QSizePolicy::Maximum</enum>
+                    <enum>QSizePolicy::Policy::Maximum</enum>
                   </property>
                   <property name="sizeHint" stdset="0">
                    <size>
@@ -242,7 +242,7 @@
                    <string>Lat:</string>
                   </property>
                   <property name="alignment">
-                   <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                    <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
                   </property>
                  </widget>
                 </item>
@@ -252,7 +252,7 @@
                    <string>Latitude in geographic coordinates</string>
                   </property>
                   <property name="buttonSymbols">
-                   <enum>QAbstractSpinBox::NoButtons</enum>
+                    <enum>QAbstractSpinBox::ButtonSymbols::NoButtons</enum>
                   </property>
                   <property name="decimals">
                    <number>5</number>
@@ -277,7 +277,7 @@
                    <string>Lon:</string>
                   </property>
                   <property name="alignment">
-                   <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                    <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
                   </property>
                  </widget>
                 </item>
@@ -287,7 +287,7 @@
                    <string>Longitude in geographic coordinates</string>
                   </property>
                   <property name="buttonSymbols">
-                   <enum>QAbstractSpinBox::NoButtons</enum>
+                    <enum>QAbstractSpinBox::ButtonSymbols::NoButtons</enum>
                   </property>
                   <property name="decimals">
                    <number>5</number>
@@ -313,7 +313,7 @@
                     <normaloff>:/plugins/CCD_Plugin/icons/center_on_point.svg</normaloff>:/plugins/CCD_Plugin/icons/center_on_point.svg</iconset>
                   </property>
                   <property name="toolButtonStyle">
-                   <enum>Qt::ToolButtonIconOnly</enum>
+                    <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
                   </property>
                   <property name="autoRaise">
                    <bool>true</bool>
@@ -368,7 +368,7 @@
                    <string>Dataset</string>
                   </property>
                   <property name="alignment">
-                   <set>Qt::AlignCenter</set>
+                   <set>Qt::AlignmentFlag::AlignCenter</set>
                   </property>
                  </widget>
                 </item>
@@ -384,7 +384,7 @@
                     <number>0</number>
                    </property>
                    <property name="sizeAdjustPolicy">
-                    <enum>QComboBox::AdjustToContents</enum>
+                    <enum>QComboBox::SizeAdjustPolicy::AdjustToContents</enum>
                    </property>
                    <item>
                    <property name="text">
@@ -425,7 +425,7 @@
                    <string>Band/Index to plot</string>
                   </property>
                   <property name="alignment">
-                   <set>Qt::AlignCenter</set>
+                   <set>Qt::AlignmentFlag::AlignCenter</set>
                   </property>
                  </widget>
                 </item>
@@ -438,7 +438,7 @@
                    <string>Blue</string>
                   </property>
                   <property name="sizeAdjustPolicy">
-                   <enum>QComboBox::AdjustToContents</enum>
+                    <enum>QComboBox::SizeAdjustPolicy::AdjustToContents</enum>
                   </property>
                   <item>
                    <property name="text">
@@ -548,7 +548,7 @@
                 <string>Bands/Indices for Change Detection</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
               </widget>
              </item>
@@ -561,7 +561,7 @@
                 <bool>true</bool>
                </property>
                <property name="sizeAdjustPolicy">
-                <enum>QComboBox::AdjustToContents</enum>
+                <enum>QComboBox::SizeAdjustPolicy::AdjustToContents</enum>
                </property>
               </widget>
              </item>
@@ -599,7 +599,7 @@
                 <string>Date Range</string>
                </property>
                <property name="alignment">
-                <set>Qt::AlignCenter</set>
+                <set>Qt::AlignmentFlag::AlignCenter</set>
                </property>
               </widget>
              </item>
@@ -657,7 +657,7 @@
                  <normaloff>:/plugins/CCD_Plugin/icons/settings.svg</normaloff>:/plugins/CCD_Plugin/icons/settings.svg</iconset>
                </property>
                <property name="toolButtonStyle">
-                <enum>Qt::ToolButtonTextBesideIcon</enum>
+                <enum>Qt::ToolButtonStyle::ToolButtonTextBesideIcon</enum>
                </property>
                <property name="autoRaise">
                 <bool>false</bool>
@@ -677,7 +677,7 @@
                  <normaloff>:/plugins/CCD_Plugin/icons/open.svg</normaloff>:/plugins/CCD_Plugin/icons/open.svg</iconset>
                </property>
                <property name="toolButtonStyle">
-                <enum>Qt::ToolButtonIconOnly</enum>
+                <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
                </property>
                <property name="autoRaise">
                 <bool>true</bool>
@@ -697,7 +697,7 @@
                  <normaloff>:/plugins/CCD_Plugin/icons/save.svg</normaloff>:/plugins/CCD_Plugin/icons/save.svg</iconset>
                </property>
                <property name="toolButtonStyle">
-                <enum>Qt::ToolButtonIconOnly</enum>
+                <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
                </property>
                <property name="autoRaise">
                 <bool>true</bool>
@@ -707,10 +707,10 @@
              <item>
               <spacer name="horizontalSpacer">
                <property name="orientation">
-                <enum>Qt::Horizontal</enum>
+                <enum>Qt::Orientation::Horizontal</enum>
                </property>
                <property name="sizeType">
-                <enum>QSizePolicy::Minimum</enum>
+                <enum>QSizePolicy::Policy::Minimum</enum>
                </property>
                <property name="sizeHint" stdset="0">
                 <size>
@@ -739,7 +739,7 @@
                 <bool>true</bool>
                </property>
                <property name="toolButtonStyle">
-                <enum>Qt::ToolButtonIconOnly</enum>
+                <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
                </property>
               </widget>
              </item>
@@ -756,7 +756,7 @@
                  <normaloff>:/plugins/CCD_Plugin/icons/generate.svg</normaloff>:/plugins/CCD_Plugin/icons/generate.svg</iconset>
                </property>
                <property name="toolButtonStyle">
-                <enum>Qt::ToolButtonTextBesideIcon</enum>
+                <enum>Qt::ToolButtonStyle::ToolButtonTextBesideIcon</enum>
                </property>
               </widget>
              </item>

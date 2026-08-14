@@ -22,16 +22,17 @@ with the collaboration of:
     Daniel Moraes <moraesd90@gmail.com>
 """
 
-import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import Enum
+from pathlib import Path
 from typing import Final, TypeAlias, assert_never
 
 import plotly.graph_objects as go
 
 from .gee_common import INDEX_BANDS, OPTICAL_BANDS
+from .lifecycle import PlotFileLifecycle
 from .plot_data import MILLISECONDS_PER_YEAR as MILLISECONDS_PER_YEAR
 from .plot_data import ModelSegment as ModelSegment
 from .plot_data import build_model_segments as build_model_segments
@@ -195,7 +196,7 @@ def _theme_settings(style: PlotStyle) -> tuple[PlotTheme, int]:
 
 
 def _page_theme_script(style: PlotStyle) -> str:
-    theme, _ = _theme_settings(style)
+    theme, active_style_index = _theme_settings(style)
     return f"""
 const graphDiv = document.getElementById("{{plot_id}}");
 const backgrounds = Object.freeze({{
@@ -207,17 +208,23 @@ const minimumWidth = 30;
 const buttonGap = 2;
 const visibleHeight = 20;
 const textBaselineY = 13;
+let activeStyleIndex = {active_style_index};
 const setPageBackground = (color) => {{
     document.documentElement.style.backgroundColor = color;
     document.body.style.backgroundColor = color;
 }};
-const currentActiveIndex = () => graphDiv._fullLayout.updatemenus[0].active;
 const ensureThemeControlStyles = () => {{
     graphDiv.classList.add("ccd-theme-controls");
     if (!graphDiv.querySelector('style[data-ccd-theme-controls="true"]')) {{
-        const style = document.createElement("style");
-        style.dataset.ccdThemeControls = "true";
-        style.textContent = `
+        const themeStyles = document.createElement("style");
+        themeStyles.dataset.ccdThemeControls = "true";
+        themeStyles.textContent = `
+.ccd-theme-controls:not(.ccd-theme-dark) .updatemenu-button.ccd-theme-active .updatemenu-item-rect {{
+    fill: {LIGHT_THEME.control_active_background} !important;
+}}
+.ccd-theme-controls:not(.ccd-theme-dark) .updatemenu-button:hover .updatemenu-item-rect {{
+    fill: {LIGHT_THEME.control_hover_background} !important;
+}}
 .ccd-theme-controls.ccd-theme-dark .updatemenu-item-rect {{
     fill: {DARK_THEME.control_background} !important;
 }}
@@ -228,7 +235,7 @@ const ensureThemeControlStyles = () => {{
     fill: {DARK_THEME.control_hover_background} !important;
 }}
 `;
-        graphDiv.appendChild(style);
+        graphDiv.appendChild(themeStyles);
     }}
 }};
 const adjustThemeControls = () => {{
@@ -238,12 +245,9 @@ const adjustThemeControls = () => {{
     if (!buttons.length || buttons.length !== rects.length || buttons.length !== texts.length) {{
         return;
     }}
-    const activeIndex = currentActiveIndex();
-    graphDiv.classList.toggle("ccd-theme-dark", activeIndex === 1);
-    const imageCornerX = 0;
-    const imageCornerY = 0;
-    let currentX = imageCornerX;
-    const rowY = imageCornerY;
+    graphDiv.classList.toggle("ccd-theme-dark", activeStyleIndex === 1);
+    let currentX = 0;
+    const rowY = 0;
     buttons.forEach((button, index) => {{
         const rect = rects[index];
         const text = texts[index];
@@ -254,7 +258,7 @@ const adjustThemeControls = () => {{
         text.setAttribute("x", horizontalPadding);
         text.setAttribute("y", textBaselineY);
         currentX += width + buttonGap;
-        button.classList.toggle("ccd-theme-active", index === activeIndex);
+        button.classList.toggle("ccd-theme-active", index === activeStyleIndex);
     }});
 }};
 let adjustmentFrame = 0;
@@ -270,6 +274,7 @@ const scheduleThemeControlAdjustment = () => {{
 ensureThemeControlStyles();
 setPageBackground("{theme.background_color}");
 graphDiv.on("plotly_buttonclicked", (event) => {{
+    activeStyleIndex = event.active;
     setPageBackground(backgrounds[event.button.label]);
     window.location.hash = event.button.label.toLowerCase();
     scheduleThemeControlAdjustment();
@@ -277,6 +282,34 @@ graphDiv.on("plotly_buttonclicked", (event) => {{
 graphDiv.on("plotly_afterplot", scheduleThemeControlAdjustment);
 scheduleThemeControlAdjustment();
 """
+
+
+def write_plot_html(
+    figure: go.Figure,
+    html_path: str | Path,
+    *,
+    image_filename: str,
+    style: PlotStyle,
+) -> None:
+    figure.write_html(
+        html_path,
+        full_html=True,
+        include_plotlyjs=True,
+        include_mathjax=False,
+        auto_open=False,
+        post_script=_page_theme_script(style),
+        config={
+            "displaylogo": False,
+            "responsive": True,
+            "displayModeBar": "hover",
+            "modeBarButtonsToRemove": ["lasso2d", "select2d"],
+            "toImageButtonOptions": {
+                "format": "png",
+                "filename": image_filename,
+                "scale": 2,
+            },
+        },
+    )
 
 
 def _trace_colors(theme: PlotTheme, has_observations: bool, segment_count: int) -> list[str]:
@@ -503,7 +536,7 @@ def build_figure(ccdc_result_info, timeseries, spec: PlotSpec, *, style: PlotSty
             "yref": "paper",
             "y": 1,
             "yanchor": "bottom",
-            "pad": {"b": 18},
+            "pad": {"b": 22},
             "font": {"color": theme.text_color, "size": 13},
         },
         # Floated into the top-right of the plot area instead of stacked under the title, where it
@@ -512,8 +545,10 @@ def build_figure(ccdc_result_info, timeseries, spec: PlotSpec, *, style: PlotSty
         legend={
             "orientation": "h",
             "x": 1,
+            "xref": "paper",
             "xanchor": "right",
             "y": 1,
+            "yref": "paper",
             "yanchor": "top",
             "bgcolor": theme.overlay_background,
             "borderwidth": 0,
@@ -574,39 +609,21 @@ def build_figure(ccdc_result_info, timeseries, spec: PlotSpec, *, style: PlotSty
 
 
 def generate_plot(
-    id, ccdc_result_info, timeseries, dataset, band_or_index_to_plot, *, style: PlotStyle = PlotStyle.LIGHT
+    ccdc_result_info,
+    timeseries,
+    spec: PlotSpec,
+    files: PlotFileLifecycle,
+    *,
+    style: PlotStyle = PlotStyle.LIGHT,
 ):
-    from CCD_Plugin.CCD_Plugin import CCD_Plugin
-
-    plugin = CCD_Plugin.inst[id]
-    spec = PlotSpec(
-        dataset=dataset,
-        band=band_or_index_to_plot,
-        longitude=float(plugin.widget.longitude.value()),
-        latitude=float(plugin.widget.latitude.value()),
-    )
     figure = build_figure(ccdc_result_info, timeseries, spec, style=style)
-    with tempfile.NamedTemporaryFile(suffix=".html", dir=plugin.tmp_dir, delete=False) as output:
-        html_file = output.name
-    figure.write_html(
-        html_file,
-        full_html=True,
-        # "directory" drops plotly.min.js beside the page once per session instead of inlining
-        # ~3.5 MB into every plot; the webview has LocalContentCanAccessFileUrls enabled and the
-        # temp directory is removed on unload, so the sibling file resolves and is cleaned up.
-        include_plotlyjs="directory",
-        auto_open=False,
-        post_script=_page_theme_script(style),
-        config={
-            "displaylogo": False,
-            "responsive": True,
-            "displayModeBar": "hover",
-            "modeBarButtonsToRemove": ["lasso2d", "select2d"],
-            "toImageButtonOptions": {
-                "format": "png",
-                "filename": f"ccd_{band_or_index_to_plot.lower().replace(' ', '_')}",
-                "scale": 2,
-            },
-        },
+    return str(
+        files.prepare(
+            lambda html_path: write_plot_html(
+                figure,
+                html_path,
+                image_filename=f"ccd_{spec.band.lower().replace(' ', '_')}",
+                style=style,
+            )
+        )
     )
-    return html_file

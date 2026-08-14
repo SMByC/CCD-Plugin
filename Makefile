@@ -26,13 +26,6 @@
 # LOCALES = af
 LOCALES =
 
-# If locales are enabled, set the name of the lrelease binary on your system. If
-# you have trouble compiling the translations, you may have to specify the full path to
-# lrelease
-#LRELEASE = lrelease
-#LRELEASE = lrelease-qt4
-
-
 # translation
 SOURCES = \
     __init__.py \
@@ -46,7 +39,7 @@ PY_FILES = \
 
 UI_FILES =
 
-EXTRAS = metadata.txt LICENSE Readme.md
+EXTRAS = metadata.txt LICENSE Readme.md screenshot.webp
 
 EXTRA_DIRS = core gui icons ui utils
 
@@ -54,20 +47,23 @@ COMPILED_RESOURCE_FILES = resources.py
 
 RESOURCE_SRC=$(shell grep '^ *<file' resources.qrc | sed 's@</file>@@g;s/.*>//g' | tr '\n' ' ')
 
-PYRCC := $(shell which pyrcc5 2>/dev/null || which pyrcc6 2>/dev/null)
+QT6_RCC ?= $(firstword $(wildcard /usr/lib/qt6/rcc /usr/lib64/qt6/rcc) $(shell command -v rcc 2>/dev/null))
+QGIS ?= qgis
+
+.PHONY: extlibs
 
 PEP8EXCLUDE=pydev,resources.py,conf.py,third_party,ui
 
 # QGISDIR points to the location where your plugin should be installed.
 # This varies by platform, relative to your HOME directory:
 #	* Linux:
-#	  .local/share/QGIS/QGIS3/profiles/default
+#	  .local/share/QGIS/QGIS4/profiles/default
 #	* Mac OS X:
-#	  Library/Application Support/QGIS/QGIS3/profiles/default
+#	  Library/Application Support/QGIS/QGIS4/profiles/default
 #	* Windows:
-#	  AppData\Roaming\QGIS\QGIS3\profiles\default'
+#	  AppData\Roaming\QGIS\QGIS4\profiles\default'
 
-QGISDIR=.local/share/QGIS/QGIS3/profiles/default
+QGISDIR=.local/share/QGIS/QGIS4/profiles/default
 
 #################################################
 # Normally you would not need to edit below here
@@ -75,45 +71,32 @@ QGISDIR=.local/share/QGIS/QGIS3/profiles/default
 
 HELP = Readme.md
 
-PLUGIN_UPLOAD = python3 plugin_upload.py -u xaviercll
-
 default: compile
 
 compile: $(COMPILED_RESOURCE_FILES)
 
 resources.py: resources.qrc $(RESOURCE_SRC)
-	@if [ -z "$(PYRCC)" ]; then \
-		echo "ERROR: neither pyrcc5 nor pyrcc6 found. Install python3-pyqt5 or python3-pyqt6."; \
+	@if [ -z "$(QT6_RCC)" ] || ! "$(QT6_RCC)" --version 2>&1 | grep -q ' 6\.'; then \
+		echo "ERROR: Qt 6 rcc not found. Set QT6_RCC to the Qt 6 resource compiler."; \
 		exit 1; \
 	fi
-	$(PYRCC) -o $@ $<
-	sed -i 's/^from PyQt[56] import QtCore$$/from qgis.PyQt import QtCore/' $@
+	$(QT6_RCC) -g python -o $@ $<
+	sed -i 's/^from PySide6 import QtCore$$/from qgis.PyQt import QtCore/' $@
 
 %.qm : %.ts
 	$(LRELEASE) $<
 
-test: compile transcompile
-	@echo
-	@echo "----------------------"
-	@echo "Regression Test Suite"
-	@echo "----------------------"
+test: compile
+	PYTHONPATH="$(CURDIR):$(CURDIR)/extlibs" uv run --frozen python -m unittest discover -s tests -p 'test_*.py' -v
 
-	@# Preceding dash means that make will continue in case of errors
-	@-export PYTHONPATH=`pwd`:$(PYTHONPATH); \
-		export QGIS_DEBUG=0; \
-		export QGIS_LOG_FILE=/dev/null; \
-		nosetests -v --with-id --with-coverage --cover-package=. \
-		3>&1 1>&2 2>&3 3>&- || true
-	@echo "----------------------"
-	@echo "If you get a 'no module named qgis.core error, try sourcing"
-	@echo "the helper script we have provided first then run make test."
-	@echo "e.g. source run-env-linux.sh <path to qgis install>; make test"
-	@echo "----------------------"
+qgis-smoke: compile
+	CCD_RUN_QGIS4_SMOKE=1 QTWEBENGINE_DISABLE_SANDBOX=1 \
+		$(QGIS) --nologo --noplugins --code tests/run_qgis4_webengine_smoke.py
 
 deploy: compile doc transcompile
 	@echo
 	@echo "------------------------------------------"
-	@echo "Deploying plugin to your qgis3 directory."
+	@echo "Deploying plugin to your QGIS 4 directory."
 	@echo "------------------------------------------"
 	# The deploy  target only works on unix like operating system where
 	# the Python plugin directory is located at:
@@ -153,11 +136,15 @@ extlibs:
 	@echo "Building extlibs.zip"
 	@echo "---------------------------"
 	rm -rf extlibs extlibs.zip
-	pip install --target=extlibs -r requirements.txt
-	find extlibs -type d \( -name "__pycache__" -o -name "*.egg-info" -o -name "tests" -o -name "test" -o -name "bin" -o -name "examples" \) -prune -exec rm -rf {} +
-	find extlibs -type f \( -name "*.pyc" -o -name "*.pyo" -o -name "*.so" -o -name "*.dll" -o -name "*.dylib" \) -delete
+	uv export --frozen --no-dev --no-emit-project --no-header --output-file .extlibs-requirements.txt
+	uv pip install --target=extlibs --require-hashes -r .extlibs-requirements.txt
+	rm -f .extlibs-requirements.txt
+	find extlibs -type d \( -name "__pycache__" -o -name "*.dist-info" -o -name "*.egg-info" -o -name "tests" -o -name "test" -o -name "bin" -o -name "examples" \) -prune -exec rm -rf {} +
+	find extlibs -type f \( -name ".lock" -o -name "*.pyc" -o -name "*.pyo" -o -name "*.so" -o -name "*.dll" -o -name "*.dylib" \) -delete
+	sed -i '/^import importlib\.metadata$$/d;s/^__version__ = importlib\.metadata\.version("plotly")$$/__version__ = "6.7.0"/' extlibs/plotly/__init__.py
 	# plotly's Jupyter payload: ~14 MB of notebook widget bundles this plugin never loads
 	rm -rf extlibs/share extlibs/plotly/labextension extlibs/plotly/package_data/widgetbundle.js
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$(CURDIR)/extlibs" python3 -c "import narwhals, packaging, plotly; assert plotly.__version__ == '6.7.0'; assert narwhals.__package__ == 'narwhals'; assert packaging.__package__ == 'packaging'"
 	cd extlibs && zip -9r ../extlibs.zip .
 	rm -rf extlibs
 	@echo "Created package: extlibs.zip"
@@ -179,26 +166,14 @@ zip: compile
 	rm -rf .pkg_tmp
 	@echo "Created package: $(PLUGINNAME).zip"
 
-package: compile
-	# Create a zip package of the plugin named $(PLUGINNAME).zip.
-	# This requires use of git (your plugin development directory must be a
-	# git repository).
-	# To use, pass a valid commit or tag as follows:
-	#   make package VERSION=Version_0.3.2
-	@echo
-	@echo "------------------------------------"
-	@echo "Exporting plugin to zip package.    "
-	@echo "------------------------------------"
-	rm -f $(PLUGINNAME).zip
-	git archive --prefix=$(PLUGINNAME)/ -o $(PLUGINNAME).zip $(VERSION)
-	echo "Created package: $(PLUGINNAME).zip"
-
-upload: zip
-	@echo
-	@echo "-------------------------------------"
-	@echo "Uploading plugin to QGIS Plugin repo."
-	@echo "-------------------------------------"
-	$(PLUGIN_UPLOAD) $(PLUGINNAME).zip
+check-package: zip
+	@unzip -p $(PLUGINNAME).zip $(PLUGINNAME)/metadata.txt | grep -q '^qgisMinimumVersion=4.0$$'
+	@if unzip -p $(PLUGINNAME).zip $(PLUGINNAME)/metadata.txt | grep -Eq 'qgisMaximumVersion|supportsQt6'; then exit 1; fi
+	@if unzip -l $(PLUGINNAME).zip | grep -Eq 'QWebView|QtWebKit|__pycache__|\.pyc$$'; then exit 1; fi
+	@if unzip -p $(PLUGINNAME).zip $(PLUGINNAME)/resources.py | grep -Eq 'PyQt5|Qt v5'; then exit 1; fi
+	@if unzip -p $(PLUGINNAME).zip $(PLUGINNAME)/Readme.md | grep -Eq 'QGIS 3|Qt5|QtWebKit'; then exit 1; fi
+	@unzip -l $(PLUGINNAME).zip | grep -q '$(PLUGINNAME)/screenshot.webp'
+	@echo "Package is QGIS 4 / Qt 6 only."
 
 transup:
 	@echo
@@ -213,8 +188,6 @@ transcompile:
 	@echo "----------------------------------------"
 	@echo "Compiled translation files to .qm files."
 	@echo "----------------------------------------"
-	#@chmod +x scripts/compile-strings.sh
-	#@scripts/compile-strings.sh $(LRELEASE) $(LOCALES)
 
 transclean:
 	@echo

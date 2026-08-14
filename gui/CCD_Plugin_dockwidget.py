@@ -22,7 +22,9 @@ with the collaboration of Daniel Moraes <moraesd90@gmail.com>
 """
 
 import os
+import weakref
 from collections import OrderedDict
+from pathlib import Path
 from typing import ClassVar
 
 from qgis.core import (
@@ -38,48 +40,14 @@ from qgis.gui import QgsMapTool, QgsVertexMarker
 from qgis.PyQt import QtWidgets, uic
 from qgis.PyQt.QtCore import QDate, Qt, QUrl, pyqtSignal
 from qgis.PyQt.QtGui import QColor, QDesktopServices, QPalette
-from qgis.PyQt.QtWidgets import QFileDialog, QMessageBox
+from qgis.PyQt.QtWebEngineCore import QWebEngineLoadingInfo, QWebEngineSettings
+from qgis.PyQt.QtWebEngineWidgets import QWebEngineView  # noqa: F401
+from qgis.PyQt.QtWidgets import QFileDialog
 from qgis.utils import iface
 
 plugin_folder = os.path.dirname(os.path.dirname(__file__))
 
-# Try QWebEngine first (Qt6 / QGIS 4.x, and Qt5 with WebEngine), then fall back to QtWebKit (Qt5 / QGIS 3.x)
-HAS_WEBENGINE = False
-HAS_WEBKIT = False
-
-try:
-    try:
-        # Qt6 moved QWebEngineSettings out of QtWebEngineWidgets; under Qt5 it is still there.
-        # Import it from both, or a Qt5 QGIS that ships WebEngine but no WebKit - increasingly
-        # common on Linux - would be told it has neither.
-        from qgis.PyQt.QtWebEngineCore import QWebEngineSettings
-    except ImportError:
-        from qgis.PyQt.QtWebEngineWidgets import QWebEngineSettings
-    from qgis.PyQt.QtWebEngineWidgets import QWebEngineView  # noqa: F401
-
-    HAS_WEBENGINE = True
-    # This .ui is loaded by both bindings, so its enums are written unscoped (Qt5 style):
-    # PyQt6's uic accepts that form, while PyQt5's uic cannot parse the Qt6-scoped one.
-    FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, "ui", "CCD_Plugin_dockwidget_QWebEngine.ui"))
-except ImportError:
-    pass
-
-if not HAS_WEBENGINE:
-    try:
-        from qgis.PyQt.QtWebKit import QWebSettings
-
-        HAS_WEBKIT = True
-        FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, "ui", "CCD_Plugin_dockwidget_QWebView.ui"))
-    except ImportError:
-        pass
-
-if not HAS_WEBENGINE and not HAS_WEBKIT:
-    msg = (
-        "CCD-Plugin needs QtWebEngine or QtWebKit in your Qt/QGIS installation. See the options here:\n\n"
-        "https://github.com/SMByC/CCD-Plugin#installation"
-    )
-    QMessageBox.critical(None, "CCD-Plugin: Error loading", msg, QMessageBox.StandardButton.Ok)
-    raise ImportError(msg)
+FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, "ui", "CCD_Plugin_dockwidget_QWebEngine.ui"))
 
 
 from CCD_Plugin.core.ccd_process import (  # noqa: E402
@@ -88,8 +56,9 @@ from CCD_Plugin.core.ccd_process import (  # noqa: E402
     resolve_ccd_bands,
 )
 from CCD_Plugin.core.gee_common import CCD_BANDS  # noqa: E402
+from CCD_Plugin.core.lifecycle import PlotFileLifecycle, PlotLoadController, TaskLifecycle  # noqa: E402
 from CCD_Plugin.core.loading import loading_page_html  # noqa: E402
-from CCD_Plugin.core.plot import PlotStyle, generate_plot  # noqa: E402
+from CCD_Plugin.core.plot import PlotSpec, PlotStyle, generate_plot  # noqa: E402
 from CCD_Plugin.gui.advanced_settings import AdvancedSettings  # noqa: E402
 from CCD_Plugin.utils.config import get_plugin_config, restore_plugin_config  # noqa: E402
 from CCD_Plugin.utils.system_utils import error_handler, wait_process  # noqa: E402
@@ -112,7 +81,7 @@ def _plot_style_from_palette(palette: QPalette) -> PlotStyle:
 class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
     closingPlugin = pyqtSignal()
 
-    def __init__(self, id, canvas=None, parent=None):
+    def __init__(self, id, plot_directory, canvas=None, parent=None):
         """Constructor."""
         super().__init__(parent)
         # Set up the user interface from Designer through FORM_CLASS.
@@ -125,6 +94,10 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.config = None
         self.last_config = None
         self.task = None
+        self.task_lifecycle = TaskLifecycle()
+        self.plot_files = PlotFileLifecycle(plot_directory)
+        self.plot_loads = PlotLoadController()
+        self.pending_configs = {}
         self.map_tools = {}
 
         self.setupUi(self)
@@ -159,16 +132,13 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         # plot web view settings
         plot_view_settings = self.plot_webview.settings()
-        if HAS_WEBENGINE:
-            plot_view_settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
-            plot_view_settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
-            plot_view_settings.setAttribute(QWebEngineSettings.WebAttribute.WebGLEnabled, True)
-        elif HAS_WEBKIT:
-            plot_view_settings.setAttribute(QWebSettings.JavascriptEnabled, True)
-            plot_view_settings.setAttribute(QWebSettings.WebGLEnabled, True)
-            plot_view_settings.setAttribute(QWebSettings.Accelerated2dCanvasEnabled, True)
+        plot_view_settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
+        plot_view_settings.setAttribute(QWebEngineSettings.WebAttribute.WebGLEnabled, True)
+        plot_view_settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, False)
+        plot_view_settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, False)
         self.plot_webview.setZoomFactor(0.85)
         self.plot_webview.urlChanged.connect(self._retain_plot_style)
+        self.plot_webview.page().loadingChanged.connect(self._plot_loading_changed)
 
         # advanced settings dialog
         self.advanced_settings = AdvancedSettings()
@@ -201,6 +171,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     def closeEvent(self, event):
         # close
+        self.dispose()
         self.closingPlugin.emit()
         event.accept()
 
@@ -308,12 +279,28 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.plot_webview.setHtml(loading_page_html(self.plot_style))
         # Held on the instance, not in module globals: the plugin is multi-instance, and a second
         # dock starting a run would otherwise drop the only Python reference to the first one's task.
-        self.task = QgsTask.fromFunction("Compute CCD", self.compute_ccd, on_finished=self.ccd_completed, config=config)
+        dock_ref = weakref.ref(self)
+        task_holder = []
+
+        def finished(exception, result=None):
+            dock = dock_ref()
+            if dock is not None:
+                dock.ccd_completed(task_holder[0], exception, result)
+
+        task = QgsTask.fromFunction(
+            "Compute CCD",
+            self.compute_ccd,
+            on_finished=finished,
+            config=config,
+        )
+        task_holder.append(task)
+        self.task = task
+        self.task_lifecycle.start(task)
         QgsApplication.taskManager().addTask(self.task)
 
     @staticmethod
     def compute_ccd(task, config):
-        ccdc_result_info, timeseries = compute_ccd(
+        computed = compute_ccd(
             coords=(config["lon"], config["lat"]),
             date_range=(config["start_date"], config["end_date"]),
             doy_range=(config["start_doy"], config["end_doy"]),
@@ -326,67 +313,83 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             lambda_lasso=config["lambda_lasso"],
             cloud_filter=config["cloud_filter"],
             plot_band=config["band_or_index_to_plot"],
+            cancelled=task.isCanceled,
         )
-
+        if computed is None or task.isCanceled():
+            return None
+        ccdc_result_info, timeseries = computed
         return config, ccdc_result_info, timeseries
 
-    def ccd_completed(self, exception, result=None):
-        if exception is None and result is not None:
-            # CCD process completed successfully
-            config, ccdc_result_info, timeseries = result
+    def ccd_completed(self, task, exception, result=None):
+        if not self.task_lifecycle.finish(task):
+            return
+        self.task = None
+        try:
+            if exception is None and result is not None:
+                config, ccdc_result_info, timeseries = result
+                notices = []
+                if not ccdc_result_info.get("tBreak"):
+                    notices.append(
+                        "Not enough data for this period to fit the change detection model, "
+                        "plotting only the observed values."
+                    )
+                ccd_bands, _ = resolve_ccd_bands(config["breakpoint_bands"])
+                added = [band for band in ccd_bands if band not in config["breakpoint_bands"]]
+                if added:
+                    notices.append(
+                        f"{', '.join(added)} added to the breakpoint bands: CCDC requires the TMask bands "
+                        "to be breakpoint bands, so change is also detected on them."
+                    )
+                if notices:
+                    self.MsgBar.clearWidgets()
+                    self.MsgBar.pushMessage("CCD-Plugin", " ".join(notices), level=Qgis.MessageLevel.Info, duration=10)
 
-            notices = []
-            # An empty tBreak means CCDC fitted no segment at all at this pixel, not merely that it
-            # found no break. Read it defensively: reduceRegion omits the key entirely when the
-            # pixel has no output, and this runs in the task callback where a raise is invisible.
-            if not ccdc_result_info.get("tBreak"):
-                notices.append(
-                    "Not enough data for this period to fit the change detection model, "
-                    "plotting only the observed values."
+                spec = PlotSpec(
+                    dataset=config["dataset"],
+                    band=config["band_or_index_to_plot"],
+                    longitude=float(config["lon"]),
+                    latitude=float(config["lat"]),
                 )
-            # Earth Engine rejects a CCDC call whose TMask bands are not also breakpoint bands, so
-            # the selection may have been widened; that widens change detection too, so say it.
-            ccd_bands, _ = resolve_ccd_bands(config["breakpoint_bands"])
-            added = [band for band in ccd_bands if band not in config["breakpoint_bands"]]
-            if added:
-                notices.append(
-                    f"{', '.join(added)} added to the breakpoint bands: CCDC requires the TMask bands "
-                    "to be breakpoint bands, so change is also detected on them."
+                pending_plot = generate_plot(
+                    ccdc_result_info,
+                    timeseries,
+                    spec,
+                    self.plot_files,
+                    style=self.plot_style,
                 )
-            if notices:
+
+                pending = self.plot_loads.begin(Path(pending_plot))
+                self.pending_configs[pending.generation] = self.comparable_settings(config)
+                self.plot_webview.load(QUrl.fromLocalFile(pending_plot))
+            else:
+                if task.isCanceled():
+                    msg = "CCD computation cancelled."
+                    level = Qgis.MessageLevel.Info
+                else:
+                    msg = f"Error computing CCD: {exception}"
+                    level = Qgis.MessageLevel.Warning
                 self.MsgBar.clearWidgets()
-                self.MsgBar.pushMessage("CCD-Plugin", " ".join(notices), level=Qgis.MessageLevel.Info, duration=10)
-
-            self.html_file = generate_plot(
-                self.id,
-                ccdc_result_info,
-                timeseries,
-                config["dataset"],
-                config["band_or_index_to_plot"],
-                style=self.plot_style,
-            )
-
-            self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
-
-            self.last_config = self.comparable_settings(config)
-        else:
-            msg = f"Error computing CCD: {exception}"
-            self.MsgBar.clearWidgets()
-            self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.MessageLevel.Warning, duration=10)
-            self.plot_webview.setHtml("")
-            # forget the last run so Generate can retry these very settings; otherwise new_plot
-            # sees no change and returns without doing anything
-            self.last_config = None
-
-        # finish
-        self.generate_button.setEnabled(True)
-        self.band_or_index_to_plot.setEnabled(True)
+                self.MsgBar.pushMessage("CCD-Plugin", msg, level=level, duration=10)
+                active = self.plot_files.active_path
+                if active is not None:
+                    self.html_file = str(active)
+                    self.plot_webview.load(QUrl.fromLocalFile(str(active)))
+                else:
+                    self.last_config = None
+        finally:
+            self.generate_button.setEnabled(True)
+            self.band_or_index_to_plot.setEnabled(True)
 
     @wait_process
     def repaint_plot(self):
-        from CCD_Plugin.core.ccd_process import ccd_results, lookup_result, make_cache_key, resolve_computed_indices
+        from CCD_Plugin.core.ccd_process import (
+            has_cached_results,
+            lookup_result,
+            make_cache_key,
+            resolve_computed_indices,
+        )
 
-        if not ccd_results:
+        if not has_cached_results():
             return
 
         # get the current configuration of the plugin
@@ -423,15 +426,22 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         self.clean_plot()
         ccdc_result_info, timeseries = cached
-        self.html_file = generate_plot(
-            self.id,
+        spec = PlotSpec(
+            dataset=dataset,
+            band=band_or_index_to_plot,
+            longitude=float(self.longitude.value()),
+            latitude=float(self.latitude.value()),
+        )
+        pending_plot = generate_plot(
             ccdc_result_info,
             timeseries,
-            dataset,
-            band_or_index_to_plot,
+            spec,
+            self.plot_files,
             style=self.plot_style,
         )
-        self.plot_webview.load(QUrl.fromLocalFile(self.html_file))
+        pending = self.plot_loads.begin(Path(pending_plot))
+        self.pending_configs[pending.generation] = self.comparable_settings(config)
+        self.plot_webview.load(QUrl.fromLocalFile(pending_plot))
 
     @error_handler
     def restore_plugin_from_yaml(self):
@@ -516,15 +526,60 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         canvas.refresh()
 
     def clean_plot(self):
-        if self.html_file and os.path.exists(self.html_file):
-            os.remove(self.html_file)
+        pending = self.plot_files.pending_path
+        if pending is not None:
+            self.plot_files.rollback(pending)
+        self.plot_loads.cancel()
+        self.pending_configs.clear()
+
+    def _plot_loading_changed(self, info: QWebEngineLoadingInfo) -> None:
+        pending_load = self.plot_loads.pending
+        pending_path = self.plot_files.pending_path
+        if pending_load is None or pending_path is None:
+            return
+        status = info.status()
+        terminal_statuses = (
+            QWebEngineLoadingInfo.LoadStatus.LoadSucceededStatus,
+            QWebEngineLoadingInfo.LoadStatus.LoadFailedStatus,
+        )
+        if status not in terminal_statuses:
+            return
+        path = Path(info.url().toLocalFile())
+        succeeded = status == QWebEngineLoadingInfo.LoadStatus.LoadSucceededStatus
+        resolution = self.plot_loads.resolve(
+            pending_load.generation,
+            path,
+            succeeded=succeeded,
+        )
+        if resolution is None:
+            return
+        staged_config = self.pending_configs.pop(pending_load.generation, None)
+        if resolution:
+            self.html_file = str(self.plot_files.commit(pending_path))
+            if staged_config is not None:
+                self.last_config = staged_config
+            return
+        active = self.plot_files.rollback(pending_path)
+        self.html_file = str(active) if active is not None else None
+        if active is not None:
+            self.plot_webview.load(QUrl.fromLocalFile(str(active)))
+        else:
+            self.plot_webview.setHtml("")
+
+    def dispose(self):
+        self.task_lifecycle.dispose()
+        self.task = None
         self.plot_webview.setHtml("")
+        self.plot_loads.cancel()
+        self.pending_configs.clear()
+        self.plot_files.clear()
         self.html_file = None
 
     def open_plot_in_web_browser(self):
         # TODO: generate and open mosaic of all bands and indices in the web browser
-        if self.html_file and os.path.exists(self.html_file):
-            QDesktopServices.openUrl(QUrl.fromLocalFile(self.html_file))
+        browser_path = self.plot_files.browser_path
+        if browser_path is not None and browser_path.exists():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(browser_path)))
 
 
 class PickerCoordsOnMap(QgsMapTool):

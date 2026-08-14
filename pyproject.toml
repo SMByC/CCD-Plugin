@@ -1,6 +1,6 @@
 [project]
 name = "CCD-Plugin"
-version = "25.8"
+version = "26.8"
 description = "Qgis plugin for Continuous Change Detection (CCDC) algorithm of a time series at a given coordinate"
 authors = [
     { name = "Xavier Corredor Llano, SMByC", email = "xavier.corredor.llano@gmail.com" },
@@ -18,6 +18,7 @@ Issues = "https://github.com/SMByC/CCD-Plugin/issues"
 
 [project.optional-dependencies]
 dev = [
+    "bandit",
     "ruff",
     "numpy",
     "earthengine-api",
@@ -25,6 +26,7 @@ dev = [
 
 [dependency-groups]
 dev = [
+    "bandit",
     "ruff",
     "numpy",
     "earthengine-api",
@@ -39,6 +41,13 @@ dev = [
 # The live Earth Engine tests are opt-in and need authenticated credentials:
 #
 #   PYTHONPATH="$PWD:$PWD/extlibs" CCD_RUN_LIVE_GEE=1 python -m unittest tests.test_gee_live
+#
+# The QGIS 4 / Qt WebEngine smoke test is opt-in and is run by `make qgis-smoke`.
+
+[tool.qgis-plugin-ci]
+plugin_path = "CCD_Plugin"
+github_organization_slug = "SMByC"
+project_slug = "CCD-Plugin"
 
 [tool.pyright]
 extraPaths = [".."]  # include project folder

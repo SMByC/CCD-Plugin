@@ -33,7 +33,7 @@
          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Chi-square probability threshold for change detection (0 to 1). Default 0.99.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Raise it&lt;/b&gt; (e.g. 0.999) to tolerate more noise and detect fewer changes — fewer false breaks.&lt;br&gt;&lt;b&gt;Lower it&lt;/b&gt; to flag more candidate changes — catches subtler change, at the cost of false breaks.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="buttonSymbols">
-         <enum>QAbstractSpinBox::NoButtons</enum>
+          <enum>QAbstractSpinBox::ButtonSymbols::NoButtons</enum>
         </property>
         <property name="decimals">
          <number>3</number>
@@ -69,7 +69,7 @@
          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Minimum length of a temporal segment, as a multiple of one year. Default 1.33.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Higher&lt;/b&gt; forces longer segments, so short-lived fluctuations cannot become their own segment.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="buttonSymbols">
-         <enum>QAbstractSpinBox::NoButtons</enum>
+          <enum>QAbstractSpinBox::ButtonSymbols::NoButtons</enum>
         </property>
         <property name="maximum">
          <double>2.000000000000000</double>
@@ -95,7 +95,7 @@
          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Consecutive observations that must exceed the threshold before a change is confirmed. Default 6; useful range 4 to 8.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Higher&lt;/b&gt; means more confidence but longer gaps between segments in cloudy areas.&lt;br&gt;&lt;b&gt;Lower&lt;/b&gt; detects change sooner but confirms more noise as change.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="buttonSymbols">
-         <enum>QAbstractSpinBox::NoButtons</enum>
+          <enum>QAbstractSpinBox::ButtonSymbols::NoButtons</enum>
         </property>
         <property name="minimum">
          <number>1</number>
@@ -114,7 +114,7 @@
          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Lambda for the LASSO harmonic fit. Default 0.002, which is the standard CCDC value of 20 rescaled for 0-1 surface reflectance (20/10000).&lt;/p&gt;&lt;p&gt;&lt;b&gt;Higher&lt;/b&gt; gives smoother, more generalised models; too high underfits.&lt;br&gt;&lt;b&gt;0&lt;/b&gt; disables regularisation and uses plain least squares, which overfits sparse series.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="buttonSymbols">
-         <enum>QAbstractSpinBox::NoButtons</enum>
+          <enum>QAbstractSpinBox::ButtonSymbols::NoButtons</enum>
         </property>
         <property name="decimals">
          <number>4</number>
@@ -178,10 +178,10 @@
    <item row="3" column="0">
     <widget class="QDialogButtonBox" name="buttonBox">
       <property name="orientation">
-       <enum>Qt::Horizontal</enum>
+       <enum>Qt::Orientation::Horizontal</enum>
       </property>
      <property name="standardButtons">
-      <set>QDialogButtonBox::Ok</set>
+      <set>QDialogButtonBox::StandardButton::Ok</set>
      </property>
     </widget>
    </item>

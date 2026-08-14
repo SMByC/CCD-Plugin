@@ -1,5 +1,6 @@
 import ast
 import math
+import tempfile
 import unittest
 from itertools import pairwise
 from pathlib import Path
@@ -30,6 +31,7 @@ from core.plot import (
     evaluate_ccdc_model,
     normalize_observations,
     sample_segment_dates,
+    write_plot_html,
 )
 
 
@@ -103,7 +105,7 @@ class PlotHelpersTest(unittest.TestCase):
         value = evaluate_ccdc_model(timestamp_ms, coefficients)
 
         # Then: sin1 contributes +1 at phase pi/2.
-        self.assertAlmostEqual(value, 1.0, places=12)
+        self.assertAlmostEqual(float(value), 1.0, places=12)
 
     def test_evaluate_all_coefficients_matches_independent_formula(self):
         # Given: all eight coefficients and a timestamp with nontrivial phases.
@@ -248,15 +250,14 @@ class PlotFigureTest(unittest.TestCase):
         self.assertEqual(LIGHT_THEME.control_background, OVERLAY_BACKGROUND)
         self.assertEqual(LIGHT_THEME.control_text_color, TEXT_COLOR)
         self.assertEqual(LIGHT_THEME.control_border_color, GRID_COLOR)
-        self.assertEqual(LIGHT_THEME.control_active_background, "#F4FAFF")
-        self.assertEqual(LIGHT_THEME.control_hover_background, "#F4FAFF")
         self.assertEqual(figure.layout.updatemenus[0].bgcolor, LIGHT_THEME.control_background)
         self.assertEqual(figure.layout.updatemenus[0].font.color, LIGHT_THEME.control_text_color)
         self.assertEqual(figure.layout.updatemenus[0].bordercolor, LIGHT_THEME.control_border_color)
 
-    def test_dark_control_text_is_accessible_in_all_plotly_states(self):
-        # Given: Dark's explicit inactive, active, and hover surfaces.
-        expected = ("#2C333A", "#E6EDF3", "#4C5864", "#3B4652", "#46535E")
+    def test_theme_controls_restore_historical_state_colors(self):
+        # Given: the historical Plotly control palette for both chart styles.
+        expected_light_states = ("#F4FAFF", "#F4FAFF")
+        expected_dark_states = ("#2C333A", "#E6EDF3", "#4C5864", "#3B4652", "#46535E")
         actual = (
             DARK_THEME.control_background,
             DARK_THEME.control_text_color,
@@ -265,14 +266,17 @@ class PlotFigureTest(unittest.TestCase):
             DARK_THEME.control_hover_background,
         )
 
-        # When/Then: the exact dark neutral ramp is used and every state meets WCAG AA.
-        self.assertEqual(actual, expected)
-        backgrounds = (
+        # When/Then: every restored state is exact and Dark remains WCAG AA.
+        self.assertEqual(
+            (LIGHT_THEME.control_active_background, LIGHT_THEME.control_hover_background),
+            expected_light_states,
+        )
+        self.assertEqual(actual, expected_dark_states)
+        for background in (
             DARK_THEME.control_background,
             DARK_THEME.control_active_background,
             DARK_THEME.control_hover_background,
-        )
-        for background in backgrounds:
+        ):
             with self.subTest(background=background):
                 self.assertGreaterEqual(_contrast_ratio(DARK_THEME.control_text_color, background), 4.5)
 
@@ -321,7 +325,7 @@ class PlotFigureTest(unittest.TestCase):
                     div_id=plot_id,
                 )
 
-                # Then: root and body start in sync and both button directions remain wired.
+                # Then: root and body start in sync and public Plotly button events remain wired.
                 self.assertIn(f'document.getElementById("{plot_id}")', html)
                 self.assertNotIn("{plot_id}", html)
                 self.assertIn("document.documentElement.style.backgroundColor", html)
@@ -334,77 +338,55 @@ class PlotFigureTest(unittest.TestCase):
                 self.assertIn("backgrounds[event.button.label]", html)
                 self.assertIn("window.location.hash = event.button.label.toLowerCase()", html)
 
-    def test_page_shell_script_compacts_native_plotly_button_geometry(self):
+    def test_page_shell_script_restores_scoped_compact_controls_with_public_state(self):
         # Given: the post-render script for either initial theme.
-        for style in PlotStyle:
+        for style, active_index in ((PlotStyle.LIGHT, 0), (PlotStyle.DARK, 1)):
             with self.subTest(style=style):
                 script = _page_theme_script(style)
 
-                # When/Then: Plotly's rendered controls are adjusted only inside graphDiv.
+                # When/Then: local state drives guarded, graph-scoped generated-node adjustments.
+                self.assertIn(f"let activeStyleIndex = {active_index}", script)
+                self.assertIn("activeStyleIndex = event.active", script)
+                self.assertNotIn("_fullLayout", script)
+                self.assertNotIn("document.querySelector", script)
                 for selector in (".updatemenu-button", ".updatemenu-item-rect", ".updatemenu-item-text"):
                     self.assertIn(f'graphDiv.querySelectorAll("{selector}")', script)
-                self.assertNotIn("document.querySelector", script)
-                self.assertIn("requestAnimationFrame", script)
+                self.assertIn("!buttons.length", script)
+                self.assertIn("buttons.length !== rects.length", script)
+                self.assertIn("buttons.length !== texts.length", script)
                 self.assertIn("horizontalPadding = 7", script)
                 self.assertIn("minimumWidth = 30", script)
                 self.assertIn("buttonGap = 2", script)
-                self.assertIn("text.getBBox().width + 2 * horizontalPadding", script)
-                self.assertIn('text.setAttribute("x", horizontalPadding)', script)
-                self.assertIn("currentX += width + buttonGap", script)
-                self.assertTrue("visibleHeight = 20" in script, "20px visible height adjustment is missing")
+                self.assertIn("visibleHeight = 20", script)
                 self.assertIn("textBaselineY = 13", script)
-                self.assertIn('rect.setAttribute("height", visibleHeight)', script)
-                self.assertIn('text.setAttribute("y", textBaselineY)', script)
-                self.assertIn("const imageCornerX = 0", script)
-                self.assertIn("const imageCornerY = 0", script)
-                self.assertIn("translate(${currentX},${rowY})", script)
+                self.assertIn("text.getBBox().width + 2 * horizontalPadding", script)
+                self.assertIn('graphDiv.on("plotly_buttonclicked"', script)
+                self.assertIn('graphDiv.on("plotly_afterplot"', script)
+                self.assertIn("requestAnimationFrame", script)
+                self.assertIn("ccd-theme-active", script)
+                self.assertIn(f"fill: {DARK_THEME.control_active_background} !important", script)
+                self.assertIn(f"fill: {DARK_THEME.control_hover_background} !important", script)
 
-    def test_page_shell_script_uses_scoped_css_classes_for_dark_states(self):
-        # Given: the post-render script with both theme directions serialized.
-        script = _page_theme_script(PlotStyle.LIGHT)
-        normal_selector = ".ccd-theme-controls.ccd-theme-dark .updatemenu-item-rect"
-        active_selector = ".ccd-theme-controls.ccd-theme-dark .updatemenu-button.ccd-theme-active .updatemenu-item-rect"
-        hover_selector = ".ccd-theme-controls.ccd-theme-dark .updatemenu-button:hover .updatemenu-item-rect"
-        normal_position = script.find(normal_selector)
-        active_position = script.find(active_selector)
-        hover_position = script.find(hover_selector)
+    def test_self_contained_writer_embeds_plotly_without_remote_or_sibling_assets(self):
+        # Given: a destination for a representative interactive figure.
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            html_path = Path(temporary_directory) / "plot.html"
 
-        # When/Then: ordered graph-scoped CSS owns Dark states without pointer handlers.
-        self.assertGreaterEqual(normal_position, 0, "graph-scoped normal rule is missing")
-        self.assertGreaterEqual(active_position, 0, "graph-scoped active rule is missing")
-        self.assertGreaterEqual(hover_position, 0, "graph-scoped hover rule is missing")
-        self.assertLess(normal_position, active_position)
-        self.assertLess(active_position, hover_position)
-        self.assertIn(f"fill: {DARK_THEME.control_background} !important", script)
-        self.assertIn(f"fill: {DARK_THEME.control_active_background} !important", script)
-        self.assertIn(f"fill: {DARK_THEME.control_hover_background} !important", script)
-        self.assertIn('graphDiv.classList.add("ccd-theme-controls")', script)
-        self.assertIn('graphDiv.classList.toggle("ccd-theme-dark"', script)
-        self.assertIn('button.classList.toggle("ccd-theme-active"', script)
-        self.assertIn('document.createElement("style")', script)
-        self.assertIn("graphDiv.querySelector", script)
-        self.assertIn("graphDiv.appendChild", script)
-        self.assertIn("currentActiveIndex", script)
-        self.assertNotIn("addEventListener", script)
-        self.assertNotIn('style.setProperty("fill"', script)
-        for event_name in ("mouseenter", "mouseleave", "mouseover", "mouseout"):
-            self.assertNotIn(event_name, script)
-        self.assertIn('graphDiv.on("plotly_buttonclicked"', script)
-        self.assertIn('graphDiv.on("plotly_afterplot"', script)
+            # When: the QWebEngine page is serialized for offline use.
+            write_plot_html(
+                _representative_figure(),
+                html_path,
+                image_filename="ccd_b4",
+                style=PlotStyle.LIGHT,
+            )
+            document = html_path.read_text(encoding="utf-8")
 
-    def test_page_shell_script_guards_cross_version_control_geometry(self):
-        # Given: the generated adjustment for Plotly-rendered control nodes.
-        script = _page_theme_script(PlotStyle.LIGHT)
-
-        # When/Then: incomplete node sets return early and positioning uses no native transform geometry.
-        self.assertTrue("!buttons.length" in script, "empty control-node guard is missing")
-        self.assertIn("buttons.length !== rects.length", script)
-        self.assertIn("buttons.length !== texts.length", script)
-        self.assertNotIn("transform.baseVal", script)
-        self.assertNotIn("baseHeight", script)
-        self.assertNotIn("baseY", script)
-        self.assertNotIn("renderedHeight", script)
-        self.assertNotIn("matrix.f", script)
+            # Then: Plotly and plugin behavior are inline and no external script is required.
+            self.assertGreater(len(document), 1_000_000)
+            self.assertIn("plotly.js", document.lower())
+            self.assertNotRegex(document, r"<script[^>]+src=")
+            self.assertNotRegex(document, r"<script[^>]+mathjax")
+            self.assertIn('graphDiv.on("plotly_buttonclicked"', document)
 
     def test_theme_toggle_has_exactly_two_ordered_update_buttons(self):
         # Given: figures initialized in each supported style.
@@ -425,6 +407,19 @@ class PlotFigureTest(unittest.TestCase):
                 self.assertEqual(menu.xanchor, "left")
                 self.assertEqual(menu.yanchor, "bottom")
                 self.assertEqual(menu.font.size, 10)
+
+    def test_legend_is_anchored_to_the_plot_area_top_right(self):
+        # Given: the representative plot's responsive in-plot legend.
+        legend = _representative_figure().layout.legend
+
+        # When/Then: paper coordinates keep it at the plot area's top-right corner.
+        self.assertEqual(legend.orientation, "h")
+        self.assertEqual(legend.x, 1)
+        self.assertEqual(legend.xref, "paper")
+        self.assertEqual(legend.xanchor, "right")
+        self.assertEqual(legend.y, 1)
+        self.assertEqual(legend.yref, "paper")
+        self.assertEqual(legend.yanchor, "top")
 
     def test_theme_buttons_carry_complete_reversible_payloads(self):
         # Given: the complete expected targets for both styles.

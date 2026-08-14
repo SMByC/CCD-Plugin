@@ -22,7 +22,9 @@ with the collaboration of Daniel Moraes <moraesd90@gmail.com>
 """
 
 import concurrent.futures
+import threading
 from collections import OrderedDict
+from collections.abc import Callable
 from typing import Final
 
 import numpy as np
@@ -58,6 +60,17 @@ DATASET_AVAILABILITY: Final = {
 # multi-decade series; keep only enough to make band switching and small parameter tweaks instant.
 CACHE_MAX_ENTRIES: Final = 8
 ccd_results: "OrderedDict[tuple, tuple]" = OrderedDict()
+_RESULTS_LOCK = threading.Lock()
+
+
+def clear_results_cache() -> None:
+    with _RESULTS_LOCK:
+        ccd_results.clear()
+
+
+def has_cached_results() -> bool:
+    with _RESULTS_LOCK:
+        return bool(ccd_results)
 
 
 class CCDComputationError(Exception):
@@ -140,32 +153,35 @@ def lookup_result(key, indices):
     of what the caller wants. That is what keeps switching the plotted band instant: a run built
     for NDVI also serves every optical band, since those are the scaled source and always present.
     """
-    entry = ccd_results.get(key)
-    if entry is None:
-        return None
-    built, ccdc_info, timeseries = entry
-    if not set(indices) <= set(built):
-        return None
-    ccd_results.move_to_end(key)
-    return ccdc_info, timeseries
+    with _RESULTS_LOCK:
+        entry = ccd_results.get(key)
+        if entry is None:
+            return None
+        built, ccdc_info, timeseries = entry
+        if not set(indices) <= set(built):
+            return None
+        ccd_results.move_to_end(key)
+        return ccdc_info, timeseries
 
 
-def _store_result(key, indices, value):
+def _store_result(key, indices, value, cancelled: Callable[[], bool] = lambda: False):
     """Record a result with the index set it was built from.
 
     Keeps whichever run for this key covers more indices, and evicts the least recently used
     entry once the cache is over its bound.
     """
-    existing = ccd_results.get(key)
-    # A run that built more indices answers strictly more views, so never replace one with a
-    # narrower run for the same key - every other parameter is already in the key.
-    if existing is not None and set(indices) < set(existing[0]):
+    with _RESULTS_LOCK:
+        if cancelled():
+            return False
+        existing = ccd_results.get(key)
+        if existing is not None and set(indices) < set(existing[0]):
+            ccd_results.move_to_end(key)
+            return True
+        ccd_results[key] = (tuple(indices), *value)
         ccd_results.move_to_end(key)
-        return
-    ccd_results[key] = (tuple(indices), *value)
-    ccd_results.move_to_end(key)
-    while len(ccd_results) > CACHE_MAX_ENTRIES:
-        ccd_results.popitem(last=False)
+        while len(ccd_results) > CACHE_MAX_ENTRIES:
+            ccd_results.popitem(last=False)
+        return True
 
 
 # getRegion's only textual column. Named rather than detected, because a scene id that happens to
@@ -233,10 +249,13 @@ def compute_ccd(
     lambda_lasso,
     cloud_filter=DEFAULT_CLOUD_FILTER,
     plot_band=None,
+    cancelled: Callable[[], bool] = lambda: False,
 ):
     # documentation: https://developers.google.com/earth-engine/apidocs/ee-algorithms-temporalsegmentation-ccdc
     import ee
 
+    if cancelled():
+        return None
     point = ee.Geometry.Point(coords)
     ccd_bands, tmask_bands = resolve_ccd_bands(breakpoint_bands, tmask_bands)
     cache_key = make_cache_key(
@@ -258,9 +277,10 @@ def compute_ccd(
     # differ within one key, so without this two runs that plot different indices (NDVI, then EVI)
     # build disjoint sets, neither is a subset of the other, and they evict each other in turn -
     # switching back then costs a full Earth Engine round trip every time.
-    existing = ccd_results.get(cache_key)
-    if existing is not None:
-        indices = resolve_indices([*existing[0], *indices])
+    with _RESULTS_LOCK:
+        existing = ccd_results.get(cache_key)
+        if existing is not None:
+            indices = resolve_indices([*existing[0], *indices])
 
     if dataset == "Sentinel-2":
         gee_data = get_gee_data_sentinel(coords, date_range, doy_range, dataset, cloud_filter, indices)
@@ -276,12 +296,16 @@ def compute_ccd(
     # collection is non-empty, and the grid to sample on. Reusing `first` for the projection keeps
     # this to a single size() evaluation rather than the two the If condition used to force.
     first = gee_data.first()
+    if cancelled():
+        return None
     catalog = ee.Dictionary(
         {
             "size": gee_data.size(),
             "projection": ee.Algorithms.If(first, ee.Image(first).select(0).projection(), ee.Projection("EPSG:4326")),
         }
     ).getInfo()
+    if cancelled():
+        return None
     if not catalog["size"]:
         raise CCDComputationError(_no_images_message(dataset, date_range))
     # Sample the observations and the CCDC fit on exactly the same pixels, and on the pixels the
@@ -297,10 +321,16 @@ def compute_ccd(
     grid = {"crs": projection["crs"], "crsTransform": projection["transform"]}
 
     def get_time_series():
+        if cancelled():
+            return None
         rows = ee.List(gee_data.getRegion(geometry=point, **grid)).getInfo()
+        if cancelled():
+            return None
         return _build_timeseries(rows)
 
     def get_ccdc():
+        if cancelled():
+            return None
         # The whole collection is passed, not just the breakpoint bands: CCDC fits coefficients for
         # every band it is handed and the plot needs the coefficients of whichever band the user
         # selects, not only the ones driving detection.
@@ -314,7 +344,8 @@ def compute_ccd(
             CCDC_DATE_FORMAT,
             lambda_lasso,
         )
-        return ccdc.reduceRegion(ee.Reducer.toList(), point, **grid).getInfo()
+        result = ccdc.reduceRegion(ee.Reducer.toList(), point, **grid).getInfo()
+        return None if cancelled() else result
 
     # both are independent round trips to Earth Engine, so overlap them
     with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -323,6 +354,9 @@ def compute_ccd(
         timeseries = future_timeseries.result()
         ccdc_info = future_ccdc.result()
 
-    _store_result(cache_key, indices, (ccdc_info, timeseries))
+    if cancelled() or timeseries is None or ccdc_info is None:
+        return None
+    if not _store_result(cache_key, indices, (ccdc_info, timeseries), cancelled=cancelled):
+        return None
 
     return ccdc_info, timeseries

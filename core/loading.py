@@ -34,14 +34,8 @@ html, body {{
     border: 6px solid {theme.grid_color};
     border-top-color: {theme.text_color};
     border-radius: 50%;
-    -webkit-transform: translate(-50%, -50%);
     transform: translate(-50%, -50%);
-    -webkit-animation: spin 0.8s linear infinite;
     animation: spin 0.8s linear infinite;
-}}
-@-webkit-keyframes spin {{
-    from {{ -webkit-transform: translate(-50%, -50%) rotate(0deg); }}
-    to {{ -webkit-transform: translate(-50%, -50%) rotate(360deg); }}
 }}
 @keyframes spin {{
     from {{ transform: translate(-50%, -50%) rotate(0deg); }}

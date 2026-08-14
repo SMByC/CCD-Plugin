@@ -24,8 +24,8 @@ import tempfile
 from typing import ClassVar
 
 from qgis.PyQt.QtCore import QCoreApplication, QLocale, QSettings, Qt, QTimer, QTranslator
-from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QWIDGETSIZE_MAX, QAction
+from qgis.PyQt.QtGui import QAction, QIcon
+from qgis.PyQt.QtWidgets import QWIDGETSIZE_MAX
 
 # Import the code for the widget
 from CCD_Plugin.gui.CCD_Plugin_dockwidget import CCD_PluginDockWidget
@@ -101,6 +101,10 @@ class CCD_Plugin:
         if not self.pluginIsActive:
             self.pluginIsActive = True
 
+            if self.tmp_dir:
+                self.removes_temporary_files()
+            self.tmp_dir = tempfile.mkdtemp()
+
             # print "** STARTING CCD_Plugin"
 
             # dockwidget may not exist if:
@@ -109,13 +113,8 @@ class CCD_Plugin:
             widget = self.widget
             if widget is None:
                 # Create the dockwidget (after translation) and keep reference
-                widget = CCD_PluginDockWidget(self.id)
+                widget = CCD_PluginDockWidget(self.id, self.tmp_dir)
                 self.widget = widget
-
-            # init tmp dir for all process and intermediate files
-            if self.tmp_dir:
-                self.removes_temporary_files()
-            self.tmp_dir = tempfile.mkdtemp()
 
             # connect to provide cleanup on closing of dockwidget
             widget.closingPlugin.connect(self.onClosePlugin)
@@ -136,6 +135,10 @@ class CCD_Plugin:
 
     def onClosePlugin(self):
         """Cleanup necessary items here when plugin is closed"""
+        widget = self.widget
+        if widget is None:
+            return
+        widget.dispose()
         self.removes_temporary_files()
 
         # delete the marker
@@ -144,13 +147,13 @@ class CCD_Plugin:
         PickerCoordsOnMap.delete_markers()
 
         # give the canvases their default tool back before the dock goes away
-        self.widget.release_map_tools()
+        widget.release_map_tools()
 
         # remove this statement if widget is to remain
         # for reuse if plugin is reopened
         # Commented next statement since it causes QGIS crashe
         # when closing the docked window:
-        self.widget.close()
+        widget.close()
         self.widget = None
 
         # reset some variables
@@ -158,6 +161,11 @@ class CCD_Plugin:
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
+        from CCD_Plugin.gui.CCD_Plugin_dockwidget import PickerCoordsOnMap
+
+        PickerCoordsOnMap.delete_markers()
+        if self.widget:
+            self.widget.dispose()
         self.removes_temporary_files()
         # Remove the plugin item and icon
         self.iface.removePluginMenu(self.menu_name_plugin, self.dockable_action)
@@ -174,16 +182,15 @@ class CCD_Plugin:
             # from under that callback turns a late finish into a RuntimeError. Releasing this
             # reference lets it be collected once nothing else refers to it.
             self.widget = None
+        self.pluginIsActive = False
+        CCD_Plugin.inst.pop(self.id, None)
 
     def removes_temporary_files(self):
-        if not self.widget:
-            return
-
         # the CCD cache holds the whole time series and coefficient set per entry, and the module
         # stays imported after a plugin reload, so it has to be emptied explicitly
-        from CCD_Plugin.core.ccd_process import ccd_results
+        from CCD_Plugin.core.ccd_process import clear_results_cache
 
-        ccd_results.clear()
+        clear_results_cache()
 
         # clear CCD_Plugin.tmp_dir
         if self.tmp_dir and os.path.isdir(self.tmp_dir):
