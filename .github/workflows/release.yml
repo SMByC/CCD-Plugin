@@ -74,12 +74,25 @@ jobs:
           fi
           echo "file=$NOTES_FILE" >> "$GITHUB_OUTPUT"
 
-      - name: Create verified GitHub release
+      - name: Prepare GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
           NOTES_FILE: ${{ steps.notes.outputs.file }}
-        run: gh release create "$RELEASE_TAG" --title "$RELEASE_TAG" --notes-file "$NOTES_FILE" --verify-tag --draft
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          RELEASE_STATE=$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft 2>/dev/null || true)
+          if [ "$RELEASE_STATE" = "false" ]; then
+            echo "Published release $RELEASE_TAG already exists"
+          else
+            DRAFT_ID=$(gh api "repos/$REPOSITORY/releases" --paginate --jq ".[] | select(.tag_name == \"$RELEASE_TAG\" and .draft == true) | .id" | sed -n '1p')
+            if [ -n "$DRAFT_ID" ]; then
+              gh api "repos/$REPOSITORY/releases/$DRAFT_ID" --method PATCH -F draft=false
+            else
+              gh release create "$RELEASE_TAG" --title "$RELEASE_TAG" --notes-file "$NOTES_FILE" --verify-tag
+            fi
+          fi
 
       - name: Package and publish plugin
         env:
@@ -113,10 +126,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release upload "$RELEASE_TAG" extlibs.zip
-
-      - name: Publish GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release edit "$RELEASE_TAG" --draft=false
+        run: gh release upload "$RELEASE_TAG" extlibs.zip --clobber
