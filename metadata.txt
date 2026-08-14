@@ -3,10 +3,9 @@ name=CCD-Plugin
 description=Qgis plugin for Continuous Change Detection (CCDC) algorithm of a time series at a given coordinate
 about=The CCD-Plugin use Google Earth Engine to get Landsat or Sentinel2 datasets and run the Continuous Change Detection (CCDC) algorithm to analyze the trends and breakpoints of change over multi-year time series at a given coordinate.
 
-version=25.8
-qgisMinimumVersion=3.36
+version=26.8
+qgisMinimumVersion=4.0
 qgisMaximumVersion=4.99
-supportsQt6=True
 
 author=Xavier Corredor Llano, SMByC
 email=xavier.corredor.llano@gmail.com
@@ -16,8 +15,20 @@ tracker=https://github.com/SMByC/CCD-Plugin/issues
 repository=https://github.com/SMByC/CCD-Plugin
 
 changelog=
-    25.9:
-    - Add support for Qgis 4 / Qt 6 (QWebEngine) while maintaining backward compatibility with Qgis 3 (QtWebKit)
+    26.8:
+    - Require QGIS 4 / Qt 6 and render plots with Qt WebEngine
+    - Only confirmed breaks are drawn as changes; one still being accumulated is drawn apart with its probability
+    - Change detection defaults to Green/Red/NIR/SWIR1/SWIR2, excluding the haze-prone blue band
+    - Sample the series and the fitted model on the source pixel grid, not a half-pixel-offset resampling of it
+    - Selectable Sentinel-2 cloud mask: Cloud Score+ (default), s2cloudless, Sen2Cor or none
+    - One tasseled cap domain across Landsat sensors, removing false breaks at the L5/L7/L8 transitions
+    - Reject out-of-range surface reflectance, clamp EVI/EVI2, and support DOY windows crossing the new year
+    - A full-year DOY window now means no seasonal filter, so a leap year's 31 December is kept
+    - Much faster on long series, and no longer hits the Earth Engine memory limit on dense points
+    - Plot: a colour per segment, break dates, RMSE on hover, counts in the header, and a far smaller page
+    - Name the dataset's availability window when a date range returns no images
+    - Bound the results cache and clear it on unload
+    - All commits in: https://github.com/SMByC/CCD-Plugin/commits
     25.8:
     - Move DOY controls to advanced settings dialog. Others UI adjustments
     - Update map marker style
