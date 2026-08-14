@@ -153,7 +153,7 @@
                    <cursorShape>PointingHandCursor</cursorShape>
                   </property>
                   <property name="toolTip">
-                   <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Pick on map with the pointer using any coordinate system, the plugin convert it in geographic coordinates&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Pick a point on the map with the pointer. The canvas may use any coordinate system; the plugin converts the click to geographic coordinates.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                   </property>
                   <property name="text">
                    <string>Pick on Map</string>
@@ -179,7 +179,7 @@
                    <cursorShape>PointingHandCursor</cursorShape>
                   </property>
                   <property name="toolTip">
-                   <string>Clear markers</string>
+                   <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Remove the coordinate markers this plugin placed on the map.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                   </property>
                   <property name="icon">
                    <iconset>
@@ -374,9 +374,9 @@
                 </item>
                 <item>
                  <widget class="QComboBox" name="dataset">
-                   <property name="toolTip">
-                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Collection of images to get the images and run CCDC&lt;/p&gt;&lt;p&gt;- Landsat C2 (30m): ~1983 → present&lt;br&gt;- Sentinel-2 (10m): ~2018 → present&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                   </property>
+                  <property name="toolTip">
+                   <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Image collection the observations and the CCDC fit come from.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Landsat C2&lt;/b&gt; (30 m): 1982 to present, dense coverage from 1984.&lt;br&gt;&lt;b&gt;Sentinel-2&lt;/b&gt; (10 m): March 2017 to present, global only from late 2018.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                  </property>
                    <property name="currentText">
                     <string>Landsat C2</string>
                    </property>
@@ -432,7 +432,7 @@
                 <item>
                  <widget class="QComboBox" name="band_or_index_to_plot">
                   <property name="toolTip">
-                   <string>Band or index and predicted curves to display in the plot</string>
+                   <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Band or index to draw, with the CCDC curves fitted to it.&lt;/p&gt;&lt;p&gt;Independent of the bands driving change detection. Switching it redraws from coefficients already in hand, with no new Earth Engine query.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                   </property>
                   <property name="currentText">
                    <string>Blue</string>
@@ -555,7 +555,7 @@
              <item row="1" column="0">
               <widget class="QgsCheckableComboBox" name="box_breakpoint_bands">
                <property name="toolTip">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Bands or indices to use for change detection (breakpoints)&lt;/p&gt;&lt;p&gt;Note: Regenerate to apply the changes&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Bands and indices whose residuals drive change detection. Each is measured against its own RMSE and they are combined into the statistic tested against Chi-square.&lt;/p&gt;&lt;p&gt;Default &lt;b&gt;Green, Red, NIR, SWIR1, SWIR2&lt;/b&gt;. Blue is left out because it carries the most residual haze and aerosol signal, a well known source of false breaks.&lt;/p&gt;&lt;p&gt;Green and SWIR1 are also the TMask bands, which Earth Engine requires to be change-detection bands, so they are added back automatically if you deselect them.&lt;/p&gt;&lt;p&gt;Note: Regenerate to apply the changes.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
                <property name="editable">
                 <bool>true</bool>
@@ -588,6 +588,9 @@
              </property>
              <item row="1" column="1">
               <widget class="QDateEdit" name="end_date">
+               <property name="toolTip">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Last date to include in the series.&lt;/p&gt;&lt;p&gt;A range that ends before the selected dataset began returns no images at all, which is the usual surprise with Sentinel-2. The plugin names the dataset's availability window when that happens.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
                <property name="calendarPopup">
                 <bool>true</bool>
                </property>
@@ -605,6 +608,9 @@
              </item>
              <item row="1" column="0">
               <widget class="QDateEdit" name="start_date">
+               <property name="toolTip">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;First date to include in the series.&lt;/p&gt;&lt;p&gt;Earlier than the dataset's first year is harmless: the series simply starts when the data does.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
                <property name="dateTime">
                 <datetime>
                  <hour>10</hour>
@@ -647,7 +653,7 @@
                 <cursorShape>PointingHandCursor</cursorShape>
                </property>
                <property name="toolTip">
-                <string>Advanced settings</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;CCDC parameters, the Sentinel-2 cloud mask, and the day-of-year window.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
                <property name="text">
                 <string>Advanced</string>
@@ -726,7 +732,7 @@
                 <cursorShape>PointingHandCursor</cursorShape>
                </property>
                <property name="toolTip">
-                <string>Automatically generate plot when a new coordinate is pick on map</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Generate the plot automatically whenever a new coordinate is picked on the map.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
                <property name="icon">
                 <iconset>
@@ -745,6 +751,9 @@
              </item>
              <item>
               <widget class="QToolButton" name="generate_button">
+               <property name="toolTip">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Run CCDC at the current coordinate and draw the plot.&lt;/p&gt;&lt;p&gt;Every change except the plotted band and the plot theme needs this to take effect.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
                <property name="cursor">
                 <cursorShape>PointingHandCursor</cursorShape>
                </property>
@@ -766,7 +775,7 @@
                 <cursorShape>PointingHandCursor</cursorShape>
                </property>
                <property name="toolTip">
-                <string>Open the current plot in a web browser</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Open the current plot in a web browser, for a bigger view.&lt;/p&gt;&lt;p&gt;Saving the plot as a PNG works there, which it does not inside the plugin.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
                <property name="icon">
                 <iconset>

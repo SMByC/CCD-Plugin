@@ -16,12 +16,18 @@
   <layout class="QGridLayout" name="gridLayout">
    <item row="1" column="0">
     <widget class="QGroupBox" name="groupBox">
+     <property name="toolTip">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Passed straight to Earth Engine's CCDC algorithm. Generate the plot again to apply a change.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
      <property name="title">
       <string>CCDC's Advanced Parameters</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_2">
       <item row="0" column="0">
        <widget class="QLabel" name="label_8">
+        <property name="toolTip">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Lambda for the LASSO harmonic fit. Default &lt;b&gt;0.002&lt;/b&gt;, the standard CCDC value of 20 rescaled for 0-1 surface reflectance (20/10000).&lt;/p&gt;&lt;p&gt;&lt;b&gt;Higher&lt;/b&gt; gives smoother, more generalised models; too high underfits.&lt;br&gt;&lt;b&gt;0&lt;/b&gt; disables regularisation and uses plain least squares, which overfits sparse series.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
         <property name="text">
          <string>Lambda:</string>
         </property>
@@ -30,7 +36,7 @@
       <item row="0" column="3">
        <widget class="QDoubleSpinBox" name="chi_square">
         <property name="toolTip">
-         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Chi-square probability threshold for change detection (0 to 1). Default 0.99.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Raise it&lt;/b&gt; (e.g. 0.999) to tolerate more noise and detect fewer changes — fewer false breaks.&lt;br&gt;&lt;b&gt;Lower it&lt;/b&gt; to flag more candidate changes — catches subtler change, at the cost of false breaks.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Confidence a deviation must reach before it counts as anomalous, as a chi-square probability from 0 to 1. Default &lt;b&gt;0.99&lt;/b&gt;.&lt;/p&gt;&lt;p&gt;Residuals are divided by the segment's own RMSE, so the bar adapts to how noisy this particular pixel is, and they are combined across the change-detection bands.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Raise the value&lt;/b&gt; (0.999) and the bar goes up: &lt;b&gt;less sensitive&lt;/b&gt;. Only stronger deviations count, so there are fewer breaks and fewer false ones, but real change is confirmed later or missed.&lt;br&gt;&lt;b&gt;Lower the value&lt;/b&gt; (0.9) and the bar comes down: &lt;b&gt;more sensitive&lt;/b&gt;. Weaker deviations count, so subtler change is caught, at the cost of more false breaks.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="buttonSymbols">
           <enum>QAbstractSpinBox::ButtonSymbols::NoButtons</enum>
@@ -51,6 +57,9 @@
       </item>
       <item row="0" column="2">
        <widget class="QLabel" name="label_9">
+        <property name="toolTip">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Confidence a deviation must reach before it counts as anomalous, as a chi-square probability from 0 to 1. Default &lt;b&gt;0.99&lt;/b&gt;.&lt;/p&gt;&lt;p&gt;Residuals are divided by the segment's own RMSE, so the bar adapts to how noisy this particular pixel is, and they are combined across the change-detection bands.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Raise the value&lt;/b&gt; (0.999) and the bar goes up: &lt;b&gt;less sensitive&lt;/b&gt;. Only stronger deviations count, so there are fewer breaks and fewer false ones, but real change is confirmed later or missed.&lt;br&gt;&lt;b&gt;Lower the value&lt;/b&gt; (0.9) and the bar comes down: &lt;b&gt;more sensitive&lt;/b&gt;. Weaker deviations count, so subtler change is caught, at the cost of more false breaks.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
         <property name="text">
          <string>Chi-square:</string>
         </property>
@@ -58,6 +67,9 @@
       </item>
       <item row="1" column="0">
        <widget class="QLabel" name="label_10">
+        <property name="toolTip">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How long the observations must span before a new model is fitted, as a multiple of one year. Default &lt;b&gt;1.33&lt;/b&gt;, so every segment covers a full seasonal cycle.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Higher&lt;/b&gt; forces longer segments, so short-lived fluctuations cannot become a segment of their own.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
         <property name="text">
          <string>Min Years:</string>
         </property>
@@ -66,7 +78,7 @@
       <item row="1" column="1">
        <widget class="QDoubleSpinBox" name="min_years">
         <property name="toolTip">
-         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Minimum length of a temporal segment, as a multiple of one year. Default 1.33.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Higher&lt;/b&gt; forces longer segments, so short-lived fluctuations cannot become their own segment.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How long the observations must span before a new model is fitted, as a multiple of one year. Default &lt;b&gt;1.33&lt;/b&gt;, so every segment covers a full seasonal cycle.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Higher&lt;/b&gt; forces longer segments, so short-lived fluctuations cannot become a segment of their own.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="buttonSymbols">
           <enum>QAbstractSpinBox::ButtonSymbols::NoButtons</enum>
@@ -84,6 +96,9 @@
       </item>
       <item row="1" column="2">
        <widget class="QLabel" name="label_11">
+        <property name="toolTip">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Consecutive observations that must all fall outside the threshold before a change is confirmed. Default &lt;b&gt;6&lt;/b&gt;; useful range 4 to 8.&lt;/p&gt;&lt;p&gt;Requiring a run of them is what keeps an undetected cloud from becoming a break. The break is dated at the first observation of the run, and the segment ends there.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Higher&lt;/b&gt; means more confidence but longer gaps between segments in cloudy areas.&lt;br&gt;&lt;b&gt;Lower&lt;/b&gt; detects change sooner but confirms more noise as change.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
         <property name="text">
          <string>Num Obs:</string>
         </property>
@@ -92,7 +107,7 @@
       <item row="1" column="3">
        <widget class="QSpinBox" name="num_obs">
         <property name="toolTip">
-         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Consecutive observations that must exceed the threshold before a change is confirmed. Default 6; useful range 4 to 8.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Higher&lt;/b&gt; means more confidence but longer gaps between segments in cloudy areas.&lt;br&gt;&lt;b&gt;Lower&lt;/b&gt; detects change sooner but confirms more noise as change.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Consecutive observations that must all fall outside the threshold before a change is confirmed. Default &lt;b&gt;6&lt;/b&gt;; useful range 4 to 8.&lt;/p&gt;&lt;p&gt;Requiring a run of them is what keeps an undetected cloud from becoming a break. The break is dated at the first observation of the run, and the segment ends there.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Higher&lt;/b&gt; means more confidence but longer gaps between segments in cloudy areas.&lt;br&gt;&lt;b&gt;Lower&lt;/b&gt; detects change sooner but confirms more noise as change.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="buttonSymbols">
           <enum>QAbstractSpinBox::ButtonSymbols::NoButtons</enum>
@@ -111,7 +126,7 @@
       <item row="0" column="1">
        <widget class="QDoubleSpinBox" name="lambda_lasso">
         <property name="toolTip">
-         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Lambda for the LASSO harmonic fit. Default 0.002, which is the standard CCDC value of 20 rescaled for 0-1 surface reflectance (20/10000).&lt;/p&gt;&lt;p&gt;&lt;b&gt;Higher&lt;/b&gt; gives smoother, more generalised models; too high underfits.&lt;br&gt;&lt;b&gt;0&lt;/b&gt; disables regularisation and uses plain least squares, which overfits sparse series.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Lambda for the LASSO harmonic fit. Default &lt;b&gt;0.002&lt;/b&gt;, the standard CCDC value of 20 rescaled for 0-1 surface reflectance (20/10000).&lt;/p&gt;&lt;p&gt;&lt;b&gt;Higher&lt;/b&gt; gives smoother, more generalised models; too high underfits.&lt;br&gt;&lt;b&gt;0&lt;/b&gt; disables regularisation and uses plain least squares, which overfits sparse series.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="buttonSymbols">
           <enum>QAbstractSpinBox::ButtonSymbols::NoButtons</enum>
@@ -135,6 +150,9 @@
    </item>
    <item row="2" column="0">
     <widget class="QGroupBox" name="cloud_mask_widget">
+     <property name="toolTip">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Per-pixel cloud and shadow mask for Sentinel-2. Landsat is not affected: it always uses the Collection 2 QA bands (CFmask, saturation and the per-sensor haze product).&lt;/p&gt;&lt;p&gt;Masking is per-pixel only, so a scene is never dropped because the rest of the tile is cloudy.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
      <property name="title">
       <string>Sentinel-2 Cloud Mask</string>
      </property>
@@ -142,7 +160,7 @@
       <item>
        <widget class="QComboBox" name="cloud_filter">
         <property name="toolTip">
-         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Per-pixel cloud/shadow mask applied to Sentinel-2 (ignored for Landsat, which always uses CFmask/QA_PIXEL).&lt;/p&gt;&lt;p&gt;- Cloud Score+: scores cloud, cirrus, haze and shadow in one band; best quality/retention balance&lt;br&gt;- s2cloudless: cloud probability plus a solar-geometry shadow projection&lt;br&gt;- Sen2Cor: the scene classification (SCL) shipped with L2A, dilated&lt;br&gt;- No Mask: keep every observation (rely on CCDC's TMask alone)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;b&gt;Cloud Score+&lt;/b&gt;: scores cloud, cirrus, haze and shadow in one band. Best quality and retention balance, and the recommended choice.&lt;br&gt;&lt;b&gt;s2cloudless&lt;/b&gt;: cloud probability plus a solar-geometry shadow projection.&lt;br&gt;&lt;b&gt;Sen2Cor&lt;/b&gt;: the scene classification (SCL) shipped with L2A, dilated.&lt;br&gt;&lt;b&gt;No Mask&lt;/b&gt;: keep every observation and let CCDC's own TMask screen the series.&lt;/p&gt;&lt;p&gt;Use &lt;b&gt;No Mask&lt;/b&gt; where the area is so cloudy that any mask leaves too few observations to fit.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="currentText">
          <string>Cloud Score+</string>
@@ -187,6 +205,9 @@
    </item>
    <item row="0" column="0">
     <widget class="QGroupBox" name="doy_widget">
+     <property name="toolTip">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Restrict every year of the series to one season, which helps where the wet season leaves too few clear observations to model.&lt;/p&gt;&lt;p&gt;The window may cross the new year: &lt;b&gt;300&lt;/b&gt; to &lt;b&gt;60&lt;/b&gt; keeps a southern-hemisphere dry season.&lt;/p&gt;&lt;p&gt;The full year, 1 to 365, means no seasonal filter at all.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
      <property name="title">
       <string>Days of the Year for Multi-Year Analysis</string>
      </property>
@@ -194,7 +215,7 @@
       <item>
        <widget class="QSpinBox" name="start_doy">
         <property name="toolTip">
-         <string>Start Day of the Year (Useful for seasonal periods)</string>
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;First day of the year to keep. Set it after the end day to have the window cross the new year.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="minimum">
          <number>1</number>
@@ -207,7 +228,7 @@
       <item>
        <widget class="QSpinBox" name="end_doy">
         <property name="toolTip">
-         <string>End Day of the Year (Useful for seasonal periods)</string>
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Last day of the year to keep. Set it before the start day to have the window cross the new year.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="minimum">
          <number>2</number>

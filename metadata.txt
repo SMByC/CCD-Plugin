@@ -1,7 +1,7 @@
 [general]
 name=CCD-Plugin
-description=Qgis plugin for Continuous Change Detection (CCDC) algorithm of a time series at a given coordinate
-about=The CCD-Plugin use Google Earth Engine to get Landsat or Sentinel2 datasets and run the Continuous Change Detection (CCDC) algorithm to analyze the trends and breakpoints of change over multi-year time series at a given coordinate.
+description=Plot a Landsat or Sentinel-2 time series at any coordinate and find its trends and breakpoints of change with the CCDC algorithm
+about=Pick a coordinate and the plugin pulls every clear Landsat (4, 5, 7, 8 and 9, Collection 2) or Sentinel-2 observation for that pixel out of Google Earth Engine, then runs the Continuous Change Detection (CCDC) algorithm over the series. CCDC fits a harmonic model to each stable period and reports a break only where several consecutive observations stop agreeing with it, so the plot shows the observations, one fitted curve per segment, and the dates the pixel changed. Bands and spectral indices, cloud masking, the seasonal window and the CCDC parameters are all configurable. Requires an active Google Earth Engine account and the Google Earth Engine plugin.
 
 version=26.8
 qgisMinimumVersion=4.0
@@ -17,7 +17,7 @@ repository=https://github.com/SMByC/CCD-Plugin
 changelog=
     26.8:
     - Require QGIS 4 / Qt 6 and render plots with Qt WebEngine
-    - Only confirmed breaks are drawn as changes; one still being accumulated is drawn apart with its probability
+    - Only confirmed breaks are drawn as changes; a change still accumulating is drawn apart, labelled with its probability
     - Change detection defaults to Green/Red/NIR/SWIR1/SWIR2, excluding the haze-prone blue band
     - Sample the series and the fitted model on the source pixel grid, not a half-pixel-offset resampling of it
     - Selectable Sentinel-2 cloud mask: Cloud Score+ (default), s2cloudless, Sen2Cor or none
@@ -27,20 +27,10 @@ changelog=
     - Much faster on long series, and no longer hits the Earth Engine memory limit on dense points
     - Plot: a colour per segment, break dates, RMSE on hover, counts in the header, and a far smaller page
     - Name the dataset's availability window when a date range returns no images
-    - Bound the results cache and clear it on unload
-    - All commits in: https://github.com/SMByC/CCD-Plugin/commits
-    25.8:
-    - Move DOY controls to advanced settings dialog. Others UI adjustments
-    - Update map marker style
-    - Finally fix the plugin size to minimum height when the plugin is started/open at the first time
-    - Fix disabling the generate button while is generating a new plot
-    - Fixes map tool handling for activate and desactive
-    - Catch all exceptions when reading the Yaml configuration file
-    - Handle locale initialization to fix some issues for some edge cases loading the plugin
-    - Typos and improve UI tooltips
+    - Cap the results cache and clear it when the plugin closes
     - All commits in: https://github.com/SMByC/CCD-Plugin/commits
 
-tags=gee,trends,change detection,ccdc,landsat,time series
+tags=gee,google earth engine,change detection,ccdc,time series,breakpoints,trends,landsat,sentinel-2,remote sensing
 
 plugin_dependencies=Google Earth Engine
 
