@@ -44,13 +44,6 @@ def pre_init_plugin() -> None:
     extra_libs_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "extlibs"))
     if os.path.isdir(extra_libs_path):
         site.addsitedir(extra_libs_path)
-        # Register with pkg_resources when available (removed in Python 3.12+)
-        try:
-            import pkg_resources
-
-            pkg_resources.working_set.add_entry(extra_libs_path)
-        except Exception:
-            pass
 
 
 # noinspection PyPep8Naming

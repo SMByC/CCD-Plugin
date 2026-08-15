@@ -2,3 +2,8 @@
 *.zip
 *.db
 extlibs
+.omo/run-continuation/
+.claude/
+.ruff_cache/
+.venv/
+uv.lock
