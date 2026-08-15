@@ -25,6 +25,14 @@ from qgis.PyQt.QtCore import QDate
 from CCD_Plugin.core.plot import resolve_plot_style
 
 
+def get_plugin_tmp_dir(id):
+    """where the plugin writes its temporary files, read late: the plugins embedding the widget
+    build it before setting tmp_dir"""
+    from CCD_Plugin.CCD_Plugin import CCD_Plugin
+
+    return CCD_Plugin.inst[id].tmp_dir
+
+
 def get_plugin_config(id):
     """get the current configuration of the plugin"""
     from CCD_Plugin.CCD_Plugin import CCD_Plugin

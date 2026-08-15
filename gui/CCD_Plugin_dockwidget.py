@@ -60,7 +60,7 @@ from CCD_Plugin.core.lifecycle import PlotFileLifecycle, PlotLoadController, Tas
 from CCD_Plugin.core.loading import loading_page_html  # noqa: E402
 from CCD_Plugin.core.plot import PlotSpec, PlotStyle, generate_plot  # noqa: E402
 from CCD_Plugin.gui.advanced_settings import AdvancedSettings  # noqa: E402
-from CCD_Plugin.utils.config import get_plugin_config, restore_plugin_config  # noqa: E402
+from CCD_Plugin.utils.config import get_plugin_config, get_plugin_tmp_dir, restore_plugin_config  # noqa: E402
 from CCD_Plugin.utils.system_utils import error_handler, wait_process  # noqa: E402
 
 
@@ -81,7 +81,7 @@ def _plot_style_from_palette(palette: QPalette) -> PlotStyle:
 class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
     closingPlugin = pyqtSignal()
 
-    def __init__(self, id, plot_directory, canvas=None, parent=None):
+    def __init__(self, id, plot_directory=None, canvas=None, parent=None):
         """Constructor."""
         super().__init__(parent)
         # Set up the user interface from Designer through FORM_CLASS.
@@ -95,7 +95,9 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.last_config = None
         self.task = None
         self.task_lifecycle = TaskLifecycle()
-        self.plot_files = PlotFileLifecycle(plot_directory)
+        self.plot_files = PlotFileLifecycle(
+            plot_directory if plot_directory is not None else lambda: get_plugin_tmp_dir(self.id)
+        )
         self.plot_loads = PlotLoadController()
         self.pending_configs = {}
         self.map_tools = {}

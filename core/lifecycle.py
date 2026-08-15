@@ -41,8 +41,9 @@ class PlotLoadController:
 class PlotFileLifecycle:
     """Own the single self-contained plot file exposed to viewers."""
 
-    def __init__(self, directory: str | Path):
-        self._directory = Path(directory)
+    def __init__(self, directory: str | Path | Callable[[], str | Path]):
+        #: callable when the directory is only known once a plot is written
+        self._directory = directory
         self.active_path: Path | None = None
         self.pending_path: Path | None = None
 
@@ -56,7 +57,8 @@ class PlotFileLifecycle:
         if previous_pending is not None:
             previous_pending.unlink(missing_ok=True)
 
-        descriptor, raw_path = tempfile.mkstemp(suffix=".html", dir=self._directory)
+        directory = self._directory() if callable(self._directory) else self._directory
+        descriptor, raw_path = tempfile.mkstemp(suffix=".html", dir=directory)
         os.close(descriptor)
         replacement = Path(raw_path)
         try:
