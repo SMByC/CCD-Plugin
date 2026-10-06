@@ -1,6 +1,7 @@
 import concurrent.futures
 import sys
 import threading
+import time
 import types
 import unittest
 from collections import OrderedDict
@@ -9,6 +10,7 @@ from unittest.mock import Mock, patch
 import core.ccd_process as ccd_process_module
 from core.ccd_process import (
     DATASET_AVAILABILITY,
+    CCDComputationError,
     _no_images_message,
     _store_result,
     ccd_results,
@@ -17,6 +19,42 @@ from core.ccd_process import (
     lookup_result,
     resolve_computed_indices,
 )
+
+REGION_HEADER = ["id", "longitude", "latitude", "time", "Blue", "Green", "Red", "NIR", "SWIR1", "SWIR2"]
+REGION_ROWS = [REGION_HEADER, ["a", 0, 0, 0.0, *[0.1] * 6], ["b", 0, 0, 86_400_000.0, *[0.2] * 6]]
+CATALOG = {"size": 2, "projection": {"crs": "EPSG:4326", "transform": [1, 0, 0, 0, 1, 0]}}
+
+
+class _Request:
+    def __init__(self, answer):
+        self._answer = answer
+
+    def getInfo(self):
+        return self._answer()
+
+
+def _fake_earth_engine(catalog=lambda: CATALOG, region=lambda: REGION_ROWS, ccdc=dict):
+    """Just enough of ee for compute_ccd; each callable answers one kind of getInfo.
+
+    Returns the ee module and the collection get_gee_data_landsat should hand back.
+    """
+    collection = types.SimpleNamespace(first=lambda: None, size=lambda: None, getRegion=lambda **_: None)
+    image = types.SimpleNamespace(select=lambda _: types.SimpleNamespace(projection=lambda: None))
+    fake_ee = types.SimpleNamespace(
+        Geometry=types.SimpleNamespace(Point=lambda coords: coords),
+        Dictionary=lambda _: _Request(catalog),
+        Image=lambda _: image,
+        Projection=lambda _: None,
+        List=lambda _: _Request(region),
+        Reducer=types.SimpleNamespace(toList=lambda: None),
+        Algorithms=types.SimpleNamespace(
+            If=lambda *_: None,
+            TemporalSegmentation=types.SimpleNamespace(
+                Ccdc=lambda *_: types.SimpleNamespace(reduceRegion=lambda *_, **__: _Request(ccdc))
+            ),
+        ),
+    )
+    return fake_ee, collection
 
 
 class NoImagesMessageTest(unittest.TestCase):
@@ -224,6 +262,138 @@ class CacheLookupTest(unittest.TestCase):
                 min_years=1.33,
                 lambda_lasso=0.002,
             )
+
+
+class CancellationTest(unittest.TestCase):
+    def setUp(self):
+        clear_results_cache()
+        self.addCleanup(clear_results_cache)
+        # every executor compute_ccd creates, so abandoned requests can be joined before the test ends
+        self.executors = []
+        test = self
+
+        class RecordingExecutor(concurrent.futures.ThreadPoolExecutor):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                test.executors.append(self)
+
+        patcher = patch.object(concurrent.futures, "ThreadPoolExecutor", RecordingExecutor)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def join_abandoned_requests(self):
+        for executor in self.executors:
+            executor.shutdown(wait=True)
+
+    def compute(self, fake_ee, collection, cancelled):
+        with (
+            patch.dict(sys.modules, {"ee": fake_ee}),
+            patch.object(ccd_process_module, "get_gee_data_landsat", lambda *_: collection),
+        ):
+            return compute_ccd(
+                coords=(0, 0),
+                date_range=("2020-01-01", "2021-01-01"),
+                doy_range=(1, 365),
+                dataset="Landsat C2",
+                breakpoint_bands=("Green", "Red", "NIR", "SWIR1", "SWIR2"),
+                tmask_bands=None,
+                num_obs=6,
+                chi_square=0.99,
+                min_years=1.33,
+                lambda_lasso=0.002,
+                cancelled=cancelled,
+            )
+
+    def test_cancelled_run_returns_without_waiting_for_earth_engine(self):
+        # Given: Earth Engine sitting on a request; getInfo cannot be interrupted.
+        requested = threading.Event()
+        answer = threading.Event()
+        self.addCleanup(answer.set)
+
+        def silent_catalog():
+            requested.set()
+            answer.wait(timeout=10)
+            return CATALOG
+
+        cancel = threading.Event()
+        threading.Thread(target=lambda: requested.wait(timeout=10) and cancel.set()).start()
+        fake_ee, collection = _fake_earth_engine(catalog=silent_catalog)
+
+        # When: the run is cancelled while that request is in flight.
+        started = time.monotonic()
+        result = self.compute(fake_ee, collection, cancel.is_set)
+        elapsed = time.monotonic() - started
+
+        # Then: it gives up on the request at once instead of holding its task until Earth Engine
+        # answers, and nothing reaches the cache.
+        self.assertIsNone(result)
+        self.assertFalse(answer.is_set())
+        self.assertLess(elapsed, 2)
+        self.assertEqual(len(ccd_results), 0)
+
+    def test_abandoned_requests_never_consult_the_task(self):
+        # Given: both parallel requests in flight, one of them still unanswered, and a probe
+        # recording which threads consult the task's cancellation.
+        answer = threading.Event()
+        self.addCleanup(answer.set)
+        region_requested = threading.Event()
+
+        def silent_region():
+            region_requested.set()
+            answer.wait(timeout=10)
+            return REGION_ROWS
+
+        cancel = threading.Event()
+        callers = []
+
+        def cancelled():
+            callers.append(threading.current_thread())
+            return cancel.is_set()
+
+        threading.Thread(target=lambda: region_requested.wait(timeout=10) and cancel.set()).start()
+        fake_ee, collection = _fake_earth_engine(region=silent_region)
+
+        # When: the run is cancelled, returns, and Earth Engine answers afterwards. Once a QGIS
+        # task's run returns, the task can be deleted, so touching it then is a use-after-free.
+        self.assertIsNone(self.compute(fake_ee, collection, cancelled))
+        answer.set()
+        self.join_abandoned_requests()
+
+        # Then: only the thread running the task ever consulted it.
+        self.assertTrue(callers)
+        self.assertEqual(set(callers), {threading.current_thread()})
+
+    def test_completed_run_is_returned_and_cached(self):
+        # Given: Earth Engine answering every request.
+        fake_ee, collection = _fake_earth_engine(ccdc=lambda: {"tBreak": [[0]]})
+
+        # When: the run completes uncancelled.
+        result = self.compute(fake_ee, collection, lambda: False)
+
+        # Then: it returns the fit and the series, and caches them for redraws.
+        self.assertIsNotNone(result)
+        ccdc_info, timeseries = result
+        self.assertEqual(ccdc_info, {"tBreak": [[0]]})
+        self.assertEqual(list(timeseries["SWIR1"]), [0.1, 0.2])
+        self.assertEqual(len(ccd_results), 1)
+
+    def test_time_series_error_wins_when_both_requests_fail(self):
+        # Given: a point with no observations, where the CCDC request fails too, and first.
+        ccdc_failed = threading.Event()
+
+        def empty_region():
+            ccdc_failed.wait(timeout=10)
+            return [REGION_HEADER]
+
+        def failing_ccdc():
+            ccdc_failed.set()
+            raise RuntimeError("Earth Engine: CCDC failed")
+
+        fake_ee, collection = _fake_earth_engine(region=empty_region, ccdc=failing_ccdc)
+
+        # When/Then: the user sees the message explaining the point, not the CCDC failure.
+        with self.assertRaisesRegex(CCDComputationError, "No observations at this point"):
+            self.compute(fake_ee, collection, lambda: False)
 
 
 if __name__ == "__main__":

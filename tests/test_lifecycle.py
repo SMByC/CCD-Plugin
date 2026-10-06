@@ -151,6 +151,25 @@ class TaskLifecycleTest(unittest.TestCase):
         self.assertTrue(previous.cancelled)
         self.assertIs(lifecycle.active_task, replacement)
 
+    def test_cancel_without_replacement_rejects_late_completion(self):
+        # Given: an active task.
+        lifecycle = TaskLifecycle()
+        task = FakeTask()
+        lifecycle.start(task)
+
+        # When: the dock drops it without starting another, as a redraw from the cache does.
+        cancelled = lifecycle.cancel()
+
+        # Then: it is cancelled and disowned, so its late completion cannot reach the view.
+        self.assertTrue(cancelled)
+        self.assertTrue(task.cancelled)
+        self.assertIsNone(lifecycle.active_task)
+        self.assertFalse(lifecycle.finish(task))
+
+    def test_cancel_reports_when_nothing_was_running(self):
+        # Given/When/Then: with no active task there is nothing to cancel or release.
+        self.assertFalse(TaskLifecycle().cancel())
+
 
 class PlotLoadControllerTest(unittest.TestCase):
     def test_only_matching_generation_and_url_can_commit(self):

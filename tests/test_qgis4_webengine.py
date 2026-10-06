@@ -86,8 +86,15 @@ if __name__ == "__main__":
 
 def run_from_qgis() -> None:
     from qgis.PyQt.QtCore import QCoreApplication, QThread, QTimer
+    from test_plot_supersession import PlotSupersessionSmokeTest
 
-    suite = unittest.defaultTestLoader.loadTestsFromTestCase(Qgis4WebEngineSmokeTest)
+    loader = unittest.defaultTestLoader
+    suite = unittest.TestSuite(
+        [
+            loader.loadTestsFromTestCase(Qgis4WebEngineSmokeTest),
+            loader.loadTestsFromTestCase(PlotSupersessionSmokeTest),
+        ]
+    )
 
     def run_in_main_loop():
         # QGIS runs --code scripts during startup and keeps processing events before it enters its

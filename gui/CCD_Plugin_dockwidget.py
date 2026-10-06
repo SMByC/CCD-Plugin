@@ -53,7 +53,11 @@ FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, "ui", "CCD_Plugin_doc
 from CCD_Plugin.core.ccd_process import (  # noqa: E402
     DEFAULT_BREAKPOINT_BANDS,
     compute_ccd,
+    has_cached_results,
+    lookup_result,
+    make_cache_key,
     resolve_ccd_bands,
+    resolve_computed_indices,
 )
 from CCD_Plugin.core.gee_common import CCD_BANDS  # noqa: E402
 from CCD_Plugin.core.lifecycle import PlotFileLifecycle, PlotLoadController, TaskLifecycle  # noqa: E402
@@ -99,7 +103,8 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             plot_directory if plot_directory is not None else lambda: get_plugin_tmp_dir(self.id)
         )
         self.plot_loads = PlotLoadController()
-        self.pending_configs = {}
+        # configuration of the plot being computed or loaded, read only while plot_in_progress()
+        self.pending_config = None
         self.map_tools = {}
 
         self.setupUi(self)
@@ -228,21 +233,30 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         if not config:
             return
 
-        # nothing but the plotted band changed since the last run, and that is redrawn from cache
-        if self.last_config and self.settings_unchanged(config):
-            # say so rather than returning silently, or the button just looks dead
-            self.MsgBar.clearWidgets()
-            self.MsgBar.pushMessage(
-                "CCD-Plugin",
-                "These settings already produced the current plot, nothing to recompute.",
-                level=Qgis.MessageLevel.Info,
-                duration=5,
-            )
-            # deliberately stays in pick mode: nothing was computed, so the user is most likely
-            # still picking and should not have the tool taken away
+        if self.plot_in_progress() and self.same_plot(self.pending_config, config):
+            # exactly this plot is already on its way, and restarting it would only delay it
             return
 
-        self.start_ccd_task(config)
+        # nothing but the plotted band changed since the last run, and that is redrawn from cache
+        if self.last_config and self.settings_unchanged(config):
+            if not self.plot_in_progress():
+                # say so rather than returning silently, or the button just looks dead
+                self.MsgBar.clearWidgets()
+                self.MsgBar.pushMessage(
+                    "CCD-Plugin",
+                    "These settings already produced the current plot, nothing to recompute.",
+                    level=Qgis.MessageLevel.Info,
+                    duration=5,
+                )
+                # deliberately stays in pick mode: nothing was computed, so the user is most likely
+                # still picking and should not have the tool taken away
+                return
+            # A newer run is about to replace the plot these settings produced. Returning here let
+            # that run win over this, the latest request, so drop it and draw this plot again.
+            if not self.draw_cached_plot(config):
+                self.start_ccd_task(config)
+        else:
+            self.start_ccd_task(config)
 
         # after finish the process
         self.finish_picking()
@@ -272,10 +286,23 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         """True when computation settings match the run that produced the current plot."""
         return self.last_config == self.comparable_settings(config)
 
+    @classmethod
+    def same_plot(cls, config, other):
+        """True when both configurations draw the same plot: same computation and same band."""
+        return (
+            cls.comparable_settings(config) == cls.comparable_settings(other)
+            and config["band_or_index_to_plot"] == other["band_or_index_to_plot"]
+        )
+
+    def plot_in_progress(self):
+        """True while a plot is being computed or loaded to replace the one on display."""
+        return self.task is not None or self.plot_loads.pending is not None
+
     def start_ccd_task(self, config):
         """Run CCD for this configuration as a background task."""
         self.clean_plot()
-        # the band combo starts runs too, so lock it as well or a second task can race the first
+        self.pending_config = config
+        # the band combo starts runs too, and switching it now would restart this one, so lock it too
         self.generate_button.setEnabled(False)
         self.band_or_index_to_plot.setEnabled(False)
         self.plot_webview.setHtml(loading_page_html(self.plot_style))
@@ -346,23 +373,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                     self.MsgBar.clearWidgets()
                     self.MsgBar.pushMessage("CCD-Plugin", " ".join(notices), level=Qgis.MessageLevel.Info, duration=10)
 
-                spec = PlotSpec(
-                    dataset=config["dataset"],
-                    band=config["band_or_index_to_plot"],
-                    longitude=float(config["lon"]),
-                    latitude=float(config["lat"]),
-                )
-                pending_plot = generate_plot(
-                    ccdc_result_info,
-                    timeseries,
-                    spec,
-                    self.plot_files,
-                    style=self.plot_style,
-                )
-
-                pending = self.plot_loads.begin(Path(pending_plot))
-                self.pending_configs[pending.generation] = self.comparable_settings(config)
-                self.plot_webview.load(QUrl.fromLocalFile(pending_plot))
+                self.load_plot(ccdc_result_info, timeseries, config)
             else:
                 if task.isCanceled():
                     msg = "CCD computation cancelled."
@@ -382,57 +393,13 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             self.generate_button.setEnabled(True)
             self.band_or_index_to_plot.setEnabled(True)
 
-    @wait_process
-    def repaint_plot(self):
-        from CCD_Plugin.core.ccd_process import (
-            has_cached_results,
-            lookup_result,
-            make_cache_key,
-            resolve_computed_indices,
-        )
-
-        if not has_cached_results():
-            return
-
-        # get the current configuration of the plugin
-        config = get_plugin_config(self.id)
-        dataset = config["dataset"]
-        band_or_index_to_plot = config["band_or_index_to_plot"]
-
-        # check if ccd results are already computed
-        key = make_cache_key(
-            (config["lon"], config["lat"]),
-            (config["start_date"], config["end_date"]),
-            (config["start_doy"], config["end_doy"]),
-            dataset,
-            config["breakpoint_bands"],
-            num_obs=config["num_obs"],
-            chi_square=config["chi_square"],
-            min_years=config["min_years"],
-            lambda_lasso=config["lambda_lasso"],
-            cloud_filter=config["cloud_filter"],
-        )
-        cached = lookup_result(key, resolve_computed_indices(config["breakpoint_bands"], band_or_index_to_plot))
-        if cached is None:
-            if self.last_config and self.settings_unchanged(config):
-                # Only the plotted band differs, and it needs an index the last run did not build,
-                # so recompute rather than making the user press Generate for a band switch.
-                self.start_ccd_task(config)
-            else:
-                # Something else changed too. Recomputing here would silently apply settings the
-                # user never confirmed, so leave the current plot up and say why nothing happened.
-                msg = "The settings changed since the last run. Press Generate to recompute the CCD."
-                self.MsgBar.clearWidgets()
-                self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.MessageLevel.Info, duration=10)
-            return
-
-        self.clean_plot()
-        ccdc_result_info, timeseries = cached
+    def load_plot(self, ccdc_result_info, timeseries, config):
+        """Write the plot of this configuration and load it to replace the one on display."""
         spec = PlotSpec(
-            dataset=dataset,
-            band=band_or_index_to_plot,
-            longitude=float(self.longitude.value()),
-            latitude=float(self.latitude.value()),
+            dataset=config["dataset"],
+            band=config["band_or_index_to_plot"],
+            longitude=float(config["lon"]),
+            latitude=float(config["lat"]),
         )
         pending_plot = generate_plot(
             ccdc_result_info,
@@ -441,9 +408,62 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             self.plot_files,
             style=self.plot_style,
         )
-        pending = self.plot_loads.begin(Path(pending_plot))
-        self.pending_configs[pending.generation] = self.comparable_settings(config)
+        self.plot_loads.begin(Path(pending_plot))
+        self.pending_config = config
         self.plot_webview.load(QUrl.fromLocalFile(pending_plot))
+
+    def draw_cached_plot(self, config):
+        """Draw this configuration from the CCD cache, superseding any plot in progress.
+
+        False, with nothing touched, when the cache cannot serve it.
+        """
+        key = make_cache_key(
+            (config["lon"], config["lat"]),
+            (config["start_date"], config["end_date"]),
+            (config["start_doy"], config["end_doy"]),
+            config["dataset"],
+            config["breakpoint_bands"],
+            num_obs=config["num_obs"],
+            chi_square=config["chi_square"],
+            min_years=config["min_years"],
+            lambda_lasso=config["lambda_lasso"],
+            cloud_filter=config["cloud_filter"],
+        )
+        cached = lookup_result(
+            key, resolve_computed_indices(config["breakpoint_bands"], config["band_or_index_to_plot"])
+        )
+        if cached is None:
+            return False
+        # Without this a run still computing would land after the redraw and replace it
+        self.clean_plot()
+        ccdc_result_info, timeseries = cached
+        self.load_plot(ccdc_result_info, timeseries, config)
+        return True
+
+    @wait_process
+    def repaint_plot(self):
+        if not has_cached_results() and not self.plot_in_progress():
+            return
+
+        # get the current configuration of the plugin
+        config = get_plugin_config(self.id)
+        if self.draw_cached_plot(config):
+            return
+
+        # The band switches against the latest run: the one in progress, or else the one on display.
+        # Comparing with the plot on display while another run is in progress let that run land
+        # later with the band it was started with.
+        last_run = self.comparable_settings(self.pending_config) if self.plot_in_progress() else self.last_config
+        if last_run and last_run == self.comparable_settings(config):
+            # Only the plotted band differs, and it needs an index the last run did not build,
+            # so recompute rather than making the user press Generate for a band switch.
+            self.start_ccd_task(config)
+        else:
+            # Something else changed too. Recomputing here would silently apply settings the
+            # user never confirmed, so leave the current plot up and say why nothing happened.
+            msg = "The settings changed since the last run. Press Generate to recompute the CCD."
+            self.MsgBar.clearWidgets()
+            self.MsgBar.pushMessage("CCD-Plugin", msg, level=Qgis.MessageLevel.Info, duration=10)
 
     @error_handler
     def restore_plugin_from_yaml(self):
@@ -528,11 +548,17 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         canvas.refresh()
 
     def clean_plot(self):
+        """Drop the plot in progress, computing or loading, so only what follows reaches the view."""
+        if self.task_lifecycle.cancel():
+            self.task = None
+            # the cancelled task's completion is now ignored, and it is what releases these
+            self.generate_button.setEnabled(True)
+            self.band_or_index_to_plot.setEnabled(True)
         pending = self.plot_files.pending_path
         if pending is not None:
             self.plot_files.rollback(pending)
         self.plot_loads.cancel()
-        self.pending_configs.clear()
+        self.pending_config = None
 
     def _plot_loading_changed(self, info: QWebEngineLoadingInfo) -> None:
         pending_load = self.plot_loads.pending
@@ -555,11 +581,9 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         )
         if resolution is None:
             return
-        staged_config = self.pending_configs.pop(pending_load.generation, None)
         if resolution:
             self.html_file = str(self.plot_files.commit(pending_path))
-            if staged_config is not None:
-                self.last_config = staged_config
+            self.last_config = self.comparable_settings(self.pending_config)
             return
         active = self.plot_files.rollback(pending_path)
         self.html_file = str(active) if active is not None else None
@@ -573,7 +597,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.task = None
         self.plot_webview.setHtml("")
         self.plot_loads.cancel()
-        self.pending_configs.clear()
+        self.pending_config = None
         self.plot_files.clear()
         self.html_file = None
 

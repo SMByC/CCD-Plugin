@@ -106,9 +106,7 @@ class TaskLifecycle:
         self._disposed = False
 
     def start(self, task: CancellableTask) -> None:
-        previous = self.active_task
-        if previous is not None:
-            previous.cancel()
+        self.cancel()
         self.active_task = task
 
     def finish(self, task: CancellableTask) -> bool:
@@ -117,9 +115,15 @@ class TaskLifecycle:
         self.active_task = None
         return True
 
-    def dispose(self) -> None:
-        self._disposed = True
+    def cancel(self) -> bool:
+        """Cancel the active task and disown it, so its completion is rejected. False if none."""
         task = self.active_task
         self.active_task = None
-        if task is not None:
-            task.cancel()
+        if task is None:
+            return False
+        task.cancel()
+        return True
+
+    def dispose(self) -> None:
+        self._disposed = True
+        self.cancel()

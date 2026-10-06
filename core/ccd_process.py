@@ -47,6 +47,10 @@ DEFAULT_TMASK_BANDS: Final = ("Green", "SWIR1")
 DEFAULT_BREAKPOINT_BANDS: Final = ("Green", "Red", "NIR", "SWIR1", "SWIR2")
 # dateFormat=2 makes tStart/tEnd/tBreak unix milliseconds, matching the 'time' column of getRegion
 CCDC_DATE_FORMAT: Final = 2
+# How often a run waiting on Earth Engine checks whether it was cancelled. getInfo cannot be
+# interrupted, so without this a superseded run kept its QGIS task, and the task manager thread it
+# runs on, until Earth Engine answered requests whose results were going to be thrown away.
+CANCEL_POLL_SECONDS: Final = 0.1
 
 # When each catalog starts, so an empty result can say whether the range was ever going to match.
 # Sentinel-2 is the one that catches people out: the plugin's date range starts in 2000 by default,
@@ -236,6 +240,16 @@ def _build_timeseries(region_rows):
     return {name: _column_array(name, column) for name, column in pairs}
 
 
+def _settled(futures, cancelled: Callable[[], bool]) -> bool:
+    """Wait for every future, or return False as soon as the run is cancelled."""
+    pending = set(futures)
+    while pending:
+        if cancelled():
+            return False
+        _done, pending = concurrent.futures.wait(pending, timeout=CANCEL_POLL_SECONDS)
+    return True
+
+
 def compute_ccd(
     coords,
     date_range,
@@ -298,61 +312,76 @@ def compute_ccd(
     first = gee_data.first()
     if cancelled():
         return None
-    catalog = ee.Dictionary(
+    catalog_request = ee.Dictionary(
         {
             "size": gee_data.size(),
             "projection": ee.Algorithms.If(first, ee.Image(first).select(0).projection(), ee.Projection("EPSG:4326")),
         }
-    ).getInfo()
-    if cancelled():
-        return None
-    if not catalog["size"]:
-        raise CCDComputationError(_no_images_message(dataset, date_range))
-    # Sample the observations and the CCDC fit on exactly the same pixels, and on the pixels the
-    # source images actually have. Asking for a nominal `scale` makes Earth Engine derive a fresh
-    # grid whose origin is not the source grid's: Landsat products are aligned to the 15 m
-    # panchromatic lattice, so their 30 m origins are always odd multiples of 15 and a derived
-    # grid lands half a pixel off in both axes. Measured on a Landsat series, `scale` alone and
-    # `crs` + `scale` each returned a different pixel centre from the native grid and different
-    # values on every shared date, by up to 0.016 reflectance - about the size of the segment RMSE
-    # CCDC compares residuals against. Passing crs *and* crsTransform pins both calls to the
-    # source grid, so the plotted observations and the fitted model come from the clicked pixel.
-    projection = catalog["projection"]
-    grid = {"crs": projection["crs"], "crsTransform": projection["transform"]}
+    )
 
-    def get_time_series():
-        if cancelled():
+    # Every request runs on this executor and is waited on with _settled, so a cancelled run returns
+    # at once and leaves its requests to finish on their own. Only this thread may call `cancelled`:
+    # it belongs to the QGIS task, which can be deleted as soon as the run returns, so the requests
+    # check `stopped` instead, which is set when the run stops waiting for them.
+    stopped = threading.Event()
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+    try:
+        future_catalog = executor.submit(catalog_request.getInfo)
+        if not _settled([future_catalog], cancelled):
             return None
-        rows = ee.List(gee_data.getRegion(geometry=point, **grid)).getInfo()
-        if cancelled():
-            return None
-        return _build_timeseries(rows)
+        catalog = future_catalog.result()
+        if not catalog["size"]:
+            raise CCDComputationError(_no_images_message(dataset, date_range))
+        # Sample the observations and the CCDC fit on exactly the same pixels, and on the pixels the
+        # source images actually have. Asking for a nominal `scale` makes Earth Engine derive a fresh
+        # grid whose origin is not the source grid's: Landsat products are aligned to the 15 m
+        # panchromatic lattice, so their 30 m origins are always odd multiples of 15 and a derived
+        # grid lands half a pixel off in both axes. Measured on a Landsat series, `scale` alone and
+        # `crs` + `scale` each returned a different pixel centre from the native grid and different
+        # values on every shared date, by up to 0.016 reflectance - about the size of the segment
+        # RMSE CCDC compares residuals against. Passing crs *and* crsTransform pins both calls to the
+        # source grid, so the plotted observations and the fitted model come from the clicked pixel.
+        projection = catalog["projection"]
+        grid = {"crs": projection["crs"], "crsTransform": projection["transform"]}
 
-    def get_ccdc():
-        if cancelled():
-            return None
-        # The whole collection is passed, not just the breakpoint bands: CCDC fits coefficients for
-        # every band it is handed and the plot needs the coefficients of whichever band the user
-        # selects, not only the ones driving detection.
-        ccdc = ee.Algorithms.TemporalSegmentation.Ccdc(
-            gee_data,
-            list(ccd_bands),
-            list(tmask_bands),
-            num_obs,
-            chi_square,
-            min_years,
-            CCDC_DATE_FORMAT,
-            lambda_lasso,
-        )
-        result = ccdc.reduceRegion(ee.Reducer.toList(), point, **grid).getInfo()
-        return None if cancelled() else result
+        def get_time_series():
+            if stopped.is_set():
+                return None
+            rows = ee.List(gee_data.getRegion(geometry=point, **grid)).getInfo()
+            if stopped.is_set():
+                return None
+            return _build_timeseries(rows)
 
-    # both are independent round trips to Earth Engine, so overlap them
-    with concurrent.futures.ThreadPoolExecutor() as executor:
+        def get_ccdc():
+            if stopped.is_set():
+                return None
+            # The whole collection is passed, not just the breakpoint bands: CCDC fits coefficients
+            # for every band it is handed and the plot needs the coefficients of whichever band the
+            # user selects, not only the ones driving detection.
+            ccdc = ee.Algorithms.TemporalSegmentation.Ccdc(
+                gee_data,
+                list(ccd_bands),
+                list(tmask_bands),
+                num_obs,
+                chi_square,
+                min_years,
+                CCDC_DATE_FORMAT,
+                lambda_lasso,
+            )
+            return ccdc.reduceRegion(ee.Reducer.toList(), point, **grid).getInfo()
+
+        # both are independent round trips to Earth Engine, so overlap them
         future_timeseries = executor.submit(get_time_series)
         future_ccdc = executor.submit(get_ccdc)
+        if not _settled([future_timeseries, future_ccdc], cancelled):
+            return None
+        # read in this order, so when both fail the time series error is the one reported: it is the
+        # one that explains an empty or fully masked point to the user
         timeseries = future_timeseries.result()
         ccdc_info = future_ccdc.result()
+    finally:
+        stopped.set()
+        executor.shutdown(wait=False, cancel_futures=True)
 
     if cancelled() or timeseries is None or ccdc_info is None:
         return None
