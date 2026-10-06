@@ -85,10 +85,19 @@ if __name__ == "__main__":
 
 
 def run_from_qgis() -> None:
-    from qgis.PyQt.QtCore import QCoreApplication, QTimer
+    from qgis.PyQt.QtCore import QCoreApplication, QThread, QTimer
 
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(Qgis4WebEngineSmokeTest)
-    result = unittest.TextTestRunner(verbosity=2).run(suite)
-    sys.stdout.flush()
-    exit_code = 0 if result.wasSuccessful() else 1
-    QTimer.singleShot(0, lambda: QCoreApplication.exit(exit_code))
+
+    def run_in_main_loop():
+        # QGIS runs --code scripts during startup and keeps processing events before it enters its
+        # main loop. QCoreApplication.exit() does nothing until that loop runs, so exiting from
+        # there left QGIS open and the exit code never reached make.
+        if QThread.currentThread().loopLevel() == 0:
+            QTimer.singleShot(100, run_in_main_loop)
+            return
+        result = unittest.TextTestRunner(verbosity=2).run(suite)
+        sys.stdout.flush()
+        QCoreApplication.exit(0 if result.wasSuccessful() else 1)
+
+    QTimer.singleShot(0, run_in_main_loop)
