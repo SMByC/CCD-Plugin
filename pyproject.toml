@@ -42,7 +42,8 @@ dev = [
 #
 #   PYTHONPATH="$PWD:$PWD/extlibs" CCD_RUN_LIVE_GEE=1 python -m unittest tests.test_gee_live
 #
-# The QGIS 4 / Qt WebEngine smoke test is opt-in and is run by `make qgis-smoke`.
+# The QGIS 4 / Qt WebEngine smoke tests are opt-in and are run by `make qgis-smoke` inside QGIS,
+# or by `make qgis-smoke-headless` in a bare QgsApplication where QGIS itself cannot start.
 
 [tool.qgis-plugin-ci]
 plugin_path = "CCD_Plugin"

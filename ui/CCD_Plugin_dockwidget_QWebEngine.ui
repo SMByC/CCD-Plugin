@@ -255,7 +255,7 @@
                     <enum>QAbstractSpinBox::ButtonSymbols::NoButtons</enum>
                   </property>
                   <property name="decimals">
-                   <number>5</number>
+                   <number>7</number>
                   </property>
                   <property name="minimum">
                    <double>-90.000000000000000</double>
@@ -290,7 +290,7 @@
                     <enum>QAbstractSpinBox::ButtonSymbols::NoButtons</enum>
                   </property>
                   <property name="decimals">
-                   <number>5</number>
+                   <number>7</number>
                   </property>
                   <property name="minimum">
                    <double>-180.000000000000000</double>
@@ -555,7 +555,7 @@
              <item row="1" column="0">
               <widget class="QgsCheckableComboBox" name="box_breakpoint_bands">
                <property name="toolTip">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Bands and indices whose residuals drive change detection. Each is measured against its own RMSE and they are combined into the statistic tested against Chi-square.&lt;/p&gt;&lt;p&gt;Default &lt;b&gt;Green, Red, NIR, SWIR1, SWIR2&lt;/b&gt;. Blue is left out because it carries the most residual haze and aerosol signal, a well known source of false breaks.&lt;/p&gt;&lt;p&gt;Green and SWIR1 are also the TMask bands, which Earth Engine requires to be change-detection bands, so they are added back automatically if you deselect them.&lt;/p&gt;&lt;p&gt;Note: Regenerate to apply the changes.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Bands and indices whose residuals drive change detection. Each is measured against its own RMSE and they are combined into the statistic tested against Chi-square.&lt;/p&gt;&lt;p&gt;Default &lt;b&gt;Green, Red, NIR, SWIR1, SWIR2&lt;/b&gt;. Blue is left out because it carries the most residual haze and aerosol signal, a well known source of false breaks.&lt;/p&gt;&lt;p&gt;Green and SWIR1 are also the TMask bands, which Earth Engine requires to be change-detection bands, so they are added back automatically if you deselect them.&lt;/p&gt;&lt;p&gt;An index adds information only when its bands are not already in the set: NDVI next to Red and NIR repeats them, and correlated bands make change detection more sensitive than the Chi-square probability says.&lt;/p&gt;&lt;p&gt;Note: Regenerate to apply the changes.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
                <property name="editable">
                 <bool>true</bool>

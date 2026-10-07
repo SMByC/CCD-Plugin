@@ -17,21 +17,29 @@
  *                                                                         *
  ***************************************************************************/
 
-with the collaboration of Daniel Moraes <moraesd90@gmail.com>
-
+Version checks for the extra libraries, kept free of QGIS imports so they can be tested anywhere.
 """
 
-import os
+import re
+from typing import Final
 
-from qgis.PyQt import uic
-from qgis.PyQt.QtWidgets import QDialog
-
-# plugin path
-plugin_folder = os.path.dirname(os.path.dirname(__file__))
-FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, "ui", "advanced_settings.ui"))
+# The plot puts the break lines in the legend through layout shapes with legendgroup/showlegend,
+# which plotly added in 5.16: on 5.15 building the figure fails with "Invalid property".
+MIN_PLOTLY_VERSION: Final = (5, 16)
 
 
-class AdvancedSettings(QDialog, FORM_CLASS):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setupUi(self)
+def version_tuple(text) -> tuple[int, ...]:
+    """The numeric release part of a version string: "5.16.0" -> (5, 16, 0), "6.0.0rc1" -> (6, 0, 0)."""
+    parts = []
+    for piece in str(text).split("."):
+        digits = re.match(r"\d+", piece)
+        if digits is None:
+            break
+        parts.append(int(digits.group()))
+        if digits.group() != piece:
+            break
+    return tuple(parts)
+
+
+def version_satisfies(text, minimum) -> bool:
+    return version_tuple(text) >= tuple(minimum)

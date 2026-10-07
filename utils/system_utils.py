@@ -34,8 +34,8 @@ def error_handler(func):
         try:
             return func(self, *args, **kwargs)
         except Exception as err:
-            # restore mouse
-            QApplication.restoreOverrideCursor()
+            # The wait cursor is restored by wait_process, which set it. Restoring it here as well
+            # popped an override cursor this plugin never set, someone else's, or one too many.
             QApplication.processEvents()
 
             # select the message bar
@@ -90,12 +90,11 @@ def wait_process(func):
     def wrapper(self, *args, **kwargs):
         # mouse wait
         QApplication.setOverrideCursor(QCursor(Qt.CursorShape.WaitCursor))
-        # do
-        obj_returned = func(self, *args, **kwargs)
-        # restore mouse
-        QApplication.restoreOverrideCursor()
-        QApplication.processEvents()
-        # finally return the object by f
-        return obj_returned
+        try:
+            return func(self, *args, **kwargs)
+        finally:
+            # restore mouse, whether it worked or raised to error_handler
+            QApplication.restoreOverrideCursor()
+            QApplication.processEvents()
 
     return wrapper

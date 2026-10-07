@@ -5,7 +5,6 @@ about=Pick a coordinate and the plugin pulls every clear Landsat (4, 5, 7, 8 and
 
 version=26.8
 qgisMinimumVersion=4.0
-qgisMaximumVersion=4.99
 
 author=Xavier Corredor Llano, SMByC
 email=xavier.corredor.llano@gmail.com
@@ -15,6 +14,19 @@ tracker=https://github.com/SMByC/CCD-Plugin/issues
 repository=https://github.com/SMByC/CCD-Plugin
 
 changelog=
+    Unreleased:
+    - The plotted band or index no longer changes the CCDC fit: NDVI/NBR used to mask dark observations out of every band's model
+    - Observations need all six bands within 0 < SR <= 1, the rule of Zhu's CCDC, LCMAP pyccd and gee-ccdc-tools; ~1% fewer Landsat observations, mostly over water
+    - The end date is now included in the series
+    - Coordinates keep 7 decimals, and a click past the antimeridian is wrapped instead of clamped to 180
+    - With a day-of-year window the model is drawn only inside it, and the header counts the dates CCDC fits
+    - Warn when change-detection bands repeat each other (an index next to its own bands)
+    - The dock is reused when reopened; closing it no longer leaves map tools, dialogs or markers behind
+    - Pick mode follows the active map tool, and the marker follows changes of the map CRS
+    - A failed or interrupted plot restores the previous one instead of leaving the loading page
+    - Earth Engine is initialized once, off the interface thread
+    - Configuration files are validated before anything is applied
+    - Requires plotly 5.16 or newer, installing the bundled one when the installed plotly is older
     26.8:
     - Require QGIS 4 / Qt 6 and render plots with Qt WebEngine
     - Only confirmed breaks are drawn as changes; a change still accumulating is drawn apart, labelled with its probability

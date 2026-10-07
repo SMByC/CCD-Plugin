@@ -9,15 +9,16 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class BuildContractTest(unittest.TestCase):
-    def test_requirements_is_the_only_runtime_dependency_source(self):
+    def test_runtime_dependencies_agree_and_stay_unlocked(self):
         # Given: the project metadata and runtime requirements declaration.
         pyproject = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
         requirements = (PROJECT_ROOT / "requirements.txt").read_text(encoding="utf-8")
         gitignore = (PROJECT_ROOT / ".gitignore").read_text(encoding="utf-8")
 
-        # When/Then: Plotly is unpinned in the sole runtime source and lockfiles stay absent.
+        # When/Then: extlibs are built from requirements.txt, and the project metadata declares the
+        # same unpinned runtime dependencies, with lockfiles absent.
         self.assertEqual(requirements.splitlines(), ["plotly"])
-        self.assertNotIn("dependencies", pyproject["project"])
+        self.assertEqual(pyproject["project"]["dependencies"], requirements.splitlines())
         self.assertFalse((PROJECT_ROOT / "uv.lock").exists())
         self.assertIn("uv.lock", gitignore.splitlines())
 
@@ -97,7 +98,7 @@ class BuildContractTest(unittest.TestCase):
         makefile = (PROJECT_ROOT / "Makefile").read_text(encoding="utf-8")
 
         # When/Then: Plotly keeps its installed version after packaging metadata is removed.
-        version_capture = 'from importlib.metadata import version; print(version(\'plotly\'))'
+        version_capture = "from importlib.metadata import version; print(version('plotly'))"
         self.assertIn(version_capture, makefile)
         self.assertIn('__version__ = \\"$${PLOTLY_VERSION}\\"', makefile)
         self.assertLess(makefile.index(version_capture), makefile.index('-name "*.dist-info"'))
@@ -158,16 +159,6 @@ class BuildContractTest(unittest.TestCase):
         self.assertIn('elif [ -n "$OSGEO_USERNAME" ] && [ -n "$OSGEO_PASSWORD" ]; then', release)
         self.assertIn('elif [ -n "$OSGEO_USERNAME" ] || [ -n "$OSGEO_PASSWORD" ]; then', release)
 
-    def test_unload_removes_global_coordinate_marker(self):
-        # Given: the plugin lifecycle source.
-        source = (PROJECT_ROOT / "CCD_Plugin.py").read_text(encoding="utf-8")
-        unload_start = source.index("    def unload(self):")
-        unload_end = source.index("    def removes_temporary_files(self):")
-        unload_source = source[unload_start:unload_end]
-
-        # When/Then: unload performs the same global marker cleanup as dock close.
-        self.assertIn("PickerCoordsOnMap.delete_markers()", unload_source)
-
     def test_completed_plot_coordinates_come_from_completed_config(self):
         # Given: the task completion source.
         source = (PROJECT_ROOT / "gui" / "CCD_Plugin_dockwidget.py").read_text(encoding="utf-8")
@@ -178,19 +169,6 @@ class BuildContractTest(unittest.TestCase):
         self.assertIn('latitude=float(config["lat"])', completion)
         self.assertNotIn("self.longitude.value()", completion)
         self.assertNotIn("self.latitude.value()", completion)
-
-    def test_failure_preserves_confirmed_plot_state(self):
-        # Given: the task completion source.
-        source = (PROJECT_ROOT / "gui" / "CCD_Plugin_dockwidget.py").read_text(encoding="utf-8")
-        completion = source[source.index("    def ccd_completed(") : source.index("    @wait_process")]
-
-        # When/Then: failure reloads the active plot and only clears last_config when none exists.
-        self.assertIn("active = self.plot_files.active_path", completion)
-        self.assertIn("self.plot_webview.load(QUrl.fromLocalFile(str(active)))", completion)
-        self.assertIn("self.last_config = None", completion)
-        self.assertNotIn('self.plot_webview.setHtml("")', completion)
-        self.assertIn("if task.isCanceled():", completion)
-        self.assertIn("level = Qgis.MessageLevel.Info", completion)
 
     def test_task_start_always_replaces_view_with_loading_but_cached_repaint_does_not(self):
         # Given: the QGIS-independent source contract for task starts and cached repaints.

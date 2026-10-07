@@ -10,12 +10,16 @@ from unittest.mock import Mock, patch
 import core.ccd_process as ccd_process_module
 from core.ccd_process import (
     DATASET_AVAILABILITY,
+    DEFAULT_BREAKPOINT_BANDS,
+    REQUEST_THREAD_NAME,
     CCDComputationError,
     _no_images_message,
     _store_result,
     ccd_results,
     clear_results_cache,
     compute_ccd,
+    correlated_detection_bands,
+    ensure_earth_engine_initialized,
     lookup_result,
     resolve_computed_indices,
 )
@@ -87,6 +91,78 @@ class NoImagesMessageTest(unittest.TestCase):
         # Given: a dataset with no availability entry.
         # Then: the generic message is returned rather than raising.
         self.assertIn("No images at this point", _no_images_message("Something else", ("2020-01-01", "2024-01-01")))
+
+    def test_a_range_ending_on_the_first_day_of_the_dataset_covers_it(self):
+        # Given: a range ending on the day Sentinel-2 starts; the end date is included.
+        message = _no_images_message("Sentinel-2", ("2000-01-01", DATASET_AVAILABILITY["Sentinel-2"][0]))
+
+        # Then: that day may have images, so the dataset's start is not blamed.
+        self.assertNotIn("has no data before", message)
+
+
+class CorrelatedDetectionBandsTest(unittest.TestCase):
+    def test_the_default_bands_repeat_nothing(self):
+        self.assertEqual(correlated_detection_bands(DEFAULT_BREAKPOINT_BANDS), ())
+
+    def test_an_index_next_to_its_own_bands_is_flagged(self):
+        # Given: NDVI added to the default set, which already holds its Red and NIR.
+        # Then: it is reported as counting the same deviation twice.
+        self.assertEqual(correlated_detection_bands([*DEFAULT_BREAKPOINT_BANDS, "NDVI"]), ("NDVI",))
+
+    def test_an_index_whose_bands_are_absent_is_not_flagged(self):
+        # Given: NDVI alone; the TMask bands added to it (Green, SWIR1) are not its sources.
+        self.assertEqual(correlated_detection_bands(["NDVI"]), ())
+
+    def test_indices_sharing_bands_with_each_other_are_both_flagged(self):
+        self.assertEqual(correlated_detection_bands(["NDVI", "EVI2"]), ("NDVI", "EVI2"))
+
+    def test_the_tasseled_cap_overlaps_the_tmask_bands_it_is_computed_from(self):
+        # Given: brightness alone; Green and SWIR1 join it as TMask bands, and it is a weighted sum
+        # over every optical band, them included.
+        self.assertEqual(correlated_detection_bands(["BRIGHTNESS"]), ("BRIGHTNESS",))
+
+
+class EarthEngineInitializationTest(unittest.TestCase):
+    ALGORITHMS = types.SimpleNamespace(TemporalSegmentation=types.SimpleNamespace(Ccdc=None))
+
+    def fake_ee(self, data, algorithms=ALGORITHMS, initialize=None):
+        return types.SimpleNamespace(Initialize=initialize or Mock(), Reset=Mock(), data=data, Algorithms=algorithms)
+
+    def initialize(self, fake_ee):
+        with patch.dict(sys.modules, {"ee": fake_ee}):
+            ensure_earth_engine_initialized()
+        return fake_ee.Initialize
+
+    def test_an_initialized_client_is_left_untouched(self):
+        # Given: a client the Earth Engine plugin already initialized with the user's project.
+        # Then: it is not initialized again, which cost network round trips and reset its state.
+        self.initialize(self.fake_ee(types.SimpleNamespace(is_initialized=lambda: True))).assert_not_called()
+
+    def test_an_uninitialized_client_is_initialized(self):
+        self.initialize(self.fake_ee(types.SimpleNamespace(is_initialized=lambda: False))).assert_called_once_with()
+
+    def test_older_clients_are_read_through_their_private_flag(self):
+        self.initialize(self.fake_ee(types.SimpleNamespace(_initialized=True))).assert_not_called()
+        self.initialize(self.fake_ee(types.SimpleNamespace(_initialized=False))).assert_called_once_with()
+
+    def test_a_client_flagged_initialized_without_its_algorithms_is_initialized_again(self):
+        # Given: a first initialization that failed after flagging the client initialized, before
+        # the algorithm catalogue was loaded - offline on the first Generate.
+        half_initialized = self.fake_ee(types.SimpleNamespace(is_initialized=lambda: True), algorithms=object())
+
+        # Then: it is initialized again rather than every later run failing for the session.
+        self.initialize(half_initialized).assert_called_once_with()
+
+    def test_a_failed_initialization_is_reset_and_reported(self):
+        # Given: an initialization that fails.
+        failing = self.fake_ee(
+            types.SimpleNamespace(is_initialized=lambda: False), initialize=Mock(side_effect=OSError("offline"))
+        )
+
+        # When/Then: the error reaches the run, and the half-initialized state is dropped.
+        with self.assertRaisesRegex(OSError, "offline"):
+            self.initialize(failing)
+        failing.Reset.assert_called_once_with()
 
 
 class ComputedIndicesTest(unittest.TestCase):
@@ -264,26 +340,19 @@ class CacheLookupTest(unittest.TestCase):
             )
 
 
+def _request_threads():
+    return [thread for thread in threading.enumerate() if thread.name == REQUEST_THREAD_NAME]
+
+
 class CancellationTest(unittest.TestCase):
     def setUp(self):
         clear_results_cache()
         self.addCleanup(clear_results_cache)
-        # every executor compute_ccd creates, so abandoned requests can be joined before the test ends
-        self.executors = []
-        test = self
-
-        class RecordingExecutor(concurrent.futures.ThreadPoolExecutor):
-            def __init__(self, *args, **kwargs):
-                super().__init__(*args, **kwargs)
-                test.executors.append(self)
-
-        patcher = patch.object(concurrent.futures, "ThreadPoolExecutor", RecordingExecutor)
-        patcher.start()
-        self.addCleanup(patcher.stop)
 
     def join_abandoned_requests(self):
-        for executor in self.executors:
-            executor.shutdown(wait=True)
+        """Let every request a run left behind finish before the test ends."""
+        for thread in _request_threads():
+            thread.join(timeout=10)
 
     def compute(self, fake_ee, collection, cancelled):
         with (
@@ -330,6 +399,14 @@ class CancellationTest(unittest.TestCase):
         self.assertFalse(answer.is_set())
         self.assertLess(elapsed, 2)
         self.assertEqual(len(ccd_results), 0)
+
+        # And: the request left behind runs on a daemon thread, which cannot hold QGIS from
+        # exiting while Earth Engine never answers - getInfo has no deadline by default.
+        abandoned = _request_threads()
+        self.assertTrue(abandoned)
+        self.assertTrue(all(thread.daemon for thread in abandoned))
+        answer.set()
+        self.join_abandoned_requests()
 
     def test_abandoned_requests_never_consult_the_task(self):
         # Given: both parallel requests in flight, one of them still unanswered, and a probe

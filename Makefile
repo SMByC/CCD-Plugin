@@ -93,6 +93,11 @@ qgis-smoke: compile
 	CCD_RUN_QGIS4_SMOKE=1 QTWEBENGINE_DISABLE_SANDBOX=1 \
 		$(QGIS) --nologo --noplugins --code tests/run_qgis4_webengine_smoke.py
 
+# the same smoke tests in a bare QgsApplication, for machines where QGIS itself cannot start
+qgis-smoke-headless: compile
+	QT_QPA_PLATFORM=offscreen QTWEBENGINE_DISABLE_SANDBOX=1 QTWEBENGINE_CHROMIUM_FLAGS=--disable-gpu \
+		python3 tests/run_qgis_smoke_headless.py
+
 deploy: compile doc transcompile
 	@echo
 	@echo "------------------------------------------"

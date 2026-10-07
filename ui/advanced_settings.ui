@@ -206,7 +206,7 @@
    <item row="0" column="0">
     <widget class="QGroupBox" name="doy_widget">
      <property name="toolTip">
-      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Restrict every year of the series to one season, which helps where the wet season leaves too few clear observations to model.&lt;/p&gt;&lt;p&gt;The window may cross the new year: &lt;b&gt;300&lt;/b&gt; to &lt;b&gt;60&lt;/b&gt; keeps a southern-hemisphere dry season.&lt;/p&gt;&lt;p&gt;The full year, 1 to 365, means no seasonal filter at all.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Restrict every year of the series to one season, which helps where the wet season leaves too few clear observations to model.&lt;/p&gt;&lt;p&gt;The window may cross the new year: &lt;b&gt;300&lt;/b&gt; to &lt;b&gt;60&lt;/b&gt; keeps a southern-hemisphere dry season.&lt;/p&gt;&lt;p&gt;The full year, 1 to 365, means no seasonal filter at all.&lt;/p&gt;&lt;p&gt;With a window, the fitted model is drawn inside it only: outside, no observation constrains the curve.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
      </property>
      <property name="title">
       <string>Days of the Year for Multi-Year Analysis</string>

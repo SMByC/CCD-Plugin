@@ -108,36 +108,46 @@ class DownloadAndUnzip(QDialog):
         self.show()
         QApplication.processEvents()
 
-        self._zip_fd, self._zip_path = tempfile.mkstemp(suffix=".zip")
-
-        downloaded_ok = self.download_file()
-        extracted_ok = (not self._cancelled) and downloaded_ok and self.extract_zip()
         #: whether the libraries were downloaded and extracted; read by install() before it
         #: replaces any existing installation
-        self.succeeded = bool(extracted_ok)
+        self.succeeded = False
+        # whatever happens, the temporary ZIP is released and the dialog closed
+        try:
+            self._zip_fd, self._zip_path = tempfile.mkstemp(suffix=".zip")
 
-        if extracted_ok:
-            self.progress_label.setText("Done!")
-            self.progress_bar.setValue(100)
-        elif not self._cancelled:
-            _log("Failed to download/extract extra libraries.", level="Critical")
-            QMessageBox.critical(
-                None,
-                "CCD-Plugin: Error installing libs",
-                (
-                    "Error downloading and extracting additional Python packages"
-                    " required for CCD-Plugin.\n\n"
-                    "Read the install instructions here:\n"
-                    "https://github.com/SMByC/CCD-Plugin#installation"
-                ),
-                QMessageBox.StandardButton.Ok,
-            )
+            downloaded_ok = self.download_file()
+            extracted_ok = (not self._cancelled) and downloaded_ok and self.extract_zip()
+            self.succeeded = bool(extracted_ok)
 
-        self._cleanup()
+            if extracted_ok:
+                self.progress_label.setText("Done!")
+                self.progress_bar.setValue(100)
+            elif not self._cancelled:
+                _log("Failed to download/extract extra libraries.", level="Critical")
+                QMessageBox.critical(
+                    None,
+                    "CCD-Plugin: Error installing libs",
+                    (
+                        "Error downloading and extracting additional Python packages"
+                        " required for CCD-Plugin.\n\n"
+                        "Read the install instructions here:\n"
+                        "https://github.com/SMByC/CCD-Plugin#installation"
+                    ),
+                    QMessageBox.StandardButton.Ok,
+                )
+        finally:
+            self._cleanup()
 
     def _on_cancel(self) -> None:
+        # Only flag it: this runs from inside the download or extraction (their processEvents),
+        # and releasing the ZIP from under them made extraction open None and raise. They see the
+        # flag and stop, and __init__ cleans up once they have.
         self._cancelled = True
-        self._cleanup()
+        self.progress_label.setText("Cancelling...")
+
+    def reject(self) -> None:
+        # Escape or the window's close button: cancel the same way, the dialog closes in _cleanup
+        self._on_cancel()
 
     def _cleanup(self) -> None:
         """Release the temporary ZIP file and close the dialog."""
@@ -203,6 +213,8 @@ class DownloadAndUnzip(QDialog):
             return False
         self.progress_label.setText("Extracting libraries...")
         QApplication.processEvents()
+        if self._cancelled:
+            return False
         try:
             with zipfile.ZipFile(self._zip_path) as bundle:
                 bundle.extractall(self.output_path)
@@ -280,10 +292,10 @@ def install() -> None:
         staging_dir = None  # consumed by the swap
         shutil.rmtree(previous_dir, ignore_errors=True)
         _log(f"Installed extra libs to: {extlibs_dir}")
-    except (OSError, ValueError) as exc:
-        # the completed download is deliberately left in place for the next attempt to sweep,
-        # rather than deleted here and re-fetched from scratch
+    except Exception as exc:  # see "Never raises" above
         _log(f"Install error: {exc}", level="Critical")
-    else:
+    finally:
+        # A staging directory left behind is never reused, the next attempt sweeps it and
+        # downloads again, so it is removed whatever happened: failed, cancelled or broken.
         if staging_dir:
             shutil.rmtree(staging_dir, ignore_errors=True)

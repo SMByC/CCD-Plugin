@@ -85,6 +85,7 @@ if __name__ == "__main__":
 
 
 def run_from_qgis() -> None:
+    import test_qgis_lifecycle
     from qgis.PyQt.QtCore import QCoreApplication, QThread, QTimer
     from test_plot_supersession import PlotSupersessionSmokeTest
 
@@ -93,6 +94,7 @@ def run_from_qgis() -> None:
         [
             loader.loadTestsFromTestCase(Qgis4WebEngineSmokeTest),
             loader.loadTestsFromTestCase(PlotSupersessionSmokeTest),
+            loader.loadTestsFromModule(test_qgis_lifecycle),
         ]
     )
 

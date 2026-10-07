@@ -99,18 +99,17 @@ class PlotFileLifecycle:
 
 
 class TaskLifecycle:
-    """Track task ownership and reject completions after disposal."""
+    """Track task ownership: only the task started last may complete, and none once disowned."""
 
     def __init__(self):
         self.active_task: CancellableTask | None = None
-        self._disposed = False
 
     def start(self, task: CancellableTask) -> None:
         self.cancel()
         self.active_task = task
 
     def finish(self, task: CancellableTask) -> bool:
-        if self._disposed or task is not self.active_task:
+        if task is not self.active_task:
             return False
         self.active_task = None
         return True
@@ -125,5 +124,9 @@ class TaskLifecycle:
         return True
 
     def dispose(self) -> None:
-        self._disposed = True
+        """Cancel and disown the active task, so its late completion is rejected.
+
+        Not terminal: a disposed dock is reused once it is opened again, and a disowned task is
+        already rejected by finish(), so refusing every later task too only made it unusable.
+        """
         self.cancel()

@@ -124,6 +124,21 @@ class TaskLifecycleTest(unittest.TestCase):
         self.assertFalse(lifecycle.finish(task))
         self.assertIsNone(lifecycle.active_task)
 
+    def test_a_disposed_lifecycle_accepts_the_next_task(self):
+        # Given: a lifecycle disposed while a task ran, as closing the dock does.
+        lifecycle = TaskLifecycle()
+        abandoned = FakeTask()
+        lifecycle.start(abandoned)
+        lifecycle.dispose()
+
+        # When: the dock is opened again and starts another task.
+        replacement = FakeTask()
+        lifecycle.start(replacement)
+
+        # Then: the new task completes; only the abandoned one stays rejected.
+        self.assertFalse(lifecycle.finish(abandoned))
+        self.assertTrue(lifecycle.finish(replacement))
+
     def test_superseded_task_completion_is_rejected(self):
         # Given: a newer task has replaced a previous registration.
         lifecycle = TaskLifecycle()

@@ -28,6 +28,12 @@ jobs:
         with:
           version: "0.8.14"
 
+      - name: Run unit tests
+        run: |
+          set -euo pipefail
+          PYTHONPATH="$PWD" uv run --no-project --python 3.12 --with-requirements requirements.txt --with numpy \
+            python -m unittest discover -s tests -p 'test_*.py' -v
+
       - name: Validate release version
         env:
           RELEASE_TAG: ${{ inputs.tag }}

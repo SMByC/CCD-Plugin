@@ -16,22 +16,20 @@
  *   (at your option) any later version.                                   *
  *                                                                         *
  ***************************************************************************/
-
-with the collaboration of Daniel Moraes <moraesd90@gmail.com>
-
 """
 
-import os
+from typing import Final
 
-from qgis.PyQt import uic
-from qgis.PyQt.QtWidgets import QDialog
-
-# plugin path
-plugin_folder = os.path.dirname(os.path.dirname(__file__))
-FORM_CLASS, _ = uic.loadUiType(os.path.join(plugin_folder, "ui", "advanced_settings.ui"))
+# Decimal places the coordinate controls keep. 7 decimals is ~1 cm: with 5 (~1.1 m) a click within
+# half a metre of a pixel edge was rounded into the neighbouring 10 m or 30 m pixel before it was
+# sent to Earth Engine, while the marker stayed where the user clicked.
+COORDINATE_DECIMALS: Final = 7
 
 
-class AdvancedSettings(QDialog, FORM_CLASS):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setupUi(self)
+def normalize_longitude(longitude: float) -> float:
+    """Wrap a longitude into [-180, 180).
+
+    A geographic canvas panned past the antimeridian reports longitudes beyond 180, which the
+    longitude control silently clamped to 180, moving the analysis to another place entirely.
+    """
+    return (longitude + 180.0) % 360.0 - 180.0

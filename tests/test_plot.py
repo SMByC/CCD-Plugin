@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from itertools import pairwise
 from pathlib import Path
+from typing import ClassVar
 
 import numpy as np
 
@@ -28,11 +29,20 @@ from core.plot import (
     _page_theme_script,
     build_figure,
     build_model_segments,
+    count_observation_dates,
     evaluate_ccdc_model,
     normalize_observations,
     sample_segment_dates,
+    utc_dates,
     write_plot_html,
 )
+from core.plot_data import within_doy_window
+
+DAY_MS = 24 * 60 * 60 * 1000
+
+
+def _timestamp_ms(text):
+    return float(np.datetime64(text, "ms").astype("int64"))
 
 
 def _representative_figure(style=PlotStyle.LIGHT):
@@ -67,34 +77,6 @@ class PlotHelpersTest(unittest.TestCase):
         source_path = Path(plot_module.__file__)
 
         ast.parse(source_path.read_text(encoding="utf-8"), filename=str(source_path), feature_version=(3, 11))
-
-    def test_resolve_plot_style_explicit_value_overrides_opposite_fallback(self):
-        # Given: each explicit canonical style and its opposite fallback.
-        for value, fallback, expected in (
-            ("light", PlotStyle.DARK, PlotStyle.LIGHT),
-            ("dark", PlotStyle.LIGHT, PlotStyle.DARK),
-        ):
-            with self.subTest(value=value):
-                # When: the retained plot style is resolved.
-                resolved = plot_module.resolve_plot_style(value, fallback)
-
-                # Then: the explicit style takes precedence.
-                self.assertEqual(resolved, expected)
-
-    def test_resolve_plot_style_uses_fallback_when_value_is_none(self):
-        # Given: no retained style and a canonical fallback.
-        # When: the retained plot style is resolved.
-        resolved = plot_module.resolve_plot_style(None, PlotStyle.DARK)
-
-        # Then: the fallback is returned unchanged.
-        self.assertIs(resolved, PlotStyle.DARK)
-
-    def test_resolve_plot_style_rejects_invalid_value(self):
-        # Given: a retained style outside the canonical values.
-        # When: the retained plot style is resolved.
-        # Then: invalid input raises ValueError.
-        with self.assertRaises(ValueError):
-            plot_module.resolve_plot_style("sepia", PlotStyle.LIGHT)
 
     def test_evaluate_uses_intercept_slope_and_ordered_harmonics(self):
         # Given: a quarter-year timestamp and a coefficient only for sin1.
@@ -207,6 +189,123 @@ class PlotHelpersTest(unittest.TestCase):
         self.assertEqual(len(segments), 1)
         self.assertEqual(segments[0].start_ms, 40.0)
         self.assertEqual(segments[0].end_ms, 50.0)
+
+    def test_utc_dates_floor_to_the_millisecond_before_and_after_the_epoch(self):
+        # Given: timestamps on both sides of 1970, one with a fraction of a millisecond.
+        dates = utc_dates([-DAY_MS - 0.5, 0.0, DAY_MS + 0.25])
+
+        # Then: they are UTC calendar times, the fraction floored rather than truncated to zero.
+        self.assertEqual(
+            [str(date) for date in dates],
+            ["1969-12-30T23:59:59.999", "1970-01-01T00:00:00.000", "1970-01-02T00:00:00.000"],
+        )
+
+    def test_same_day_observations_count_as_one_date(self):
+        # Given: two scenes of the same pass, seconds apart, and one more on another day.
+        times = [
+            _timestamp_ms("2020-03-01T15:10:00"),
+            _timestamp_ms("2020-03-01T15:10:24"),
+            _timestamp_ms("2020-03-17"),
+        ]
+
+        # Then: they fall on two dates, the number of observations CCDC fits.
+        self.assertEqual(count_observation_dates(times), 2)
+
+    def test_doy_window_matches_the_earth_engine_filter(self):
+        # Given: the days around a window's ends - DOY 149, 150, 250 and 251 - in a leap year and a
+        # common one, and 31 December of a leap year, DOY 366.
+        times = [_timestamp_ms(day) for day in ("2020-05-28", "2020-05-29", "2021-09-07", "2021-09-08", "2020-12-31")]
+
+        # Then: ends are inclusive, a wrapped window spans the new year, and the full year or no
+        # window keeps everything, 31 December of a leap year (DOY 366) included.
+        self.assertEqual(list(within_doy_window(times, (150, 250))), [False, True, True, False, False])
+        self.assertEqual(list(within_doy_window(times, (300, 60))), [False, False, False, False, True])
+        self.assertEqual(list(within_doy_window(times, (1, 365))), [True] * 5)
+        self.assertEqual(list(within_doy_window(times, None)), [True] * 5)
+
+    TWO_YEARS: ClassVar[dict] = {
+        "tStart": [[_timestamp_ms("2019-01-01T15:10")]],
+        "tEnd": [[_timestamp_ms("2020-12-31T15:10")]],
+        "B4_coefs": [[[1.0] * 8]],
+    }
+
+    @staticmethod
+    def seasons(segment):
+        """The runs of samples carrying the model, as lists of ISO times."""
+        runs, current = [], []
+        for date, value in zip(utc_dates(segment.dates_ms), segment.values, strict=True):
+            if np.isnan(value):
+                runs.append(current)
+                current = []
+            else:
+                current.append(str(date))
+        return [*runs, current] if current else runs
+
+    def test_the_model_is_drawn_inside_the_doy_window_only(self):
+        # When: a two-year segment is sampled for a June-September window, and without a window.
+        windowed = build_model_segments(self.TWO_YEARS, "B4", doy_range=(152, 273))[0]
+        full = build_model_segments(self.TWO_YEARS, "B4")[0]
+
+        # Then: one piece per season, from its first to its last day - DOY 152 to 273 is a day
+        # earlier in the leap year 2020 - and a gap between them, so no line crosses the months no
+        # observation constrained; without a window, no gap.
+        seasons = self.seasons(windowed)
+        self.assertEqual(
+            [(season[0], season[-1]) for season in seasons],
+            [
+                ("2019-06-01T00:00:00.000", "2019-09-30T23:59:59.999"),
+                ("2020-05-31T00:00:00.000", "2020-09-29T23:59:59.999"),
+            ],
+        )
+        modelled = ~np.isnan(windowed.values)
+        self.assertTrue(within_doy_window(windowed.dates_ms[modelled], (152, 273)).all())
+        np.testing.assert_allclose(
+            windowed.values[modelled], evaluate_ccdc_model(windowed.dates_ms[modelled], [1.0] * 8)
+        )
+        self.assertFalse(np.isnan(full.values).any())
+        # and only the seasons are sampled, not the whole span with most of it left empty
+        self.assertLess(windowed.dates_ms.size, full.dates_ms.size)
+
+    def test_a_window_across_the_new_year_is_drawn_season_by_season(self):
+        # When: the same segment is sampled for a 300-60 window, a southern dry season.
+        segment = build_model_segments(self.TWO_YEARS, "B4", doy_range=(300, 60))[0]
+
+        # Then: the seasons run across the new year, DOY 60 being 1 March in 2019 and 29 February
+        # in the leap year 2020, and the segment's own ends cut the first and last one.
+        self.assertEqual(
+            [(season[0], season[-1]) for season in self.seasons(segment)],
+            [
+                ("2019-01-01T15:10:00.000", "2019-03-01T23:59:59.999"),
+                ("2019-10-27T00:00:00.000", "2020-02-29T23:59:59.999"),
+                ("2020-10-26T00:00:00.000", "2020-12-31T15:10:00.000"),
+            ],
+        )
+
+    def test_a_season_too_short_for_a_line_is_drawn_as_a_point(self):
+        # Given: a one-day window, which a five-day sampling grid missed or hit once - never twice.
+        spec = PlotSpec(dataset="Landsat", band="B4", longitude=0.0, latitude=0.0, doy_range=(100, 100))
+
+        # When: the model is sampled and drawn for it.
+        segment = build_model_segments(self.TWO_YEARS, "B4", doy_range=(100, 100))[0]
+        trace = build_figure(self.TWO_YEARS, {"time": [], "B4": []}, spec).data[1]
+
+        # Then: each season is sampled at both ends of its day and marked by one point.
+        self.assertEqual(
+            self.seasons(segment),
+            [
+                ["2019-04-10T00:00:00.000", "2019-04-10T23:59:59.999"],
+                ["2020-04-09T00:00:00.000", "2020-04-09T23:59:59.999"],
+            ],
+        )
+        self.assertEqual(trace.mode, "lines+markers")
+        self.assertEqual(int(np.count_nonzero(trace.marker.size)), 2)
+
+    def test_long_seasons_are_drawn_as_lines_alone(self):
+        spec = PlotSpec(dataset="Landsat", band="B4", longitude=0.0, latitude=0.0, doy_range=(152, 273))
+
+        trace = build_figure(self.TWO_YEARS, {"time": [], "B4": []}, spec).data[1]
+
+        self.assertEqual(trace.mode, "lines")
 
 
 class PlotFigureTest(unittest.TestCase):
@@ -638,6 +737,38 @@ class PlotFigureTest(unittest.TestCase):
         for previous, current in pairwise(segment_colors):
             self.assertNotEqual(previous, current)
         self.assertEqual(segment_colors[0], segment_colors[len(MODEL_COLORS)])
+
+    def test_a_break_without_change_probability_is_drawn_without_a_percentage(self):
+        # Given: a break whose changeProb Earth Engine left out (masked).
+        result_info = {
+            "tStart": [[0.0]],
+            "tEnd": [[10.0 * DAY_MS]],
+            "tBreak": [[9.0 * DAY_MS]],
+            "changeProb": [[None]],
+            "B4_coefs": [[[1.0] * 8]],
+        }
+        spec = PlotSpec(dataset="Landsat", band="B4", longitude=0.0, latitude=0.0)
+
+        # When: the figure is built - formatting the missing probability used to raise.
+        figure = build_figure(result_info, {"time": [0.0], "B4": [1.0]}, spec)
+
+        # Then: the break is drawn as unconfirmed, labelled with its date alone.
+        self.assertEqual(figure.layout.shapes[0].name, "In progress")
+        self.assertEqual(figure.layout.annotations[0].text, "1970-01-10")
+
+    def test_header_counts_the_dates_when_scenes_share_a_day(self):
+        # Given: three observations, two of them on the same day from overlapping scenes.
+        times = [0.0, 24_000.0, 16 * DAY_MS]
+        spec = PlotSpec(dataset="Landsat", band="B4", longitude=0.0, latitude=0.0)
+
+        # When: the figure is built with and without the duplicate.
+        duplicated = build_figure({}, {"time": times, "B4": [1.0, 1.0, 2.0]}, spec)
+        unique = build_figure({}, {"time": times[1:], "B4": [1.0, 2.0]}, spec)
+
+        # Then: the header gives the dates CCDC fits next to the observations drawn, only when they differ.
+        self.assertIn("3 obs on 2 dates", duplicated.layout.title.text)
+        self.assertIn("2 obs  ·", unique.layout.title.text)
+        self.assertNotIn("dates", unique.layout.title.text)
 
     def test_build_figure_empty_input_has_annotation_and_no_data_traces(self):
         # Given: empty observations, an empty selected band, and no model result.

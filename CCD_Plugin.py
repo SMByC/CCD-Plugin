@@ -20,9 +20,9 @@
 
 import os.path
 import shutil
-import tempfile
 from typing import ClassVar
 
+from qgis.PyQt import sip
 from qgis.PyQt.QtCore import QCoreApplication, QLocale, QSettings, Qt, QTimer, QTranslator
 from qgis.PyQt.QtGui import QAction, QIcon
 from qgis.PyQt.QtWidgets import QWIDGETSIZE_MAX
@@ -61,9 +61,10 @@ class CCD_Plugin:
             QCoreApplication.installTranslator(self.translator)
 
         self.menu_name_plugin = self.tr("Continuous Change Detection Plugin")
-        self.pluginIsActive = False
         self.widget = None
         self.tmp_dir = None
+        # the temporary directory get_plugin_tmp_dir created, as opposed to one an embedding plugin handed in
+        self.created_tmp_dir = None
 
         # save the instance
         self.id = str(id(self))
@@ -96,26 +97,18 @@ class CCD_Plugin:
         self.iface.addPluginToMenu(self.menu_name_plugin, self.dockable_action)
 
     def run(self):
-        """Run method that loads and starts the plugin"""
+        """Show the dock, building it the first time.
 
-        if not self.pluginIsActive:
-            self.pluginIsActive = True
-
-            if self.tmp_dir:
-                self.removes_temporary_files()
-            self.tmp_dir = tempfile.mkdtemp()
-
-            # print "** STARTING CCD_Plugin"
-
-            # dockwidget may not exist if:
-            #    first run of plugin
-            #    removed on close (see self.onClosePlugin method)
-            widget = self.widget
-            if widget is None:
-                # Create the dockwidget (after translation) and keep reference
-                widget = CCD_PluginDockWidget(self.id, self.tmp_dir)
-                self.widget = widget
-
+        One dock for the life of the plugin, hidden when closed and shown again here. A dock built
+        per opening stayed parented to the main window after its close, listed under the Panels
+        menu: reopened from there and closed, it closed the current dock through its own
+        closingPlugin connection, and each one kept its pickers and its Advanced dialog alive.
+        """
+        widget = self.widget
+        if widget is None:
+            # the plot directory is read late and created on demand, see get_plugin_tmp_dir
+            widget = CCD_PluginDockWidget(self.id)
+            self.widget = widget
             # connect to provide cleanup on closing of dockwidget
             widget.closingPlugin.connect(self.onClosePlugin)
 
@@ -123,76 +116,74 @@ class CCD_Plugin:
             target_height = widget.minimumSizeHint().height()
             widget.setMinimumHeight(target_height)
             widget.setMaximumHeight(target_height)
-
-            # show the dockwidget
             self.iface.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, widget)
-            widget.show()
 
             # allow resizing larger afterward
-            QTimer.singleShot(100, lambda: widget.setMaximumHeight(QWIDGETSIZE_MAX))
+            QTimer.singleShot(100, lambda: None if sip.isdeleted(widget) else widget.setMaximumHeight(QWIDGETSIZE_MAX))
+
+        widget.show()
+        widget.raise_()
 
     # --------------------------------------------------------------------------
 
     def onClosePlugin(self):
-        """Cleanup necessary items here when plugin is closed"""
-        widget = self.widget
-        if widget is None:
-            return
-        widget.dispose()
-        self.removes_temporary_files()
+        """The dock was closed: its run, plot, pick mode and marker are already gone (dispose).
 
-        # delete the marker
-        from CCD_Plugin.gui.CCD_Plugin_dockwidget import PickerCoordsOnMap
-
-        PickerCoordsOnMap.delete_markers()
-
-        # give the canvases their default tool back before the dock goes away
-        widget.release_map_tools()
-
-        # remove this statement if widget is to remain
-        # for reuse if plugin is reopened
-        # Commented next statement since it causes QGIS crashe
-        # when closing the docked window:
-        widget.close()
-        self.widget = None
-
-        # reset some variables
-        self.pluginIsActive = False
+        The dock stays, hidden, and is shown again by run(); only the pickers are let go.
+        """
+        if self.widget is not None:
+            self.widget.release_map_tools()
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
-        from CCD_Plugin.gui.CCD_Plugin_dockwidget import PickerCoordsOnMap
-
-        PickerCoordsOnMap.delete_markers()
-        if self.widget:
-            self.widget.dispose()
+        widget, self.widget = self.widget, None
+        if widget is not None and not sip.isdeleted(widget):
+            widget.closingPlugin.disconnect(self.onClosePlugin)
+            widget.dispose()
+            # hand the canvases back their tool and delete the pickers: each one is owned by its
+            # canvas and holds a reference to this widget
+            widget.release_map_tools()
+            self.iface.removeDockWidget(widget)
+            # Deleting it is safe with a run still in flight: the task only holds a weak reference
+            # to the dock, and dispose() disowned the task, so its completion is ignored.
+            widget.deleteLater()
         self.removes_temporary_files()
-        # Remove the plugin item and icon
-        self.iface.removePluginMenu(self.menu_name_plugin, self.dockable_action)
-        self.iface.removeToolBarIcon(self.dockable_action)
-
-        if self.widget:
-            # hand the canvases back their default tool, and drop the cached pickers: each one
-            # holds a reference to this widget and is owned by its canvas, so leaving them in
-            # place keeps the dock reachable no matter what happens below
-            self.widget.release_map_tools()
-            self.iface.removeDockWidget(self.widget)
-            # Drop the reference rather than deleteLater(): a CCD task still in flight holds the
-            # widget alive through its on_finished bound method, and deleting the C++ object out
-            # from under that callback turns a late finish into a RuntimeError. Releasing this
-            # reference lets it be collected once nothing else refers to it.
-            self.widget = None
-        self.pluginIsActive = False
-        CCD_Plugin.inst.pop(self.id, None)
-
-    def removes_temporary_files(self):
-        # the CCD cache holds the whole time series and coefficient set per entry, and the module
+        # the CCD cache holds the time series and coefficients of the last runs, and the module
         # stays imported after a plugin reload, so it has to be emptied explicitly
         from CCD_Plugin.core.ccd_process import clear_results_cache
 
         clear_results_cache()
+        # Remove the plugin item and icon
+        self.iface.removePluginMenu(self.menu_name_plugin, self.dockable_action)
+        self.iface.removeToolBarIcon(self.dockable_action)
+        self.dockable_action.deleteLater()
+        CCD_Plugin.inst.pop(self.id, None)
 
-        # clear CCD_Plugin.tmp_dir
-        if self.tmp_dir and os.path.isdir(self.tmp_dir):
-            shutil.rmtree(self.tmp_dir, ignore_errors=True)
+    def release(self):
+        """End an instance another plugin embedded: the counterpart of unload for one that never
+        ran initGui. Stops its run, hands its canvases back their tools and forgets the instance.
+
+        Its plot files go with dispose(); a temporary directory is removed only if it was created
+        here, whatever tmp_dir is now: ThRasE hands in its own, shared with the rest of its files.
+        """
+        widget, self.widget = self.widget, None
+        if widget is not None and not sip.isdeleted(widget):
+            widget.dispose()
+            widget.release_map_tools()
+        created, self.created_tmp_dir = self.created_tmp_dir, None
+        if created:
+            shutil.rmtree(created, ignore_errors=True)
+            if self.tmp_dir == created:
+                self.tmp_dir = None
+        CCD_Plugin.inst.pop(self.id, None)
+
+    def removes_temporary_files(self):
+        """Remove this instance's temporary directory, the plots written for its dock.
+
+        The results cache is shared by every instance, the plugin's own dock and the ones other
+        plugins embed, so it is left to unload.
+        """
+        for directory in {self.tmp_dir, self.created_tmp_dir} - {None}:
+            shutil.rmtree(directory, ignore_errors=True)
         self.tmp_dir = None
+        self.created_tmp_dir = None

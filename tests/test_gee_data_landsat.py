@@ -4,11 +4,15 @@ import unittest
 
 from core.gee_common import (
     CCD_BANDS,
+    INDEX_BANDS,
     INDEX_RANGE,
+    INDEX_SOURCES,
     OPTICAL_BANDS,
+    REFLECTANCE_RANGE,
     add_indices,
     date_and_doy_filter,
     resolve_indices,
+    valid_reflectance,
 )
 from core.gee_data_landsat import SENSORS, TC_OLI, TC_TM
 
@@ -28,12 +32,18 @@ def _restore_module(name, previous):
 class FakeBand:
     """Records the naming/casting/clamping of one derived band through a chain of band maths."""
 
-    def __init__(self, name: str = "") -> None:
+    def __init__(self, name: str = "", floors: list | None = None) -> None:
         self.name = name
         self.cast_count = 0
         self.clamped_to: tuple[float, float] | None = None
         self.masked_by: FakeBand | None = None
         self._multiplied_by = None
+        # (band, floor) for every max() taken on the way, shared by the whole chain
+        self.floors = floors if floors is not None else []
+
+    def max(self, other) -> "FakeBand":
+        self.floors.append((self.name, other))
+        return self._derived()
 
     def rename(self, name: str) -> "FakeBand":
         self.name = name
@@ -50,7 +60,7 @@ class FakeBand:
     # Arithmetic yields a fresh recorder, so two indices derived from the same source band do not
     # end up sharing (and overwriting) one another's name.
     def _derived(self) -> "FakeBand":
-        derived = FakeBand(self.name)
+        derived = FakeBand(self.name, self.floors)
         # carry the recorded weights through reduce()/mask() so the whole chain can be asserted
         derived._multiplied_by = self._multiplied_by
         return derived
@@ -87,12 +97,13 @@ class FakeBand:
 class FakeImage:
     def __init__(self) -> None:
         self.added_bands: list[FakeBand] = []
+        self.floors: list = []
 
     def select(self, bands) -> FakeBand:
-        return FakeBand(bands if isinstance(bands, str) else "stack")
+        return FakeBand(bands if isinstance(bands, str) else "stack", self.floors)
 
     def normalizedDifference(self, bands: list[str]) -> FakeBand:
-        return FakeBand("normalizedDifference")
+        raise AssertionError("normalizedDifference masks negative inputs, dropping the observation from CCDC")
 
     def addBands(self, bands: list[FakeBand]) -> "FakeImage":
         self.added_bands = list(bands)
@@ -173,6 +184,90 @@ class AddIndicesTest(unittest.TestCase):
         self.assertEqual(added["EVI2"].clamped_to, INDEX_RANGE)
         self.assertIsNone(added["NDVI"].clamped_to)
         self.assertIsNone(added["NBR"].clamped_to)
+
+    def test_no_index_masks_a_pixel_the_optical_bands_keep(self):
+        # Given: a fake image whose normalizedDifference refuses to run: it masks negative inputs,
+        # and CCDC drops a whole observation when any band of it is masked.
+        fake_image = FakeImage()
+
+        # When: every index is added.
+        add_indices(fake_image, TC_TM)
+
+        # Then: no ratio index carries a mask of its own, so plotting one cannot change the fit.
+        added = {band.name: band for band in fake_image.added_bands}
+        for name in ("NDVI", "NBR", "EVI", "EVI2"):
+            with self.subTest(index=name):
+                self.assertIsNone(added[name].masked_by)
+
+    def test_ratio_indices_are_computed_from_inputs_floored_at_zero(self):
+        # Given: a fake image.
+        fake_image = FakeImage()
+
+        # When: the ratio indices are added.
+        add_indices(fake_image, TC_TM, ["NDVI", "NBR", "EVI", "EVI2"])
+
+        # Then: every input they read is floored at zero, which keeps them defined and in range.
+        self.assertEqual(set(fake_image.floors), {("NIR", 0), ("Red", 0), ("Blue", 0), ("SWIR2", 0)})
+
+    def test_every_index_is_cast_to_plain_float(self):
+        # Given: a fake image. CCDC needs a homogeneous collection, and the value range Earth
+        # Engine infers for an arithmetic result differs between sensors.
+        fake_image = FakeImage()
+
+        # When: every index is added.
+        add_indices(fake_image, TC_TM)
+
+        # Then: each one is cast to float exactly once.
+        for band in fake_image.added_bands:
+            with self.subTest(index=band.name):
+                self.assertEqual(band.cast_count, 1)
+
+    def test_every_index_names_its_optical_sources(self):
+        # Given/When/Then: the redundancy check knows what each index is computed from.
+        self.assertEqual(set(INDEX_SOURCES), set(INDEX_BANDS))
+        for name, sources in INDEX_SOURCES.items():
+            with self.subTest(index=name):
+                self.assertLessEqual(set(sources), set(OPTICAL_BANDS))
+
+
+class FakeReduction:
+    """One reduction of a fake optical stack, recording the comparisons made on it."""
+
+    def __init__(self, reducer, calls):
+        self.reducer = reducer
+        self.calls = calls
+
+    def gt(self, value):
+        self.calls.append((self.reducer, "gt", value))
+        return self
+
+    def lte(self, value):
+        self.calls.append((self.reducer, "lte", value))
+        return self
+
+    def And(self, other):
+        return self
+
+
+class ValidReflectanceTest(unittest.TestCase):
+    def setUp(self):
+        module = types.ModuleType("ee")
+        module.Reducer = types.SimpleNamespace(min=lambda: "min", max=lambda: "max")
+        self.addCleanup(_restore_module, "ee", sys.modules.get("ee"))
+        sys.modules["ee"] = module
+
+    def test_every_band_must_be_strictly_positive_and_at_most_one(self):
+        # Given: a fake optical stack.
+        calls = []
+        stack = types.SimpleNamespace(reduce=lambda reducer: FakeReduction(reducer, calls))
+
+        # When: the validity mask is built.
+        valid_reflectance(stack)
+
+        # Then: the darkest band must be above 0, as the reference CCDC implementations require,
+        # and the brightest at most 1.
+        self.assertEqual(REFLECTANCE_RANGE, (0.0, 1.0))
+        self.assertEqual(sorted(calls), [("max", "lte", 1.0), ("min", "gt", 0.0)])
 
 
 class TasseledCapTest(unittest.TestCase):
@@ -267,13 +362,27 @@ class FakeFilter:
         self.args = args
 
 
+class FakeDate:
+    """Records an ee.Date and the offsets applied to it."""
+
+    def __init__(self, value, offsets=()):
+        self.value = value
+        self.offsets = offsets
+
+    def advance(self, delta, unit):
+        return FakeDate(self.value, (*self.offsets, (delta, unit)))
+
+    def __eq__(self, other):
+        return isinstance(other, FakeDate) and (self.value, self.offsets) == (other.value, other.offsets)
+
+    def __repr__(self):
+        return f"FakeDate({self.value!r}, {self.offsets!r})"
+
+
 class DayOfYearFilterTest(unittest.TestCase):
     def setUp(self):
-        import sys
-        import types
-
         module = types.ModuleType("ee")
-        module.Date = lambda value: value
+        module.Date = FakeDate
         module.Filter = types.SimpleNamespace(
             date=lambda start, end: FakeFilter("date", start, end),
             dayOfYear=lambda start, end: FakeFilter("doy", start, end),
@@ -300,6 +409,15 @@ class DayOfYearFilterTest(unittest.TestCase):
 
         # Then: only the date filter remains - no per-scene day-of-year test to evaluate.
         self.assertEqual(combined.kind, "date")
+
+    def test_the_end_date_is_included(self):
+        # Given: a range the date controls present as inclusive at both ends.
+        # When: the filter is built.
+        combined = date_and_doy_filter(("2020-01-01", "2020-12-31"), (1, 365))
+
+        # Then: Earth Engine's exclusive end is moved past the last selected day, so the
+        # observations of 31 December - and a single-day range - are kept.
+        self.assertEqual(combined.args, (FakeDate("2020-01-01"), FakeDate("2020-12-31", ((1, "day"),))))
 
     def test_window_wrapping_the_new_year_becomes_a_union(self):
         # Given: a southern-hemisphere dry season that crosses the new year.

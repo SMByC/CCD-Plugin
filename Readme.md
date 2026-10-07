@@ -106,6 +106,26 @@ For Sentinel-2 the mask is selectable in *Advanced settings*:
 In every case the masks are per-pixel only: a scene is never dropped because the rest of the tile is cloudy,
 since only the pixel at the requested coordinate matters.
 
+### Valid observations
+
+On top of the cloud mask, an observation is used only when all six bands are physical surface reflectance,
+**0 < SR ≤ 1**, for both datasets. This is the rule of the reference CCDC implementations: Zhu's CCDC code (v12.30),
+USGS LCMAP `pyccd` and `gee-ccdc-tools`. Negative values are known computational artifacts of the atmospheric
+correction over dark targets (USGS), and above 1 is residual cloud or saturation. Over Colombia this removes about 1%
+of the clear Landsat observations, nearly all of them over water.
+
+The plotted band never changes the model: every index is computed so that it is defined wherever the six bands are,
+because CCDC drops a whole observation as soon as any of its bands is masked.
+
+Both dates of the range are included. A point where two Landsat rows or two Sentinel-2 tiles overlap is imaged twice
+on the same day; both are drawn, but CCDC fits one observation per day, and the plot header gives the number of dates.
+With a day-of-year window the fitted model is drawn inside the window only: outside it no observation constrains the
+curve.
+
+The change-detection bands are combined in a chi-square test that assumes they are independent. An index computed from
+bands already in the set (NDVI next to Red and NIR) counts the same deviation twice, making detection more sensitive
+than the Chi-square probability says, so the plugin warns about it.
+
 ## References
 
 - Zhu, Z., & Woodcock, C. E. (2014). Continuous change detection and classification of land cover using all available Landsat data. Remote sensing of Environment, 144, 152-171. https://doi.org/10.1016/j.rse.2014.01.011
@@ -136,6 +156,10 @@ plugin version and extract its contents into an `extlibs` directory inside `CCD_
 
 > **Download plot as a png:**
 > It is not working inside the plugin, but it works when the plot is opened in a web browser
+
+> **Water pixels:**
+> Landsat and Sentinel-2 surface reflectance is built for land. Over water it is unreliable (USGS recommends the
+> Aquatic Reflectance product for water studies), so breaks found on water pixels should not be trusted.
 
 ## About us
 

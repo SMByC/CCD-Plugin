@@ -10,7 +10,11 @@ from unittest.mock import Mock, patch
 RUN_QGIS4_SMOKE = os.environ.get("CCD_RUN_QGIS4_SMOKE") == "1"
 
 DOCK_ID = "plot-supersession-test"
-REGION_HEADER = ["id", "longitude", "latitude", "time", "Blue", "Green", "Red", "NIR", "SWIR1", "SWIR2"]
+BANDS = [
+    *("Blue", "Green", "Red", "NIR", "SWIR1", "SWIR2"),
+    *("NDVI", "NBR", "EVI", "EVI2", "BRIGHTNESS", "GREENNESS", "WETNESS"),
+]
+REGION_HEADER = ["id", "longitude", "latitude", "time", *BANDS]
 CATALOG = {"size": 2, "projection": {"crs": "EPSG:4326", "transform": [1, 0, 0, 0, 1, 0]}}
 SETTLE_TIMEOUT_SECONDS = 30
 # well under the time a silent Earth Engine request blocks for, so a superseded run that waits for
@@ -81,8 +85,8 @@ class FakeEarthEngine:
     def _region(longitude):
         return [
             REGION_HEADER,
-            ["a", longitude, 0, 0.0, *[0.1] * 6],
-            ["b", longitude, 0, 86_400_000.0, *[0.2] * 6],
+            ["a", longitude, 0, 0.0, *[0.1] * len(BANDS)],
+            ["b", longitude, 0, 86_400_000.0, *[0.2] * len(BANDS)],
         ]
 
 
@@ -166,7 +170,8 @@ class PlotSupersessionSmokeTest(unittest.TestCase):
         self.settle()
 
     def assertShowing(self, longitude, band="SWIR1"):
-        spec = self.plotted.get(self.dock.html_file)
+        active = self.dock.plot_files.active_path
+        spec = self.plotted.get(str(active)) if active is not None else None
         self.assertIsNotNone(spec, "no plot on display")
         self.assertEqual((spec.longitude, spec.band), (longitude, band))
         self.assertEqual(self.dock.last_config["lon"], longitude)
@@ -235,6 +240,34 @@ class PlotSupersessionSmokeTest(unittest.TestCase):
 
         # Then: the redraw stays, and the run it superseded does not land over it.
         self.assertShowing(-70.0, "NIR")
+
+    def test_switching_to_a_band_the_run_builds_keeps_the_run(self):
+        # Given: a run in progress, plotting SWIR1; it builds every optical band.
+        self.launch(-71.0)
+        self.dock.start_ccd_task.reset_mock()
+
+        # When: the band switches to another optical band, as a configuration restore does.
+        self.dock.band_or_index_to_plot.setCurrentText("NIR")
+        self.earth_engine.release(-71.0)
+        self.settle()
+
+        # Then: the run was kept, not restarted from scratch, and lands with that band.
+        self.assertShowing(-71.0, "NIR")
+        self.dock.start_ccd_task.assert_not_called()
+
+    def test_switching_to_an_index_the_run_does_not_build_restarts_it(self):
+        # Given: a run in progress, plotting SWIR1, which builds no index.
+        self.launch(-71.0)
+        self.dock.start_ccd_task.reset_mock()
+
+        # When: the band switches to NDVI.
+        self.dock.band_or_index_to_plot.setCurrentText("NDVI")
+        self.earth_engine.release(-71.0)
+        self.settle()
+
+        # Then: the run is restarted so the index is built, and the plot shows it.
+        self.assertShowing(-71.0, "NDVI")
+        self.dock.start_ccd_task.assert_called_once()
 
     def test_launching_the_run_in_progress_again_keeps_it(self):
         # Given: a run that Earth Engine has not answered.

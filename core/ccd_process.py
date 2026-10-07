@@ -29,7 +29,7 @@ from typing import Final
 
 import numpy as np
 
-from .gee_common import OPTICAL_BANDS, resolve_indices
+from .gee_common import INDEX_SOURCES, OPTICAL_BANDS, resolve_indices
 from .gee_data_landsat import get_gee_data_landsat
 from .gee_data_sentinel import DEFAULT_CLOUD_FILTER, get_gee_data_sentinel
 
@@ -51,6 +51,8 @@ CCDC_DATE_FORMAT: Final = 2
 # interrupted, so without this a superseded run kept its QGIS task, and the task manager thread it
 # runs on, until Earth Engine answered requests whose results were going to be thrown away.
 CANCEL_POLL_SECONDS: Final = 0.1
+# Name of the threads running Earth Engine requests, so they can be told apart from QGIS' own
+REQUEST_THREAD_NAME: Final = "ccd-earth-engine-request"
 
 # When each catalog starts, so an empty result can say whether the range was ever going to match.
 # Sentinel-2 is the one that catches people out: the plugin's date range starts in 2000 by default,
@@ -82,6 +84,66 @@ class CCDComputationError(Exception):
 
     Carries a message written for the user, since the GUI shows it verbatim in the message bar.
     """
+
+
+_INITIALIZE_LOCK = threading.Lock()
+
+
+def _earth_engine_ready(ee) -> bool:
+    """Whether the client is initialized and has loaded the algorithms a run calls.
+
+    ee.Initialize flags the client initialized before it downloads the algorithm catalogue, so a
+    first initialization that failed half-way (offline, the API not enabled) stays flagged, with
+    no ee.Algorithms to run CCDC from, until the catalogue is checked as well.
+    """
+    data = getattr(ee, "data", None)
+    is_initialized = getattr(data, "is_initialized", None)
+    initialized = is_initialized() if callable(is_initialized) else bool(getattr(data, "_initialized", False))
+    return initialized and hasattr(getattr(ee, "Algorithms", None), "TemporalSegmentation")
+
+
+def ensure_earth_engine_initialized():
+    """Initialize the Earth Engine client once, leaving a ready one untouched.
+
+    The client state is process-wide and shared with the Earth Engine plugin, which initializes it
+    with the user's project. Initializing again on every run cost a credential refresh and two
+    discovery-document downloads, and reset whatever that plugin had configured.
+    """
+    import ee
+
+    with _INITIALIZE_LOCK:
+        if _earth_engine_ready(ee):
+            return
+        try:
+            ee.Initialize()
+        except Exception:
+            # drop the half-initialized state, so the next run initializes again instead of
+            # finding the client flagged initialized and failing for the rest of the session
+            reset = getattr(ee, "Reset", None)
+            if callable(reset):
+                reset()
+            raise
+
+
+def correlated_detection_bands(breakpoint_bands, tmask_bands=None):
+    """Indices of the change-detection set that repeat information already in it.
+
+    CCDC sums the squared normalised residuals of every detection band and tests that sum against a
+    chi-square distribution with one degree of freedom per band, which assumes the bands are
+    independent. An index computed from bands already in the set, or sharing them with another
+    index, counts the same deviation more than once: two fully correlated bands at 0.99 flag about
+    3.2% of observations instead of 1%, so change is detected more readily than the threshold says.
+    """
+    ccd_bands, _ = resolve_ccd_bands(breakpoint_bands, tmask_bands)
+    correlated = []
+    for index in resolve_indices(ccd_bands):
+        others = set()
+        for band in ccd_bands:
+            if band != index:
+                others.update(INDEX_SOURCES.get(band, (band,)))
+        if others.intersection(INDEX_SOURCES[index]):
+            correlated.append(index)
+    return tuple(correlated)
 
 
 def resolve_ccd_bands(breakpoint_bands, tmask_bands=None):
@@ -144,8 +206,8 @@ def make_cache_key(
 def _no_images_message(dataset, date_range):
     """Why the collection came back empty, in terms the user can act on."""
     start, note = DATASET_AVAILABILITY.get(dataset, (None, ""))
-    # dates are ISO strings, so a plain comparison orders them correctly
-    if start and date_range[1] <= start:
+    # dates are ISO strings, so a plain comparison orders them correctly; the end date is included
+    if start and date_range[1] < start:
         return f"{dataset} has no data before {start}. {note}"
     return "No images at this point for the selected date and DOY range."
 
@@ -240,6 +302,28 @@ def _build_timeseries(region_rows):
     return {name: _column_array(name, column) for name, column in pairs}
 
 
+def _in_background(function: Callable[[], object]) -> concurrent.futures.Future:
+    """Run one Earth Engine request on its own daemon thread.
+
+    Daemon, because a cancelled run leaves its requests behind and getInfo can neither be
+    interrupted nor, by default, time out. A ThreadPoolExecutor worker is joined at interpreter
+    shutdown, so a request Earth Engine never answered held QGIS from exiting. A deadline is not
+    the fix: ee.data.setDeadline is process-wide and would change the Earth Engine plugin too.
+    """
+    future: concurrent.futures.Future = concurrent.futures.Future()
+
+    def run():
+        if not future.set_running_or_notify_cancel():
+            return
+        try:
+            future.set_result(function())
+        except BaseException as error:
+            future.set_exception(error)
+
+    threading.Thread(target=run, name=REQUEST_THREAD_NAME, daemon=True).start()
+    return future
+
+
 def _settled(futures, cancelled: Callable[[], bool]) -> bool:
     """Wait for every future, or return False as soon as the run is cancelled."""
     pending = set(futures)
@@ -303,9 +387,6 @@ def compute_ccd(
     else:
         raise CCDComputationError(f"Unsupported dataset: {dataset}. Use 'Landsat C2' or 'Sentinel-2'.")
 
-    # One round trip that both proves the collection is non-empty and fetches the grid to sample
-    # on. Both are needed before the parallel calls below, and asking for them together keeps it
-    # to a single serial request.
     # One serial round trip for the two things the parallel requests below both need: proof the
     # collection is non-empty, and the grid to sample on. Reusing `first` for the projection keeps
     # this to a single size() evaluation rather than the two the If condition used to force.
@@ -319,14 +400,13 @@ def compute_ccd(
         }
     )
 
-    # Every request runs on this executor and is waited on with _settled, so a cancelled run returns
-    # at once and leaves its requests to finish on their own. Only this thread may call `cancelled`:
-    # it belongs to the QGIS task, which can be deleted as soon as the run returns, so the requests
-    # check `stopped` instead, which is set when the run stops waiting for them.
+    # Every request runs in the background and is waited on with _settled, so a cancelled run
+    # returns at once and leaves its requests to finish on their own. Only this thread may call
+    # `cancelled`: it belongs to the QGIS task, which can be deleted as soon as the run returns, so
+    # the requests check `stopped` instead, which is set when the run stops waiting for them.
     stopped = threading.Event()
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
     try:
-        future_catalog = executor.submit(catalog_request.getInfo)
+        future_catalog = _in_background(catalog_request.getInfo)
         if not _settled([future_catalog], cancelled):
             return None
         catalog = future_catalog.result()
@@ -371,8 +451,8 @@ def compute_ccd(
             return ccdc.reduceRegion(ee.Reducer.toList(), point, **grid).getInfo()
 
         # both are independent round trips to Earth Engine, so overlap them
-        future_timeseries = executor.submit(get_time_series)
-        future_ccdc = executor.submit(get_ccdc)
+        future_timeseries = _in_background(get_time_series)
+        future_ccdc = _in_background(get_ccdc)
         if not _settled([future_timeseries, future_ccdc], cancelled):
             return None
         # read in this order, so when both fail the time series error is the one reported: it is the
@@ -381,7 +461,6 @@ def compute_ccd(
         ccdc_info = future_ccdc.result()
     finally:
         stopped.set()
-        executor.shutdown(wait=False, cancel_futures=True)
 
     if cancelled() or timeseries is None or ccdc_info is None:
         return None

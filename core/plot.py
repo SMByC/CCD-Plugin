@@ -29,16 +29,20 @@ from enum import Enum
 from pathlib import Path
 from typing import Final, TypeAlias, assert_never
 
+import numpy as np
 import plotly.graph_objects as go
 
+from .coordinates import COORDINATE_DECIMALS
 from .gee_common import INDEX_BANDS, OPTICAL_BANDS
 from .lifecycle import PlotFileLifecycle
 from .plot_data import MILLISECONDS_PER_YEAR as MILLISECONDS_PER_YEAR
 from .plot_data import ModelSegment as ModelSegment
 from .plot_data import build_model_segments as build_model_segments
+from .plot_data import count_observation_dates as count_observation_dates
 from .plot_data import evaluate_ccdc_model as evaluate_ccdc_model
 from .plot_data import normalize_observations as normalize_observations
 from .plot_data import sample_segment_dates as sample_segment_dates
+from .plot_data import utc_dates as utc_dates
 
 _PlotlyValue: TypeAlias = (
     str
@@ -71,6 +75,7 @@ OBSERVATION_COLOR: Final = "#3F83B5"
 # slots 4 and 5, so it only ever appears on a pixel with five fitted segments.
 MODEL_COLORS: Final = ("#50a064", "#8b66b3", "#979836", "#1b8abd", "#bb6690")
 MODEL_LINE_WIDTH: Final = 2
+MODEL_POINT_SIZE: Final = 5
 # Drawn semi-transparent so the fit reads as a soft overlay on its own observations rather than a
 # band painted across them. Composited over white this lands the slots at 2.4-2.9:1, under the 3:1
 # a solid data mark would want - a deliberate trade for the softer look. It only bites in the gaps
@@ -98,10 +103,6 @@ SPECTRAL_INDEX_BANDS: Final = frozenset(INDEX_BANDS)
 class PlotStyle(Enum):
     LIGHT = "light"
     DARK = "dark"
-
-
-def resolve_plot_style(value: str | None, fallback: PlotStyle) -> PlotStyle:
-    return fallback if value is None else PlotStyle(value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,6 +166,8 @@ class PlotSpec:
     band: str
     longitude: float
     latitude: float
+    # the day-of-year window the series was restricted to, None or the full year for none
+    doy_range: tuple[int, int] | None = None
 
 
 def _utc_datetime(timestamp_ms: float) -> datetime:
@@ -359,13 +362,15 @@ def _theme_layout_payload(figure: go.Figure, source: PlotTheme, target: PlotThem
 def build_figure(ccdc_result_info, timeseries, spec: PlotSpec, *, style: PlotStyle = PlotStyle.LIGHT) -> go.Figure:
     theme, active_style_index = _theme_settings(style)
     observation_times, observation_values = normalize_observations(timeseries, spec.band)
-    segments = build_model_segments(ccdc_result_info, spec.band)
+    segments = build_model_segments(ccdc_result_info, spec.band, spec.doy_range)
     figure = go.Figure()
 
+    # Dates are handed to plotly as datetime64 arrays: a list of datetime objects is validated
+    # element by element, which was most of the time spent building a 40-year figure.
     if observation_times.size:
         figure.add_trace(
             go.Scatter(
-                x=[_utc_datetime(timestamp_ms) for timestamp_ms in observation_times],
+                x=utc_dates(observation_times),
                 y=observation_values,
                 name="Observed",
                 mode="markers",
@@ -403,15 +408,19 @@ def build_figure(ccdc_result_info, timeseries, spec: PlotSpec, *, style: PlotSty
         details = [f"Start {start:%Y-%m-%d}", f"End {end:%Y-%m-%d}"]
         if segment.rmse is not None:
             details.append(f"RMSE {segment.rmse:.4f}")
+        color = theme.model_colors[index % len(theme.model_colors)]
+        # seasons of a day-of-year window too short to see as a line are marked by a point
+        marked = bool(segment.points.any())
         figure.add_trace(
             go.Scatter(
-                x=[_utc_datetime(timestamp_ms) for timestamp_ms in segment.dates_ms],
+                x=utc_dates(segment.dates_ms),
                 y=segment.values,
                 name="CCDC fit",
-                mode="lines",
+                mode="lines+markers" if marked else "lines",
                 legendgroup="model",
                 showlegend=False,
-                line={"color": theme.model_colors[index % len(theme.model_colors)], "width": MODEL_LINE_WIDTH},
+                line={"color": color, "width": MODEL_LINE_WIDTH},
+                marker={"color": color, "size": np.where(segment.points, MODEL_POINT_SIZE, 0)} if marked else None,
                 opacity=MODEL_LINE_OPACITY,
                 hovertemplate=(
                     f"Segment {segment.number}<br>Model value %{{y:.4f}}<br>" + "<br>".join(details) + "<extra></extra>"
@@ -423,6 +432,11 @@ def build_figure(ccdc_result_info, timeseries, spec: PlotSpec, *, style: PlotSty
     # consecutive observations minObservations requires, changeProb sits between 0 and 1, and it
     # stays there if the series ends first. Drawing those the same as a confirmed break reports a
     # change that CCDC did not detect, most often right at the end of the series.
+    #
+    # Collected and handed to the layout once: add_shape/add_annotation deep-copy every shape and
+    # annotation already on the figure, so adding them one by one cost quadratic time in breaks.
+    shapes = []
+    annotations = []
     break_count = 0
     pending_count = 0
     for segment in segments:
@@ -440,40 +454,44 @@ def build_figure(ccdc_result_info, timeseries, spec: PlotSpec, *, style: PlotSty
             label, group = "In progress", "pending"
             first = pending_count == 0
             pending_count += 1
-        figure.add_shape(
-            type="line",
-            x0=break_date,
-            x1=break_date,
-            y0=0,
-            y1=1,
-            xref="x",
-            yref="paper",
-            line={"color": color, "width": width, "dash": dash},
-            name=label,
-            legendgroup=group,
-            showlegend=first,
+        shapes.append(
+            {
+                "type": "line",
+                "x0": break_date,
+                "x1": break_date,
+                "y0": 0,
+                "y1": 1,
+                "xref": "x",
+                "yref": "paper",
+                "line": {"color": color, "width": width, "dash": dash},
+                "name": label,
+                "legendgroup": group,
+                "showlegend": first,
+            }
         )
         # the exact break date is the plugin's main output, so label it in full rather than by year
         text = f"{break_date:%Y-%m-%d}"
-        if not confirmed:
+        if not confirmed and segment.change_probability is not None:
             text += f" ({segment.change_probability:.0%})"
-        figure.add_annotation(
-            x=break_date,
-            y=0.02,
-            xref="x",
-            yref="paper",
-            text=text,
-            showarrow=False,
-            textangle=-90,
-            xanchor="right" if (break_count + pending_count) % 2 == 1 else "left",
-            yanchor="bottom",
-            font={"color": color, "size": 9},
-            # the label lands on top of the scatter, so back it just enough to stay legible
-            bgcolor=theme.overlay_background,
-            borderpad=1,
+        annotations.append(
+            {
+                "x": break_date,
+                "y": 0.02,
+                "xref": "x",
+                "yref": "paper",
+                "text": text,
+                "showarrow": False,
+                "textangle": -90,
+                "xanchor": "right" if (break_count + pending_count) % 2 == 1 else "left",
+                "yanchor": "bottom",
+                "font": {"color": color, "size": 9},
+                # the label lands on top of the scatter, so back it just enough to stay legible
+                "bgcolor": theme.overlay_background,
+                "borderpad": 1,
+            }
         )
 
-    all_dates = [*observation_times]
+    all_dates = [float(observation_times.min()), float(observation_times.max())] if observation_times.size else []
     for segment in segments:
         all_dates.extend((segment.start_ms, segment.end_ms))
     x_axis = {
@@ -499,17 +517,27 @@ def build_figure(ccdc_result_info, timeseries, spec: PlotSpec, *, style: PlotSty
         x_axis["range"] = [_utc_datetime(earliest - margin_ms), _utc_datetime(latest + margin_ms)]
 
     if not observation_times.size and not segments:
-        figure.add_annotation(
-            x=0.5,
-            y=0.5,
-            xref="paper",
-            yref="paper",
-            text="No valid observations or fitted model segments",
-            showarrow=False,
-            font={"color": theme.text_color, "size": 12},
+        annotations.append(
+            {
+                "x": 0.5,
+                "y": 0.5,
+                "xref": "paper",
+                "yref": "paper",
+                "text": "No valid observations or fitted model segments",
+                "showarrow": False,
+                "font": {"color": theme.text_color, "size": 12},
+            }
         )
 
+    observation_count = observation_values.size
+    date_count = count_observation_dates(observation_times) if observation_count else 0
+    # same-day duplicates from overlapping scenes are drawn, but CCDC fits one observation per day
+    observations_text = f"{observation_count} obs" + (
+        f" on {date_count} dates" if date_count != observation_count else ""
+    )
     figure.update_layout(
+        shapes=shapes,
+        annotations=annotations,
         autosize=True,
         hovermode="closest",
         paper_bgcolor=theme.background_color,
@@ -524,8 +552,8 @@ def build_figure(ccdc_result_info, timeseries, spec: PlotSpec, *, style: PlotSty
             "text": (
                 f"{spec.band} · {spec.dataset}"
                 f"<br><span style='font-size:11px;color:{theme.muted_text_color}'>"
-                f"Lat: {spec.latitude:.5f}  Lon: {spec.longitude:.5f}"
-                f"  ·  {observation_values.size} obs"
+                f"Lat: {spec.latitude:.{COORDINATE_DECIMALS}f}  Lon: {spec.longitude:.{COORDINATE_DECIMALS}f}"
+                f"  ·  {observations_text}"
                 f"  ·  {len(segments)} segment{'' if len(segments) == 1 else 's'}"
                 f"  ·  {break_count} break{'' if break_count == 1 else 's'}"
                 + (f"  ·  {pending_count} in progress" if pending_count else "")

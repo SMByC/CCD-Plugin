@@ -27,13 +27,33 @@ OPTICAL_BANDS: Final = ("Blue", "Green", "Red", "NIR", "SWIR1", "SWIR2")
 INDEX_BANDS: Final = ("NDVI", "NBR", "EVI", "EVI2", "BRIGHTNESS", "GREENNESS", "WETNESS")
 # Schema every dataset must expose so that CCDC, the cache key and the plot are dataset-agnostic
 CCD_BANDS: Final = (*OPTICAL_BANDS, *INDEX_BANDS)
+# The optical bands each index is computed from, to tell when a change-detection set repeats itself
+INDEX_SOURCES: Final = {
+    "NDVI": ("NIR", "Red"),
+    "NBR": ("NIR", "SWIR2"),
+    "EVI": ("NIR", "Red", "Blue"),
+    "EVI2": ("NIR", "Red"),
+    "BRIGHTNESS": OPTICAL_BANDS,
+    "GREENNESS": OPTICAL_BANDS,
+    "WETNESS": OPTICAL_BANDS,
+}
+
+# An observation is used only when all six optical bands are physical surface reflectance,
+# 0 < SR <= 1, whatever the dataset. This is the rule of the reference CCDC implementations:
+# Zhu's CCDC code (v12.30) keeps 0 < SR < 10000 on all six bands, LCMAP pyccd does the same in
+# qa.filter_saturated, and gee-ccdc-tools (Arevalo et al. 2020) masks any band <= 0. USGS
+# describes negative Landsat SR as a known computational artefact of the atmospheric correction
+# over dark targets: an over-estimated aerosol pushes the short wavelengths below zero and biases
+# the rest of that observation low too. CCDC is built for irregular sampling, so a dropped
+# observation costs little, while a biased one ends up in the residuals the change test reads.
+# Measured over 95 stratified points in Colombia (2000-2026) the rule removes ~1% of clear Landsat
+# observations, nearly all of them over water. Above 1 is residual cloud, snow or saturation.
+REFLECTANCE_RANGE: Final = (0.0, 1.0)
 
 # EVI/EVI2 are ratios whose denominator can approach zero on bright hazy or cloud-edge pixels,
 # which yields values orders of magnitude outside the physical range. A single such observation
 # dominates the LASSO fit of a whole CCDC segment and rescales the plot, so clamp to the
 # physically meaningful interval instead of letting the outlier through.
-# (NDVI/NBR need no clamp: ee.Image.normalizedDifference already masks negative inputs and a
-# zero denominator, so it cannot produce out-of-range values.)
 INDEX_RANGE: Final = (-1.0, 1.0)
 
 # A full-year window means "no seasonal restriction", not "days 1 to 365": the GUI reports it
@@ -42,8 +62,22 @@ INDEX_RANGE: Final = (-1.0, 1.0)
 FULL_YEAR: Final = (1, 365)
 
 
+def valid_reflectance(scaled):
+    """Mask of the pixels whose optical bands are all physical surface reflectance.
+
+    `scaled` holds the OPTICAL_BANDS schema in reflectance units; see REFLECTANCE_RANGE.
+    """
+    import ee
+
+    low, high = REFLECTANCE_RANGE
+    return scaled.reduce(ee.Reducer.min()).gt(low).And(scaled.reduce(ee.Reducer.max()).lte(high))
+
+
 def date_and_doy_filter(date_range, doy_range):
     """Filter for the date range, narrowed to a day-of-year window when one was asked for.
+
+    Both dates are inclusive, as the date controls present them: Earth Engine's date filter
+    excludes its end, so the end is moved to the start of the following day.
 
     A DOY window such as 300-60 (southern-hemisphere dry season) is not expressible as a single
     ee.Filter.dayOfYear call: the naive form would ask for start <= doy <= end with start > end
@@ -52,7 +86,7 @@ def date_and_doy_filter(date_range, doy_range):
     import ee
 
     start_doy, end_doy = doy_range
-    date_filter = ee.Filter.date(ee.Date(date_range[0]), ee.Date(date_range[1]))
+    date_filter = ee.Filter.date(ee.Date(date_range[0]), ee.Date(date_range[1]).advance(1, "day"))
     if (start_doy, end_doy) == FULL_YEAR:
         # No season was chosen, so the date range alone is the selection. This keeps 31 December
         # of a leap year (DOY 366) too, which an explicit dayOfYear(1, 365) would have dropped.
@@ -94,12 +128,29 @@ def add_indices(image, tc_coefficients, indices=INDEX_BANDS):
         return image
 
     optical = image.select(list(OPTICAL_BANDS))
-    near_infrared, red, blue = image.select("NIR"), image.select("Red"), image.select("Blue")
     low, high = INDEX_RANGE
+
+    # Every derived band has to be defined wherever the optical bands are. CCDC drops a whole
+    # observation as soon as any of its bands is masked, so an index that masks a pixel the optical
+    # bands keep removes that observation from the fit of every band: plotting NDVI used to change
+    # the segments drawn for SWIR1 (measured: 136 observations fitted at a lake, 122 with NDVI
+    # plotted). ee.Image.normalizedDifference is such an index, it masks negative inputs and a zero
+    # denominator. The ratios here are computed from inputs floored at 0 instead: with the inputs
+    # inside REFLECTANCE_RANGE the floor is a no-op, and it keeps the ratios defined (Earth Engine
+    # returns 0 for 0/0) should the validity rule ever be relaxed.
+    #
+    # Every derived band is also cast to plain float: CCDC requires a homogeneous collection, and
+    # the value range Earth Engine infers for an arithmetic result differs between sensors.
+    near_infrared, red, blue, swir2 = (image.select(band).max(0) for band in ("NIR", "Red", "Blue", "SWIR2"))
+
+    def normalized_difference(first, second, name):
+        # (a - b) / (a + b) of non-negative inputs is already within [-1, 1]
+        return first.subtract(second).divide(first.add(second)).rename(name).toFloat()
 
     # ee.Reducer.sum() skips masked bands rather than propagating the mask, so a pixel with one
     # band missing would come back as a silently short weighted sum instead of masked - which is
-    # what ee.Image.expression did. Re-apply "every input band valid" to restore that.
+    # what ee.Image.expression did. Re-apply "every input band valid" to restore that. It is the
+    # optical bands' own mask, so it masks nothing they do not.
     all_bands_valid = optical.mask().reduce(ee.Reducer.min())
 
     def tasseled_cap(component):
@@ -113,8 +164,8 @@ def add_indices(image, tc_coefficients, indices=INDEX_BANDS):
         )
 
     builders = {
-        "NDVI": lambda: image.normalizedDifference(["NIR", "Red"]).rename("NDVI"),
-        "NBR": lambda: image.normalizedDifference(["NIR", "SWIR2"]).rename("NBR"),
+        "NDVI": lambda: normalized_difference(near_infrared, red, "NDVI"),
+        "NBR": lambda: normalized_difference(near_infrared, swir2, "NBR"),
         # 2.5 * (NIR - Red) / (NIR + 6 * Red - 7.5 * Blue + 1)
         "EVI": lambda: (
             near_infrared.subtract(red)
@@ -122,6 +173,7 @@ def add_indices(image, tc_coefficients, indices=INDEX_BANDS):
             .divide(near_infrared.add(red.multiply(6)).subtract(blue.multiply(7.5)).add(1))
             .rename("EVI")
             .clamp(low, high)
+            .toFloat()
         ),
         # 2.5 * (NIR - Red) / (NIR + 2.4 * Red + 1)
         "EVI2": lambda: (
@@ -130,6 +182,7 @@ def add_indices(image, tc_coefficients, indices=INDEX_BANDS):
             .divide(near_infrared.add(red.multiply(2.4)).add(1))
             .rename("EVI2")
             .clamp(low, high)
+            .toFloat()
         ),
         "BRIGHTNESS": lambda: tasseled_cap("BRIGHTNESS"),
         "GREENNESS": lambda: tasseled_cap("GREENNESS"),

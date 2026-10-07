@@ -21,7 +21,7 @@
 
 from typing import Final
 
-from .gee_common import INDEX_BANDS, OPTICAL_BANDS, add_indices, filter_collection, resolve_indices
+from .gee_common import INDEX_BANDS, OPTICAL_BANDS, add_indices, filter_collection, resolve_indices, valid_reflectance
 
 S2_SR: Final = "COPERNICUS/S2_SR_HARMONIZED"
 S2_CLOUD_PROBABILITY: Final = "COPERNICUS/S2_CLOUD_PROBABILITY"
@@ -32,14 +32,11 @@ S2_BANDS: Final = ("B2", "B3", "B4", "B8", "B11", "B12")
 S2_SCALE: Final = 0.0001
 
 # S2_SR_HARMONIZED shifts processing-baseline 04.00 scenes (2022-01-25 onward) back by the
-# BOA_ADD_OFFSET of -1000 DN so they line up radiometrically with earlier scenes. Scenes before
-# that date were clipped at DN 0 and can never go negative; later scenes reach DN -1000, i.e.
-# -0.1 reflectance, for the very same target. Any floor tighter than -0.1 would therefore mask
-# dark observations in the later era only and hand CCDC an artificial break at the baseline
-# switch, so -0.1 is the only value that treats both eras alike.
-S2_MIN: Final = -0.1
-# Surface reflectance above 1 is not physical; it is residual bright cloud the mask did not catch.
-S2_MAX: Final = 1.0
+# BOA_ADD_OFFSET so they line up with earlier scenes, and its bands are unsigned 16-bit: a value
+# can never fall below DN 0, in either era. DN 0 is also the L2A no-data value, so a band at
+# exactly 0 is either missing or a clipped dark retrieval. Both eras are treated alike by the
+# shared rule, which keeps only 0 < SR <= 1 (see gee_common.REFLECTANCE_RANGE); above 1 is
+# residual bright cloud the mask did not catch, or saturation (DN 65535).
 
 # Scene classification (SCL) classes that are never usable: 0 no data, 1 saturated/defective,
 # 3 cloud shadow, 8 cloud medium probability, 9 cloud high probability, 10 thin cirrus, 11 snow.
@@ -78,12 +75,22 @@ TC_S2: Final = {
 
 
 def prepare_bands(image):
-    """Scale the L2A bands into the common optical schema, keeping SCL for the cloud masks."""
-    import ee
+    """Scale the L2A bands into the common optical schema, keeping SCL for the cloud masks.
 
+    Not masked to valid reflectance here, see keep_valid_reflectance.
+    """
     scaled = image.select(list(S2_BANDS)).multiply(S2_SCALE).rename(list(OPTICAL_BANDS))
-    in_range = scaled.reduce(ee.Reducer.min()).gt(S2_MIN).And(scaled.reduce(ee.Reducer.max()).lte(S2_MAX))
-    return image.addBands(scaled).updateMask(in_range)
+    return image.addBands(scaled)
+
+
+def keep_valid_reflectance(image):
+    """Mask the observations whose optical bands are not physical reflectance.
+
+    Applied after the cloud masks, not before: Sen2Cor and s2cloudless grow their rejected area
+    with focal_max, which skips masked pixels, so masking first removed the brightest cloud pixels
+    (reflectance above 1) from the very seeds the cloud buffer is grown from.
+    """
+    return image.updateMask(valid_reflectance(image.select(list(OPTICAL_BANDS))))
 
 
 def scl_mask(image):
@@ -223,4 +230,4 @@ def get_gee_data_sentinel(coords, date_range, doy_range, name, cloud_filter=DEFA
     # the raw DN bands would be fitted at 10000x the scale the lambda is tuned for.
     # CCDC and the plot both need the series in chronological order.
     schema = [*OPTICAL_BANDS, *resolve_indices(indices)]
-    return collection.select(schema).sort("system:time_start")
+    return collection.map(keep_valid_reflectance).select(schema).sort("system:time_start")

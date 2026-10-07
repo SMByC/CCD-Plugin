@@ -1,16 +1,40 @@
 from typing import assert_never
 
-from .plot import DARK_THEME, LIGHT_THEME, PlotStyle
+from .plot import DARK_THEME, LIGHT_THEME, PlotStyle, PlotTheme
+
+
+def _theme(style: PlotStyle) -> PlotTheme:
+    match style:
+        case PlotStyle.LIGHT:
+            return LIGHT_THEME
+        case PlotStyle.DARK:
+            return DARK_THEME
+        case unreachable:
+            assert_never(unreachable)
+
+
+def blank_page_html(style: PlotStyle) -> str:
+    """The empty view, in the plot's background, for when there is no plot to show."""
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CCD</title>
+<style>
+html, body {{
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    background-color: {_theme(style).background_color};
+}}
+</style>
+</head>
+<body></body>
+</html>"""
 
 
 def loading_page_html(style: PlotStyle) -> str:
-    match style:
-        case PlotStyle.LIGHT:
-            theme = LIGHT_THEME
-        case PlotStyle.DARK:
-            theme = DARK_THEME
-        case unreachable:
-            assert_never(unreachable)
+    theme = _theme(style)
 
     return f"""<!doctype html>
 <html lang="en">

@@ -28,18 +28,16 @@ C01 datasets were removed from the Google Earth Engine data catalog.
 from dataclasses import dataclass
 from typing import Final
 
-from .gee_common import INDEX_BANDS, OPTICAL_BANDS, add_indices, filter_collection
+from .gee_common import INDEX_BANDS, OPTICAL_BANDS, add_indices, filter_collection, valid_reflectance
 
 # Collection 2 Level-2 scaling (USGS): SR = DN * 2.75e-5 - 0.2 over the valid DN range
-# 7273-43636, which maps exactly onto surface reflectance [0.0, 1.0].
+# 7273-43636, which maps exactly onto surface reflectance [0.0, 1.0]. Only that range is kept, see
+# gee_common.REFLECTANCE_RANGE. Below it is the dark-target artefact of the atmospheric
+# correction: measured over Colombia it is mostly over water, where LaSRC pushes Red or NIR below
+# zero on ~8% of clear OLI observations, and the short wavelengths over dense forest on ~2% (USGS
+# also maps LaSRC values below -0.2 to exactly -0.2). Above it is residual cloud CFmask missed.
 SR_SCALE: Final = 0.0000275
 SR_OFFSET: Final = -0.2
-# Reflectance below 0 is a legitimate retrieval artefact over dark targets (water, shadow), so a
-# small negative tolerance is kept rather than dropping those observations. Above 1.0 the retrieval
-# is outside the documented valid range and is dominated by residual thin cloud that CFmask missed;
-# those pixels are high-magnitude outliers that would drive false CCDC breaks, so they are rejected.
-SR_MIN: Final = -0.05
-SR_MAX: Final = 1.0
 
 # QA_PIXEL (CFmask) bits rejected: 0 fill, 1 dilated cloud, 2 cirrus (OLI only), 3 cloud,
 # 4 cloud shadow, 5 snow. The cloud/shadow/snow *confidence* bits (8-15) are deliberately not
@@ -127,7 +125,7 @@ def prepare_image(image, spec):
     qa_bitmask = sum(1 << bit for bit in spec.qa_pixel_bits)
     clear = image.select("QA_PIXEL").bitwiseAnd(qa_bitmask).eq(0)
     no_saturation = image.select("QA_RADSAT").bitwiseAnd(spec.saturation_mask).eq(0)
-    in_range = scaled.reduce(ee.Reducer.min()).gt(SR_MIN).And(scaled.reduce(ee.Reducer.max()).lte(SR_MAX))
+    in_range = valid_reflectance(scaled)
     # The Landsat 7 SLC-off gaps themselves are already fill, which the QA_PIXEL bit 0 test above
     # rejects. Eroding one further pixel to drop the gap rims as well was measured 1.5-3.5x slower
     # over a 40-year series - a focal op has to fetch a neighbourhood for every ETM+ scene - which
