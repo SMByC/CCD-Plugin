@@ -152,6 +152,20 @@ Each numeric GitHub release includes `extlibs.zip`, built with the latest compat
 `requirements.txt`. If automatic installation is not available, download that asset from the release matching the
 plugin version and extract its contents into an `extlibs` directory inside `CCD_Plugin`.
 
+### Releasing
+
+Before tagging a numeric release, update the versions in `metadata.txt` and `pyproject.toml` and finalize the
+`Unreleased` changelog. The release workflow builds and validates the plugin ZIP and `extlibs.zip` first. It uploads
+both to a GitHub draft before publishing it, then uploads the same plugin ZIP to the QGIS repository when credentials
+are configured. Reruns preserve completed public assets and upload only missing ones; replacements are limited to
+drafts. Empty `starter` records left by failed uploads are cleaned up before retrying. A QGIS publication failure
+leaves both GitHub assets available; retrying the failed QGIS job downloads the published ZIP instead of rebuilding
+or re-uploading the GitHub release. The manual Package workflow uses the same archive validation.
+
+An existing GitHub prerelease is packaged with `experimental=True` in the staged metadata. Its status is checked
+again before publication, including against the downloaded ZIP sent to QGIS, so a prerelease cannot silently be
+published there as non-experimental.
+
 ### Known issues
 
 > **Download plot as a png:**

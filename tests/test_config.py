@@ -265,6 +265,40 @@ class RestorePluginConfigTest(unittest.TestCase):
         self.assertNotIn("end_date", settings)
         self.assertIn("start_date: not applied without a valid end_date", self.log.call_args.args[0])
 
+    def test_malformed_field_types_are_skipped_in_lenient_mode(self):
+        from CCD_Plugin.core.plot import PlotStyle
+
+        invalid = {
+            "dataset": ["Landsat C2"],
+            "cloud_filter": {},
+            "band_or_index_to_plot": ["NIR"],
+            "plot_style": {"theme": "dark"},
+            "num_obs": float("inf"),
+            "start_doy": float("-inf"),
+            "end_doy": float("nan"),
+        }
+        widget = _Widget(PlotStyle.LIGHT)
+
+        self.assertFalse(self._restore(widget, _complete_config(**invalid)))
+
+        applied = dict(widget.settings_set())
+        self.assertEqual(applied["latitude"], 5.0)
+        self.assertEqual(applied["longitude"], -75.0)
+        for field in invalid:
+            self.assertNotIn(field, applied)
+            self.assertIn(field, self.log.call_args.args[0])
+
+    def test_strict_restore_reports_all_malformed_fields_without_applying_any(self):
+        from CCD_Plugin.core.plot import PlotStyle
+
+        widget = _Widget(PlotStyle.LIGHT)
+        with self.assertRaises(ValueError) as raised:
+            self._restore(widget, _complete_config(dataset=[], num_obs=float("inf")), strict=True)
+
+        self.assertIn("dataset", str(raised.exception))
+        self.assertIn("num_obs", str(raised.exception))
+        self.assertEqual(widget.events, [])
+
     def test_yaml_restore_validates_strictly_and_repaints_only_when_needed(self):
         import yaml
         from CCD_Plugin.gui import CCD_Plugin_dockwidget as dockwidget_module

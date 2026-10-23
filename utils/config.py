@@ -95,14 +95,20 @@ def _number(value, control, integer=False):
     Checked here rather than left to the control, which clamps silently and so would run the
     computation with a parameter nobody asked for.
     """
-    if isinstance(value, bool) or not isinstance(value, Real) or (integer and int(value) != value):
+    if isinstance(value, bool) or not isinstance(value, Real):
         raise ValueError(f"{value!r} is not {'an integer' if integer else 'a number'}")
+    # Check the bounded range before converting: it also rejects NaN/infinity, and very large
+    # integers, without int(inf) or float(huge_integer) escaping the validation path.
     if not control.minimum() <= value <= control.maximum():
         raise ValueError(f"{value} is outside {control.minimum()}-{control.maximum()}")
+    if integer and int(value) != value:
+        raise ValueError(f"{value!r} is not an integer")
     return int(value) if integer else float(value)
 
 
 def _choice(value, choices, aliases=None):
+    if not isinstance(value, str):
+        raise ValueError(f"{value!r} is not a text choice")
     value = (aliases or {}).get(value, value)
     if value not in choices:
         raise ValueError(f"{value!r} is not one of {', '.join(choices)}")

@@ -48,10 +48,15 @@ jobs:
 
       - name: Stage plugin repository
         env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag }}
           STAGE_DIR: ${{ runner.temp }}/ccd-plugin-stage
         run: |
           set -euo pipefail
           python scripts/stage_plugin.py "$STAGE_DIR"
+          python scripts/publish_release.py prepare "$RELEASE_TAG" "$STAGE_DIR/CCD_Plugin/metadata.txt" \
+            --repository "$REPOSITORY"
           git -C "$STAGE_DIR" init
           git -C "$STAGE_DIR" config user.name "github-actions[bot]"
           git -C "$STAGE_DIR" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -66,12 +71,8 @@ jobs:
           set -euo pipefail
           cd "$STAGE_DIR"
           uvx --from qgis-plugin-ci==2.10.0 qgis-plugin-ci package "$RELEASE_TAG"
-          test -f "CCD_Plugin.$RELEASE_TAG.zip"
-          unzip -l "CCD_Plugin.$RELEASE_TAG.zip" | grep -q 'CCD_Plugin/resources.py'
-          if unzip -l "CCD_Plugin.$RELEASE_TAG.zip" | grep -Eq 'resources_rc|resources\.qrc|/tests/|__pycache__|\.pyc$'; then
-            echo "Plugin archive contains excluded files" >&2
-            exit 1
-          fi
+          python "$GITHUB_WORKSPACE/scripts/publish_release.py" check "$RELEASE_TAG" \
+            "CCD_Plugin.$RELEASE_TAG.zip" "$GITHUB_WORKSPACE/extlibs.zip"
           cp "CCD_Plugin.$RELEASE_TAG.zip" "$GITHUB_WORKSPACE/"
 
       - name: Upload package artifacts

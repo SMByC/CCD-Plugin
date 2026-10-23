@@ -27,6 +27,7 @@ import time
 import traceback
 import weakref
 from collections import OrderedDict
+from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar
@@ -61,7 +62,6 @@ from CCD_Plugin.core.ccd_process import (  # noqa: E402
     compute_ccd,
     correlated_detection_bands,
     ensure_earth_engine_initialized,
-    has_cached_results,
     lookup_result,
     make_cache_key,
     resolve_ccd_bands,
@@ -146,6 +146,8 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # off, and the next click edited the raster. QGIS' main canvas gets back the tool in use
         # when picking began, the one its toolbar shows checked.
         self.default_map_tools = {view: view.mapTool() for view in self.canvas} if canvas is not None else None
+        # Full snapshot of the last successfully displayed plot, including its band. A failed
+        # redraw keeps this snapshot, so Generate can retry the band still selected in the UI.
         self.last_config = None
         self.task = None
         # the indices the run in progress builds: a band switch it can serve does not restart it
@@ -371,21 +373,14 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             # exactly this plot is already on its way, and restarting it would only delay it
             return
 
-        # nothing but the plotted band changed since the last run, and that is redrawn from cache
-        if self.last_config and self.settings_unchanged(config):
-            if not self.plot_in_progress() and not self.plot_hidden:
-                # say so rather than returning silently, or the button just looks dead
-                self.show_message("These settings already produced the current plot, nothing to recompute.", duration=5)
-                # deliberately stays in pick mode: nothing was computed, so the user is most likely
-                # still picking and should not have the tool taken away
-                return
-            # A newer run is about to replace the plot these settings produced, or the plot was
-            # taken off the view (plot_hidden). Returning here let that run win over this, the
-            # latest request, or left the view empty, so draw this plot again.
-            if not self.draw_cached_plot(config):
-                self.start_ccd_task(config)
-        # settings a recent run already computed are drawn from the cache, not computed again
-        elif not self.draw_cached_plot(config):
+        if not self.plot_in_progress() and not self.plot_hidden and self.same_plot(self.last_config, config):
+            self.show_message("These settings already produced the current plot, nothing to recompute.", duration=5)
+            # Nothing was drawn, so leave pick mode active for another coordinate.
+            return
+
+        # Retry a failed band switch, restore a hidden plot, or supersede an older request.
+        # Computation settings alone do not prove that the requested band is on display.
+        if not self.draw_cached_plot(config):
             self.start_ccd_task(config)
 
         # after finish the process
@@ -410,7 +405,9 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     def settings_unchanged(self, config):
         """True when computation settings match the run that produced the current plot."""
-        return self.last_config == self.comparable_settings(config)
+        return self.last_config is not None and self.comparable_settings(self.last_config) == self.comparable_settings(
+            config
+        )
 
     @classmethod
     def same_plot(cls, config, other):
@@ -462,7 +459,8 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
     def compute_ccd(task, config):
         # here rather than before the task starts: the first initialization talks to Google and
         # would freeze QGIS while it does
-        ensure_earth_engine_initialized()
+        if not ensure_earth_engine_initialized(cancelled=task.isCanceled):
+            return None
         computed = compute_ccd(
             coords=(config["lon"], config["lat"]),
             date_range=(config["start_date"], config["end_date"]),
@@ -596,7 +594,9 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     @wait_process
     def repaint_plot(self):
-        if not has_cached_results() and not self.plot_in_progress():
+        # The shared cache can be evicted or cleared by another dock. This dock's last plot still
+        # tells us whether a band change should recompute; only an unused dock has nothing to redraw.
+        if self.last_config is None and not self.plot_in_progress():
             return
 
         # get the current configuration of the plugin
@@ -622,8 +622,8 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # Comparing with the plot on display while another run is in progress let that run land
         # later with the band it was started with.
         in_progress = self.plot_in_progress() and self.pending_config is not None
-        last_run = self.comparable_settings(self.pending_config) if in_progress else self.last_config
-        if last_run and last_run == self.comparable_settings(config):
+        last_run = self.pending_config if in_progress else self.last_config
+        if last_run is not None and self.comparable_settings(last_run) == self.comparable_settings(config):
             # Only the plotted band differs, and it needs an index the last run did not build,
             # so recompute rather than making the user press Generate for a band switch.
             self.start_ccd_task(config)
@@ -759,7 +759,7 @@ class CCD_PluginDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             return
         if resolution:
             self.plot_files.commit(pending_path)
-            self.last_config = self.comparable_settings(self.pending_config)
+            self.last_config = deepcopy(self.pending_config)
             self.plot_hidden = False
             self.crash_reload = None
             return

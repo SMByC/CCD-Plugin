@@ -23,6 +23,7 @@ with the collaboration of Daniel Moraes <moraesd90@gmail.com>
 
 import concurrent.futures
 import threading
+import time
 from collections import OrderedDict
 from collections.abc import Callable
 from typing import Final
@@ -53,6 +54,10 @@ CCDC_DATE_FORMAT: Final = 2
 CANCEL_POLL_SECONDS: Final = 0.1
 # Name of the threads running Earth Engine requests, so they can be told apart from QGIS' own
 REQUEST_THREAD_NAME: Final = "ccd-earth-engine-request"
+INITIALIZE_THREAD_NAME: Final = "ccd-earth-engine-initialize"
+# Each task waits at most this long for client initialization. A timed-out/cancelled waiter does
+# not reset shared client state or launch another initialization over one still in progress.
+INITIALIZE_TIMEOUT_SECONDS: Final = 120.0
 
 # When each catalog starts, so an empty result can say whether the range was ever going to match.
 # Sentinel-2 is the one that catches people out: the plugin's date range starts in 2000 by default,
@@ -87,6 +92,7 @@ class CCDComputationError(Exception):
 
 
 _INITIALIZE_LOCK = threading.Lock()
+_INITIALIZE_FUTURE: concurrent.futures.Future | None = None
 
 
 def _earth_engine_ready(ee) -> bool:
@@ -102,27 +108,57 @@ def _earth_engine_ready(ee) -> bool:
     return initialized and hasattr(getattr(ee, "Algorithms", None), "TemporalSegmentation")
 
 
-def ensure_earth_engine_initialized():
-    """Initialize the Earth Engine client once, leaving a ready one untouched.
+def _initialize_earth_engine(ee):
+    """Initialize the shared client without retaining a QGIS task or its cancellation callback."""
+    try:
+        ee.Initialize()
+    except Exception:
+        # Drop half-initialized state before allowing another attempt.
+        reset = getattr(ee, "Reset", None)
+        if callable(reset):
+            reset()
+        raise
+
+
+def ensure_earth_engine_initialized(
+    cancelled: Callable[[], bool] = lambda: False, *, timeout: float = INITIALIZE_TIMEOUT_SECONDS
+) -> bool:
+    """Wait for a ready Earth Engine client; False if the calling task is cancelled.
 
     The client state is process-wide and shared with the Earth Engine plugin, which initializes it
-    with the user's project. Initializing again on every run cost a credential refresh and two
-    discovery-document downloads, and reset whatever that plugin had configured.
+    with the user's project. Concurrent callers share one daemon initializer, with a short lock
+    around registration only. Network I/O never holds a QGIS task or that lock after cancellation.
+    A cancelled or timed-out caller leaves the initializer running for other callers; once it
+    fails, a later run can retry. Only the caller's thread ever consults `cancelled`.
     """
     import ee
 
+    global _INITIALIZE_FUTURE
+    if cancelled():
+        return False
+    deadline = time.monotonic() + timeout
     with _INITIALIZE_LOCK:
-        if _earth_engine_ready(ee):
-            return
-        try:
-            ee.Initialize()
-        except Exception:
-            # drop the half-initialized state, so the next run initializes again instead of
-            # finding the client flagged initialized and failing for the rest of the session
-            reset = getattr(ee, "Reset", None)
-            if callable(reset):
-                reset()
-            raise
+        # An in-flight initialization takes precedence over the client's early initialized flag.
+        if _INITIALIZE_FUTURE is None or _INITIALIZE_FUTURE.done():
+            if _earth_engine_ready(ee):
+                return not cancelled()
+            _INITIALIZE_FUTURE = _in_background(lambda: _initialize_earth_engine(ee), name=INITIALIZE_THREAD_NAME)
+        future = _INITIALIZE_FUTURE
+
+    while not future.done():
+        if cancelled():
+            return False
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise CCDComputationError(
+                "Earth Engine initialization timed out. Check your connection and Earth Engine authentication, "
+                "then try again."
+            )
+        concurrent.futures.wait([future], timeout=min(CANCEL_POLL_SECONDS, remaining))
+    if cancelled():
+        return False
+    future.result()  # report initialization errors to every caller waiting for this attempt
+    return True
 
 
 def correlated_detection_bands(breakpoint_bands, tmask_bands=None):
@@ -302,7 +338,7 @@ def _build_timeseries(region_rows):
     return {name: _column_array(name, column) for name, column in pairs}
 
 
-def _in_background(function: Callable[[], object]) -> concurrent.futures.Future:
+def _in_background(function: Callable[[], object], *, name: str = REQUEST_THREAD_NAME) -> concurrent.futures.Future:
     """Run one Earth Engine request on its own daemon thread.
 
     Daemon, because a cancelled run leaves its requests behind and getInfo can neither be
@@ -320,7 +356,7 @@ def _in_background(function: Callable[[], object]) -> concurrent.futures.Future:
         except BaseException as error:
             future.set_exception(error)
 
-    threading.Thread(target=run, name=REQUEST_THREAD_NAME, daemon=True).start()
+    threading.Thread(target=run, name=name, daemon=True).start()
     return future
 
 

@@ -15,8 +15,12 @@ repository=https://github.com/SMByC/CCD-Plugin
 
 changelog=
     Unreleased:
+    - Generate retries failed band switches, and band switching recomputes after the shared cache is cleared
+    - Earth Engine initialization is shared across runs, with cancellable waits and a timeout
+    - Malformed configuration field types are reported without aborting lenient project restores
+    - Validate release archives before publication; preserve public assets on retries and retain prerelease experimental status for QGIS
     - The plotted band or index no longer changes the CCDC fit: NDVI/NBR used to mask dark observations out of every band's model
-    - Observations need all six bands within 0 < SR <= 1, the rule of Zhu's CCDC, LCMAP pyccd and gee-ccdc-tools; ~1% fewer Landsat observations, mostly over water
+    - Observations need all six bands within 0 < SR <= 1, the rule of Zhu's CCDC, LCMAP pyccd and gee-ccdc-tools; about one percent fewer Landsat observations, mostly over water
     - The end date is now included in the series
     - Coordinates keep 7 decimals, and a click past the antimeridian is wrapped instead of clamped to 180
     - With a day-of-year window the model is drawn only inside it, and the header counts the dates CCDC fits

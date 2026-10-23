@@ -7,6 +7,16 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class Qgis4MigrationContractTest(unittest.TestCase):
+    def test_every_metadata_value_is_readable_by_qgis(self):
+        # QGIS uses ConfigParser.get(), including interpolation, when reading each field.
+        metadata = configparser.ConfigParser()
+        metadata.read(PROJECT_ROOT / "metadata.txt", encoding="utf-8")
+
+        for section in metadata.sections():
+            for key in metadata[section]:
+                with self.subTest(section=section, key=key):
+                    self.assertIsInstance(metadata.get(section, key), str)
+
     def test_metadata_targets_qgis4_only(self):
         # Given: the plugin repository metadata.
         metadata = configparser.ConfigParser()

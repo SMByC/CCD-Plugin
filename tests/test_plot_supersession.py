@@ -282,6 +282,83 @@ class PlotSupersessionSmokeTest(unittest.TestCase):
         self.assertShowing(-71.0)
         self.dock.start_ccd_task.assert_called_once()
 
+    def test_generate_retries_a_failed_band_switch(self):
+        from CCD_Plugin.core import ccd_process
+
+        self.plot(-70.0)
+        with patch.object(ccd_process, "get_gee_data_landsat", side_effect=RuntimeError("temporary service error")):
+            self.dock.band_or_index_to_plot.setCurrentText("NDVI")
+            self.settle()
+        self.assertShowing(-70.0, "SWIR1")
+        self.assertEqual(self.dock.band_or_index_to_plot.currentText(), "NDVI")
+
+        self.dock.start_ccd_task.reset_mock()
+        self.dock.new_plot()
+        self.settle()
+
+        self.assertShowing(-70.0, "NDVI")
+        self.dock.start_ccd_task.assert_called_once()
+
+    def test_generate_retries_a_failed_cached_redraw(self):
+        from CCD_Plugin.gui import CCD_Plugin_dockwidget as dock_module
+
+        self.plot(-70.0)
+        with patch.object(dock_module, "generate_plot", side_effect=OSError("disk full")):
+            self.dock.band_or_index_to_plot.setCurrentText("NIR")
+        self.assertShowing(-70.0, "SWIR1")
+
+        self.dock.start_ccd_task.reset_mock()
+        self.dock.new_plot()
+        self.settle()
+
+        self.assertShowing(-70.0, "NIR")
+        self.dock.start_ccd_task.assert_not_called()
+
+    def test_band_switch_recomputes_after_the_shared_cache_is_cleared(self):
+        from CCD_Plugin.core.ccd_process import clear_results_cache
+
+        self.plot(-70.0)
+        clear_results_cache()  # another plugin instance unloading clears this shared cache
+        self.dock.start_ccd_task.reset_mock()
+
+        self.dock.band_or_index_to_plot.setCurrentText("NIR")
+        self.settle()
+
+        self.assertShowing(-70.0, "NIR")
+        self.dock.start_ccd_task.assert_called_once()
+
+    def test_generate_keeps_an_identical_confirmed_plot(self):
+        self.plot(-70.0)
+        active = self.dock.plot_files.active_path
+        self.dock.start_ccd_task.reset_mock()
+
+        self.dock.new_plot()
+
+        self.assertEqual(self.dock.plot_files.active_path, active)
+        self.dock.start_ccd_task.assert_not_called()
+
+    def test_cancelling_during_initialization_releases_the_qgis_task(self):
+        entered, release = threading.Event(), threading.Event()
+
+        def initialize():
+            entered.set()
+            if not release.wait(timeout=SILENT_REQUEST_TIMEOUT_SECONDS):
+                raise TimeoutError("initialization was never released")
+
+        self.earth_engine.module.Initialize = initialize
+        self.launch(-70.0)
+        try:
+            self.wait_until(entered.is_set, "initialization never started")
+            self.dock.dispose()
+            self.wait_until(
+                lambda: self.task_manager.countActiveTasks() == 0,
+                "cancelled initialization kept its QGIS task",
+                timeout=PROMPT_CANCEL_TIMEOUT_SECONDS,
+            )
+        finally:
+            release.set()
+            self.drain()
+
 
 if __name__ == "__main__":
     unittest.main()

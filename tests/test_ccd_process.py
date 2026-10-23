@@ -125,6 +125,37 @@ class CorrelatedDetectionBandsTest(unittest.TestCase):
 class EarthEngineInitializationTest(unittest.TestCase):
     ALGORITHMS = types.SimpleNamespace(TemporalSegmentation=types.SimpleNamespace(Ccdc=None))
 
+    def setUp(self):
+        patcher = patch.object(ccd_process_module, "_INITIALIZE_FUTURE", None)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.releases = []
+        self.addCleanup(self.finish_initialization)
+
+    def finish_initialization(self):
+        for event in self.releases:
+            event.set()
+        future = ccd_process_module._INITIALIZE_FUTURE
+        if future is not None:
+            future.exception(timeout=5)
+
+    def blocked_client(self):
+        entered, release, ready = threading.Event(), threading.Event(), threading.Event()
+        self.releases.append(release)
+        threads = []
+
+        def initialize():
+            threads.append(threading.current_thread())
+            entered.set()
+            if not release.wait(timeout=10):
+                raise TimeoutError("test did not release initialization")
+            ready.set()
+
+        client = self.fake_ee(
+            types.SimpleNamespace(is_initialized=ready.is_set), initialize=Mock(side_effect=initialize)
+        )
+        return client, entered, release, threads
+
     def fake_ee(self, data, algorithms=ALGORITHMS, initialize=None):
         return types.SimpleNamespace(Initialize=initialize or Mock(), Reset=Mock(), data=data, Algorithms=algorithms)
 
@@ -163,6 +194,82 @@ class EarthEngineInitializationTest(unittest.TestCase):
         with self.assertRaisesRegex(OSError, "offline"):
             self.initialize(failing)
         failing.Reset.assert_called_once_with()
+
+    def test_an_already_cancelled_run_does_not_initialize(self):
+        client = self.fake_ee(types.SimpleNamespace(is_initialized=lambda: False))
+        with patch.dict(sys.modules, {"ee": client}):
+            self.assertFalse(ensure_earth_engine_initialized(cancelled=lambda: True))
+        client.Initialize.assert_not_called()
+
+    def test_concurrent_callers_share_initialization_and_cancel_independently(self):
+        client, entered, release, threads = self.blocked_client()
+        cancel_first, second_waiting = threading.Event(), threading.Event()
+        caller_threads = []
+
+        def first_cancelled():
+            caller_threads.append(threading.current_thread())
+            return cancel_first.is_set()
+
+        second_checks = 0
+
+        def second_cancelled():
+            nonlocal second_checks
+            second_checks += 1
+            if second_checks > 1:  # past registration, now waiting on the shared initializer
+                second_waiting.set()
+            caller_threads.append(threading.current_thread())
+            return False
+
+        with patch.dict(sys.modules, {"ee": client}), concurrent.futures.ThreadPoolExecutor(max_workers=2) as callers:
+            try:
+                first = callers.submit(ensure_earth_engine_initialized, first_cancelled)
+                self.assertTrue(entered.wait(timeout=2))
+                second = callers.submit(ensure_earth_engine_initialized, second_cancelled)
+                self.assertTrue(second_waiting.wait(timeout=2))
+                cancel_first.set()
+
+                self.assertFalse(first.result(timeout=2))
+                self.assertFalse(second.done())
+                client.Initialize.assert_called_once_with()
+                client.Reset.assert_not_called()
+                self.assertTrue(threads[0].daemon)
+
+                release.set()
+                self.assertTrue(second.result(timeout=2))
+                self.assertNotIn(threads[0], caller_threads)
+                self.assertTrue(ensure_earth_engine_initialized())
+                client.Initialize.assert_called_once_with()
+            finally:
+                release.set()
+
+    def test_a_timed_out_wait_keeps_a_single_initializer_and_can_recover(self):
+        client, entered, release, threads = self.blocked_client()
+        with patch.dict(sys.modules, {"ee": client}):
+            started = time.monotonic()
+            for _ in range(2):
+                with self.assertRaisesRegex(CCDComputationError, "initialization timed out"):
+                    ensure_earth_engine_initialized(timeout=0.02)
+            self.assertLess(time.monotonic() - started, 2)
+            self.assertTrue(entered.is_set())
+            self.assertTrue(threads[0].daemon)
+            client.Initialize.assert_called_once_with()
+            client.Reset.assert_not_called()
+
+            release.set()
+            self.assertTrue(ensure_earth_engine_initialized(timeout=2))
+            client.Initialize.assert_called_once_with()
+
+    def test_a_failed_attempt_can_be_retried(self):
+        client = self.fake_ee(
+            types.SimpleNamespace(is_initialized=lambda: False),
+            initialize=Mock(side_effect=[OSError("offline"), None]),
+        )
+        with patch.dict(sys.modules, {"ee": client}):
+            with self.assertRaisesRegex(OSError, "offline"):
+                ensure_earth_engine_initialized()
+            self.assertTrue(ensure_earth_engine_initialized())
+        self.assertEqual(client.Initialize.call_count, 2)
+        client.Reset.assert_called_once_with()
 
 
 class ComputedIndicesTest(unittest.TestCase):
