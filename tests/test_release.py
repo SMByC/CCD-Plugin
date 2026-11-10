@@ -6,6 +6,7 @@ import tempfile
 import types
 import unittest
 import zipfile
+from itertools import pairwise
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -14,10 +15,27 @@ from scripts.publish_release import publish_github, publish_qgis, validate_archi
 
 VERSION = "26.10"
 REPOSITORY = "SMByC/CCD-Plugin"
+UPLOAD_URL = f"https://uploads.github.com/repos/{REPOSITORY}/releases/42/assets"
 METADATA = (
     f"[general]\nname=CCD-Plugin\nversion={VERSION}\nqgisMinimumVersion=4.0\n"
     "changelog=Release notes\nexperimental=False\n"
 )
+
+
+def api_fields(arguments):
+    """Parse the gh api field forms used by release publication."""
+    fields = {}
+    for flag, argument in pairwise(arguments):
+        if flag not in ("-f", "-F"):
+            continue
+        key, value = argument.split("=", 1)
+        if flag == "-F":
+            if value.startswith("@"):
+                value = Path(value[1:]).read_bytes().decode("utf-8")
+            elif value in ("true", "false"):
+                value = json.loads(value)
+        fields[key] = value
+    return fields
 
 
 class GithubService:
@@ -36,56 +54,81 @@ class GithubService:
         self.fail_archive = None
         self.fail_lookup = False
         self.fail_publish = False
+        self.hide_tag_lookup = False
+        self.tag_exists = True
+        self.create_payload = None
+        self.tag_name = VERSION
+
+    def release(self):
+        return {
+            "id": 42,
+            "tag_name": self.tag_name,
+            "draft": self.draft,
+            "prerelease": self.prerelease,
+            "upload_url": UPLOAD_URL + "{?name,label}",
+            "assets": [
+                {
+                    "id": self.asset_ids.setdefault(name, len(self.asset_ids) + 1),
+                    "name": name,
+                    "state": "starter" if name in self.starters else "uploaded",
+                    "size": len(contents),
+                }
+                for name, contents in self.assets.items()
+            ],
+        }
 
     def run(self, command, **kwargs):
         self.calls.append(command)
         args = command[1:]
         output = ""
         if args[:2] == ["api", f"repos/{REPOSITORY}/releases"]:
-            if self.fail_lookup:
-                raise subprocess.CalledProcessError(1, command)
-            if self.exists:
-                release = {
-                    "id": 42,
-                    "draft": self.draft,
-                    "prerelease": self.prerelease,
-                    "assets": [
-                        {
-                            "id": self.asset_ids.setdefault(name, len(self.asset_ids) + 1),
-                            "name": name,
-                            "state": "starter" if name in self.starters else "uploaded",
-                            "size": len(contents),
-                        }
-                        for name, contents in self.assets.items()
-                    ],
-                }
-                output = "42\n" if args[-1].endswith("| .id") else json.dumps(release) + "\n"
-        elif args[:2] == ["release", "create"]:
+            # Listing is deliberately unsupported: finding a draft must not depend on it.
+            if "POST" not in args:
+                raise AssertionError(command)
             if self.exists:
                 raise subprocess.CalledProcessError(1, command)
             self.exists = True
             self.creations += 1
-            self.draft = "--draft" in args
-        elif args[:2] == ["release", "upload"]:
-            for filename in args[3 : args.index("--repo")]:
-                path = Path(filename)
-                if path.name in self.assets and "--clobber" not in args:
-                    raise subprocess.CalledProcessError(1, command)
-                # gh deletes a clobbered asset before upload. A failed upload can leave an empty
-                # starter record, not the completed replacement the old fake incorrectly stored.
-                self.assets.pop(path.name, None)
-                self.starters.discard(path.name)
-                if self.fail_upload or self.fail_archive == path.name:
-                    self.assets[path.name] = b""
-                    self.starters.add(path.name)
-                    raise subprocess.CalledProcessError(1, command)
-                self.assets[path.name] = path.read_bytes()
+            self.create_payload = api_fields(args)
+            self.tag_name = self.create_payload["tag_name"]
+            self.draft = self.create_payload.get("draft", False)
+            output = json.dumps(self.release())
+        elif args[:2] == ["api", "graphql"]:
+            if self.fail_lookup:
+                raise subprocess.CalledProcessError(1, command)
+            fields = api_fields(args)
+            if f"{fields['owner']}/{fields['name']}" != REPOSITORY:
+                raise subprocess.CalledProcessError(1, command)
+            release = None
+            if self.exists and not self.hide_tag_lookup and fields["tag"] == self.tag_name:
+                release = {"databaseId": 42}
+            output = json.dumps({"data": {"repository": {"release": release}}})
+        elif args[:2] == ["api", f"repos/{REPOSITORY}/git/ref/tags/{VERSION}"]:
+            if not self.tag_exists:
+                raise subprocess.CalledProcessError(1, command)
+        elif args[:2] == ["api", UPLOAD_URL]:
+            path = Path(args[args.index("--input") + 1])
+            if not self.exists or path.name in self.assets:
+                raise subprocess.CalledProcessError(1, command)
+            if "POST" not in args or f"name={path.name}" not in args or "Content-Type: application/zip" not in args:
+                raise AssertionError(command)
+            # A failed upload can leave an empty starter record, not a completed replacement.
+            if self.fail_upload or self.fail_archive == path.name:
+                self.assets[path.name] = b""
+                self.starters.add(path.name)
+                raise subprocess.CalledProcessError(1, command)
+            self.assets[path.name] = path.read_bytes()
         elif args[0] == "api" and args[1].startswith(f"repos/{REPOSITORY}/releases/assets/"):
             self.assert_delete(command)
         elif args[:2] == ["api", f"repos/{REPOSITORY}/releases/42"]:
-            if self.fail_publish:
-                raise subprocess.CalledProcessError(1, command)
-            self.draft = False
+            if "PATCH" in args:
+                if self.fail_publish:
+                    raise subprocess.CalledProcessError(1, command)
+                self.draft = False
+            else:
+                if not self.exists:
+                    raise subprocess.CalledProcessError(1, command)
+                output = json.dumps(self.release())
         else:
             raise AssertionError(f"Unexpected gh invocation: {command}")
         return subprocess.CompletedProcess(command, 0, stdout=output)
@@ -175,14 +218,40 @@ class ReleaseTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Dependency archive"):
             validate_archives(VERSION, self.plugin, self.extlibs)
 
+    def test_new_draft_publishes_from_the_creation_response_with_the_expected_payload(self):
+        self.github.hide_tag_lookup = True
+        self.notes = self.root / "release notes.md"
+        notes = '## Publicación\r\n\r\n- 100%: {owner}/{repo} on {branch}; "quotes" and \\paths.\r\n'
+        self.notes.write_bytes(notes.encode("utf-8"))
+
+        self.publish()
+
+        self.assertEqual(
+            self.github.create_payload,
+            {"tag_name": VERSION, "name": VERSION, "draft": True, "body": notes},
+        )
+        self.assert_complete_release()
+        self.assertEqual(self.github.creations, 1)
+
+    def test_missing_remote_tag_cannot_create_a_release(self):
+        self.github.tag_exists = False
+
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.publish()
+
+        self.assertFalse(self.github.exists)
+        self.assertEqual(self.github.creations, 0)
+        self.assertEqual(self.github.assets, {})
+
     def test_partial_upload_stays_draft_and_retry_replaces_existing_assets(self):
-        self.github.fail_upload = True
+        self.github.fail_archive = self.plugin.name
         with self.assertRaises(subprocess.CalledProcessError):
             self.publish()
         self.assertTrue(self.github.draft)
-        self.assertEqual(set(self.github.assets), {self.extlibs.name})
+        self.assertEqual(self.github.assets[self.extlibs.name], self.extlibs.read_bytes())
+        self.assertEqual(self.github.assets[self.plugin.name], b"")
 
-        self.github.fail_upload = False
+        self.github.fail_archive = None
         self.publish()
 
         self.assertEqual(self.github.creations, 1)
@@ -218,7 +287,7 @@ class ReleaseTest(unittest.TestCase):
 
         self.assertEqual(self.github.assets, published)
         self.assertFalse(self.github.draft)
-        self.assertFalse(any(call[1:3] == ["release", "upload"] for call in self.github.calls))
+        self.assertFalse(any(call[1:3] == ["api", UPLOAD_URL] for call in self.github.calls))
         self.assertFalse(any("PATCH" in call or "DELETE" in call for call in self.github.calls))
 
     def test_public_rerun_preserves_published_bytes_when_a_rebuild_differs(self):
@@ -242,8 +311,8 @@ class ReleaseTest(unittest.TestCase):
         self.publish()
 
         self.assert_complete_release()
-        uploads = [call for call in self.github.calls if call[1:3] == ["release", "upload"]]
-        self.assertTrue(all("--clobber" not in call for call in uploads))
+        uploads = [call for call in self.github.calls if call[1:3] == ["api", UPLOAD_URL]]
+        self.assertEqual(len(uploads), 2)
         self.assertTrue(all(str(self.plugin) not in call for call in uploads))
 
     def test_github_prerelease_rejects_a_nonexperimental_plugin_archive(self):
@@ -298,7 +367,7 @@ class ReleaseTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "incomplete"):
             self.publish()
         self.assertEqual(self.github.assets, {self.extlibs.name: b""})
-        self.assertFalse(any("DELETE" in call or "--clobber" in call for call in self.github.calls))
+        self.assertFalse(any("DELETE" in call for call in self.github.calls))
 
     def test_lookup_failure_does_not_create_another_release(self):
         self.github.fail_lookup = True
@@ -330,7 +399,12 @@ class ReleaseTest(unittest.TestCase):
         self.password_upload.assert_called_once_with(
             username="test-user", password="test-password", archive=str(self.plugin)
         )
-        self.assertTrue(all(call[1:3] == ["api", f"repos/{REPOSITORY}/releases"] for call in self.github.calls))
+        self.assertTrue(
+            all(
+                call[1:3] in (["api", "graphql"], ["api", f"repos/{REPOSITORY}/releases/42"]) and "PATCH" not in call
+                for call in self.github.calls
+            )
+        )
 
     def test_qgis_refuses_a_stable_archive_after_the_release_is_marked_prerelease(self):
         self.publish()

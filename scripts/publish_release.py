@@ -13,6 +13,7 @@ import re
 import subprocess
 import zipfile
 from pathlib import Path
+from urllib.parse import quote
 
 
 def _plugin_metadata(archive: zipfile.ZipFile) -> configparser.ConfigParser:
@@ -56,15 +57,29 @@ def _gh(*arguments: str) -> str:
 
 
 def _release(repository: str, version: str) -> dict | None:
-    # Listing releases also finds drafts, unlike the REST endpoint for a published tag.
-    matches = _gh(
-        "api",
-        f"repos/{repository}/releases",
-        "--paginate",
-        "--jq",
-        f".[] | select(.tag_name == {json.dumps(version)}) | @json",
-    ).splitlines()
-    return json.loads(matches[0]) if matches else None
+    # GraphQL resolves pending draft tags too, without depending on the release list's freshness.
+    # Fetch the REST representation by ID for its asset IDs and upload URL.
+    owner, name = repository.split("/", 1)
+    response = json.loads(
+        _gh(
+            "api",
+            "graphql",
+            "-f",
+            "query=query($owner: String!, $name: String!, $tag: String!) {"
+            " repository(owner: $owner, name: $name) { release(tagName: $tag) { databaseId } }"
+            "}",
+            "-f",
+            f"owner={owner}",
+            "-f",
+            f"name={name}",
+            "-f",
+            f"tag={version}",
+        )
+    )
+    release = response["data"]["repository"]["release"]
+    if release is None:
+        return None
+    return json.loads(_gh("api", f"repos/{repository}/releases/{release['databaseId']}"))
 
 
 def prepare_metadata(repository: str, version: str, path: Path) -> None:
@@ -100,40 +115,57 @@ def publish_github(repository: str, version: str, plugin: Path, extlibs: Path, n
         raise FileNotFoundError(notes)
     release = _release(repository, version)
     if release is None:
-        _gh(
-            "release",
-            "create",
-            version,
-            "--repo",
-            repository,
-            "--draft",
-            "--verify-tag",
-            "--title",
-            version,
-            "--notes-file",
-            str(notes),
+        # Preserve --verify-tag: never let release creation implicitly create a remote tag.
+        _gh("api", f"repos/{repository}/git/ref/tags/{quote(version, safe='')}")
+        # The release list can omit a just-created draft. Keep the POST response instead of
+        # rediscovering the release, and use its ID/upload URL throughout publication.
+        release = json.loads(
+            _gh(
+                "api",
+                f"repos/{repository}/releases",
+                "--method",
+                "POST",
+                "-f",
+                f"tag_name={version}",
+                "-f",
+                f"name={version}",
+                "-F",
+                "draft=true",
+                "-F",
+                f"body=@{notes}",
+            )
         )
-        release = _release(repository, version)
-        if release is None:
-            raise RuntimeError("The newly created GitHub draft could not be found")
 
     # Recheck after packaging: the owner may have changed the release's prerelease flag.
     _check_release_metadata(version, plugin, release)
     assets = {asset["name"]: asset for asset in release["assets"]}
+    upload_url = release["upload_url"].split("{", 1)[0]
     for archive in (extlibs, plugin):
         asset = assets.get(archive.name)
-        if not release["draft"] and asset is not None:
-            if asset["state"] == "uploaded" and asset["size"] > 0:
-                # A rebuild can resolve newer dependencies. The already-published bytes are the
-                # release; never delete them just because someone reran the workflow.
-                continue
-            if asset["state"] == "starter" and asset["size"] == 0:
-                # GitHub documents these empty placeholders after failed uploads as safe to delete.
-                _gh("api", f"repos/{repository}/releases/assets/{asset['id']}", "--method", "DELETE")
-            else:
-                raise ValueError(f"Published asset {archive.name} is incomplete; refusing to replace it automatically")
-        options = ["--clobber"] if release["draft"] else []
-        _gh("release", "upload", version, str(archive), "--repo", repository, *options)
+        if asset is not None:
+            if not release["draft"]:
+                if asset["state"] == "uploaded" and asset["size"] > 0:
+                    # A rebuild can resolve newer dependencies. The already-published bytes are the
+                    # release; never delete them just because someone reran the workflow.
+                    continue
+                if asset["state"] != "starter" or asset["size"] != 0:
+                    raise ValueError(
+                        f"Published asset {archive.name} is incomplete; refusing to replace it automatically"
+                    )
+            # Replace draft assets, or the empty starter records GitHub leaves after failed uploads.
+            _gh("api", f"repos/{repository}/releases/assets/{asset['id']}", "--method", "DELETE")
+        _gh(
+            "api",
+            upload_url,
+            "--method",
+            "POST",
+            "--header",
+            "Content-Type: application/zip",
+            "--input",
+            str(archive),
+            "-f",
+            f"name={archive.name}",
+        )
     if release["draft"]:
         _gh("api", f"repos/{repository}/releases/{release['id']}", "--method", "PATCH", "-F", "draft=false")
 

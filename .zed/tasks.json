@@ -1,0 +1,31 @@
+[
+  {
+    "label": "Run tests",
+    "command": "make test",
+    "args": []
+  },
+  {
+    "label": "Release a new version in GitHub",
+    "command": "echo 'Release CCD-Plugin' && echo '==================' && echo '' && echo 'Recent tags:' && git tag --sort=-creatordate | head -5 && echo '' && read -p 'Enter version to release: ' VERSION && [[ \"$VERSION\" =~ ^[0-9]+\\.[0-9]+(\\.[0-9]+)?$ ]] || { echo 'Invalid version. Use major.minor or major.minor.patch.' >&2; exit 1; } && git diff --quiet && git diff --cached --quiet || { echo 'Commit or stash all tracked changes before creating a release tag.' >&2; exit 1; } && METADATA_VERSION=$(git show HEAD:metadata.txt | sed -n 's/^version=//p') && [ \"$METADATA_VERSION\" = \"$VERSION\" ] || { echo \"Committed metadata.txt version '$METADATA_VERSION' does not match '$VERSION'.\" >&2; exit 1; } && git tag \"$VERSION\" && git push origin \"$VERSION\" && echo '' && echo \"Tag '$VERSION' pushed. GitHub Actions will create the plugin and extlibs release.\"",
+    "use_new_terminal": true,
+    "reveal": "always",
+    "shell": {
+      "with_arguments": {
+        "program": "/bin/bash",
+        "args": ["-i"]
+      }
+    }
+  },
+  {
+    "label": "Build local plugin package",
+    "command": "echo 'Build CCD-Plugin package' && echo '========================' && echo '' && LATEST=$(git tag --sort=-creatordate | head -1) && read -p \"Enter version (latest tag: $LATEST): \" VERSION && [[ \"$VERSION\" =~ ^[0-9]+\\.[0-9]+(\\.[0-9]+)?$ ]] || { echo 'Invalid version. Use major.minor or major.minor.patch.' >&2; exit 1; } && STAGE_DIR=$(mktemp -d /tmp/ccd-plugin-stage.XXXXXX) && trap 'rm -rf \"$STAGE_DIR\"' EXIT && python scripts/stage_plugin.py \"$STAGE_DIR\" && git -C \"$STAGE_DIR\" init -q && git -C \"$STAGE_DIR\" config user.name zed-package && git -C \"$STAGE_DIR\" config user.email zed-package@example.invalid && git -C \"$STAGE_DIR\" add . && git -C \"$STAGE_DIR\" commit -qm 'Stage local package' && cd \"$STAGE_DIR\" && uvx --from qgis-plugin-ci==2.10.0 qgis-plugin-ci package \"$VERSION\" --disable-submodule-update && cp \"CCD_Plugin.$VERSION.zip\" \"$ZED_WORKTREE_ROOT/\" && echo '' && echo \"Package created: CCD_Plugin.$VERSION.zip\"",
+    "use_new_terminal": true,
+    "reveal": "always",
+    "shell": {
+      "with_arguments": {
+        "program": "/bin/bash",
+        "args": ["-i"]
+      }
+    }
+  }
+]
