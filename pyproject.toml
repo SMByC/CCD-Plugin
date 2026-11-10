@@ -1,6 +1,6 @@
 [project]
 name = "CCD-Plugin"
-version = "26.8"
+version = "26.11"
 description = "Qgis plugin for Continuous Change Detection (CCDC) algorithm of a time series at a given coordinate"
 authors = [
     { name = "Xavier Corredor Llano, SMByC", email = "xavier.corredor.llano@gmail.com" },

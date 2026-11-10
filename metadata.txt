@@ -3,7 +3,7 @@ name=CCD-Plugin
 description=Plot a Landsat or Sentinel-2 time series at any coordinate and find its trends and breakpoints of change with the CCDC algorithm
 about=Pick a coordinate and the plugin pulls every clear Landsat (4, 5, 7, 8 and 9, Collection 2) or Sentinel-2 observation for that pixel out of Google Earth Engine, then runs the Continuous Change Detection (CCDC) algorithm over the series. CCDC fits a harmonic model to each stable period and reports a break only where several consecutive observations stop agreeing with it, so the plot shows the observations, one fitted curve per segment, and the dates the pixel changed. Bands and spectral indices, cloud masking, the seasonal window and the CCDC parameters are all configurable. Requires an active Google Earth Engine account and the Google Earth Engine plugin.
 
-version=26.8
+version=26.11
 qgisMinimumVersion=4.0
 
 author=Xavier Corredor Llano, SMByC
@@ -14,7 +14,7 @@ tracker=https://github.com/SMByC/CCD-Plugin/issues
 repository=https://github.com/SMByC/CCD-Plugin
 
 changelog=
-    Unreleased:
+    26.11:
     - Generate retries failed band switches, and band switching recomputes after the shared cache is cleared
     - Earth Engine initialization is shared across runs, with cancellable waits and a timeout
     - Malformed configuration field types are reported without aborting lenient project restores
